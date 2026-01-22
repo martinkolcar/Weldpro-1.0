@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeldPro - Prihlásenie</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            background: linear-gradient(135deg, #1a1f3a 0%, #0f1419 50%, #1a1f3a 100%);
+            position: relative;
+        }
+        
+        /* Animovaný gradient pozadie */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(102,126,234,0.1) 0%, transparent 70%);
+            animation: rotate 20s linear infinite;
+        }
+        
+        @keyframes rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .brand-logo {
+            position: fixed;
+            top: 50px;
+            left: 60px;
+            z-index: 100;
+            animation: fadeInDown 1s ease-out;
+        }
+        .brand-logo h1 {
+            font-size: 48px;
+            font-weight: 900;
+            color: white;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            letter-spacing: -2px;
+            margin-bottom: 5px;
+        }
+        .brand-logo .gradient-text {
+            background: linear-gradient(135deg, #fff 0%, #e0e7ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .brand-logo p {
+            font-size: 15px;
+            color: rgba(255,255,255,0.9);
+            font-weight: 500;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .login-box {
+            position: fixed;
+            right: 100px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 440px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(30px) saturate(180%);
+            border-radius: 28px;
+            padding: 55px;
+            box-shadow: 0 40px 100px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255, 255, 255, 0.6) inset;
+            z-index: 100;
+            animation: slideInRight 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateY(-50%) translateX(100px) scale(0.9); }
+            to { opacity: 1; transform: translateY(-50%) translateX(0) scale(1); }
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .login-header h2 {
+            font-size: 28px;
+            color: #111827;
+            font-weight: 800;
+            margin-bottom: 8px;
+            letter-spacing: -0.8px;
+        }
+        .login-header p {
+            font-size: 14px;
+            color: #6b7280;
+            font-weight: 500;
+        }
+        .input-group {
+            margin-bottom: 24px;
+        }
+        .input-group label {
+            display: block;
+            font-size: 13px;
+            color: #374151;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        .input-wrapper {
+            position: relative;
+        }
+        .input-icon {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 20px;
+            transition: all 0.3s;
+            z-index: 2;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 18px 20px 18px 56px;
+            border: 2px solid #e5e7eb;
+            border-radius: 16px;
+            font-size: 15px;
+            transition: all 0.3s;
+            font-family: inherit;
+            background: #f9fafb;
+            color: #111827;
+            font-weight: 500;
+        }
+        .input-group input::placeholder {
+            color: #9ca3af;
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+            transform: translateY(-1px);
+        }
+        .input-group input:focus ~ .input-icon {
+            color: #667eea;
+            transform: translateY(-50%) scale(1.1);
+        }
+        .remember-forgot {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            font-size: 13px;
+        }
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #6b7280;
+            cursor: pointer;
+            user-select: none;
+        }
+        .remember-me input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+        .forgot-password {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .forgot-password:hover {
+            color: #764ba2;
+        }
+        .login-button {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+        }
+        .login-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 32px rgba(102, 126, 234, 0.5);
+        }
+        .login-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .error-message {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 13px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .error-message.show {
+            display: block;
+            animation: shake 0.5s;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+        @media (max-width: 768px) {
+            .brand-logo { left: 30px; top: 30px; }
+            .brand-logo h1 { font-size: 32px; }
+            .login-box { right: 20px; left: 20px; width: auto; padding: 40px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="brand-logo">
+        <h1><span class="gradient-text">WeldPro</span></h1>
+        <p>MANAGEMENT</p>
+    </div>
+    <div class="login-box">
+        <div class="login-header">
+            <h2>Vitajte späť</h2>
+            <p>Prihláste sa do systému</p>
+        </div>
+        <div class="error-message" id="errorMessage"></div>
+        <form onsubmit="return handleLogin(event);">
+            <div class="input-group">
+                <label for="username">Používateľské meno</label>
+                <div class="input-wrapper">
+                    <input type="text" id="username" placeholder="Zadajte vaše meno" required autocomplete="username">
+                    <span class="input-icon">👤</span>
+                </div>
+            </div>
+            <div class="input-group">
+                <label for="password">Heslo</label>
+                <div class="input-wrapper">
+                    <input type="password" id="password" placeholder="Zadajte vaše heslo" required autocomplete="current-password">
+                    <span class="input-icon">🔒</span>
+                </div>
+            </div>
+            <div class="remember-forgot">
+                <label class="remember-me">
+                    <input type="checkbox" id="rememberMe">
+                    <span>Zapamätať si ma</span>
+                </label>
+                <a href="#" class="forgot-password" onclick="event.preventDefault(); alert('Kontaktujte administrátora.');">
+                    Zabudli ste heslo?
+                </a>
+            </div>
+            <button type="submit" class="login-button" id="loginButton">
+                PRIHLÁSIŤ SA
+            </button>
+        </form>
+    </div>
+
+    <script>
+        const ADMIN_USER = {
+            username: 'admin',
+            password: 'weldpro2025',
+            role: 'admin',
+            displayName: 'Administrátor'
+        };
+
+        // Auto-login check
+        window.addEventListener('load', function() {
+            const session = localStorage.getItem('weldpro_session') || sessionStorage.getItem('weldpro_session');
+            if (session) {
+                window.location.href = 'app.html';
+            }
+        });
+
+        function handleLogin(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const rememberMe = document.getElementById('rememberMe').checked;
+            const errorMsg = document.getElementById('errorMessage');
+            const loginButton = document.getElementById('loginButton');
+
+            errorMsg.classList.remove('show');
+            loginButton.disabled = true;
+            loginButton.textContent = 'OVERUJEM...';
+
+            setTimeout(function() {
+                if (username === ADMIN_USER.username && password === ADMIN_USER.password) {
+                    loginSuccess(ADMIN_USER, rememberMe);
+                } else {
+                    showError('❌ Nesprávne meno alebo heslo!');
+                    loginButton.disabled = false;
+                    loginButton.textContent = 'PRIHLÁSIŤ SA';
+                }
+            }, 500);
+            
+            return false;
+        }
+
+        function loginSuccess(userData, remember) {
+            const sessionData = {
+                username: userData.username,
+                role: userData.role,
+                displayName: userData.displayName,
+                permissions: getDefaultPermissions(userData.role),
+                loginTime: new Date().toISOString()
+            };
+
+            if (remember) {
+                localStorage.setItem('weldpro_session', JSON.stringify(sessionData));
+            } else {
+                sessionStorage.setItem('weldpro_session', JSON.stringify(sessionData));
+            }
+
+            setTimeout(function() {
+                window.location.href = 'app.html';
+            }, 400);
+        }
+
+        function showError(message) {
+            const errorMsg = document.getElementById('errorMessage');
+            errorMsg.textContent = message;
+            errorMsg.classList.add('show');
+        }
+
+        function getDefaultPermissions(role) {
+            return {
+                canEdit: true, canDelete: true, canExport: true, canAdmin: true,
+                canViewAll: true, canCreateProjects: true, canMarkWelds: true,
+                canMarkCrosses: true, canManageSpools: true
+            };
+        }
+    </script>
+</body>
+</html>
