@@ -4684,10 +4684,13 @@ return;
 var html='';
 packages.forEach(function(packageId){
 var pkg=exportData.packages[packageId];
-html+='<label style="display:block;padding:8px;margin-bottom:5px;background:white;border:1px solid #ddd;border-radius:4px;cursor:pointer">';
+html+='<div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:white;border:1px solid #ddd;border-radius:4px">';
+html+='<label style="flex:1;cursor:pointer">';
 html+='<input type="checkbox" class="delivery-package-checkbox" data-package-id="'+packageId+'" onchange="updateTotalSpoolsCount()"> ';
 html+='<strong>Balík #'+pkg.packageNum+'</strong> ('+pkg.spools.length+' spoolov) - '+pkg.created;
 html+='</label>';
+html+='<button onclick="deletePackage(\''+packageId+'\')" style="background:#ef4444;color:white;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">🗑️</button>';
+html+='</div>';
 });
 
 list.innerHTML=html;
@@ -10224,17 +10227,30 @@ const listEl=document.getElementById('offlineProjectsList');
 listEl.innerHTML='<div style="text-align:center;color:#999;padding:40px">⏳ Načítavam...</div>';
 try{
 if(!db){listEl.innerHTML='<div style="text-align:center;color:#ef4444;padding:40px">❌ Firebase nedostupný</div>';return;}
-const snapshot=await db.collection('library').orderBy('uploadedAt','desc').get();
-if(snapshot.empty){listEl.innerHTML='<div style="text-align:center;color:#999;padding:40px">📭 Žiadne projekty</div>';return;}
+const snapshot=await db.collection('projects').orderBy('date','desc').get();
+if(snapshot.empty){listEl.innerHTML='<div style="text-align:center;color:#999;padding:40px">📭 Žiadne projekty v knižnici</div>';return;}
 let html='';
-snapshot.forEach(doc=>{
-const project=doc.data();
-const size=JSON.stringify(project).length;
+for(const doc of snapshot.docs){
+const meta=doc.data();
+const size=meta.size||0;
 const isDownloaded=localStorage.getItem('offline_project_'+doc.id)!==null;
-html+=`<div class="offline-project-item" data-id="${doc.id}" data-size="${size}" style="background:${isDownloaded?'#d1fae5':'white'};border:2px solid ${isDownloaded?'#10b981':'#e5e7eb'};border-radius:8px;padding:15px;margin-bottom:12px;cursor:pointer" onclick="toggleProjectSelection('${doc.id}')"><div style="display:flex;align-items:center;gap:15px"><input type="checkbox" class="project-checkbox" data-id="${doc.id}" onclick="event.stopPropagation();toggleProjectSelection('${doc.id}')" style="width:20px;height:20px;cursor:pointer"><div style="flex:1"><div style="font-weight:700;font-size:15px;color:#333">${project.projectName||doc.id}${isDownloaded?' <span style="background:#10b981;color:white;padding:2px 8px;border-radius:4px;font-size:11px">✅</span>':''}</div><div style="font-size:12px;color:#666">${project.partName||''} • ${(size/1024).toFixed(1)} KB</div></div></div></div>`;
-});
+html+=`<div class="offline-project-item" data-id="${doc.id}" data-size="${size}" style="background:${isDownloaded?'#d1fae5':'white'};border:2px solid ${isDownloaded?'#10b981':'#e5e7eb'};border-radius:8px;padding:15px;margin-bottom:12px;cursor:pointer" onclick="toggleProjectSelection('${doc.id}')"><div style="display:flex;align-items:center;gap:15px"><input type="checkbox" class="project-checkbox" data-id="${doc.id}" onclick="event.stopPropagation();toggleProjectSelection('${doc.id}')" style="width:20px;height:20px;cursor:pointer"><div style="flex:1"><div style="font-weight:700;font-size:15px;color:#333">${meta.name||doc.id}${isDownloaded?' <span style="background:#10b981;color:white;padding:2px 8px;border-radius:4px;font-size:11px">✅</span>':''}</div><div style="font-size:12px;color:#666">${(size/1024).toFixed(1)} KB • ${meta.date?new Date(meta.date).toLocaleDateString('sk-SK'):''}</div></div></div></div>`;
+}
 listEl.innerHTML=html;
-}catch(error){console.error(error);listEl.innerHTML='<div style="text-align:center;color:#ef4444;padding:40px">❌</div>';}
+const usedSpace=getUsedLocalStorage();
+const totalSpace=15*1024*1024;
+const availableSpace=totalSpace-usedSpace;
+document.getElementById('availableSpace').textContent=(availableSpace/1024/1024).toFixed(1)+' MB';
+}catch(error){console.error(error);listEl.innerHTML='<div style="text-align:center;color:#ef4444;padding:40px">❌ '+error.message+'</div>';}
+}
+function getUsedLocalStorage(){
+let total=0;
+for(let key in localStorage){
+if(localStorage.hasOwnProperty(key)){
+total+=localStorage[key].length+key.length;
+}
+}
+return total;
 }
 function toggleProjectSelection(projectId){
 const checkbox=document.querySelector(`.project-checkbox[data-id="${projectId}"]`);
@@ -10285,17 +10301,16 @@ let downloaded=0;
 for(const projectId of selectedProjects){
 try{
 btn.textContent=`⏳ Sťahujem... (${downloaded+1}/${selectedProjects.size})`;
-const doc=await db.collection('library').doc(projectId).get();
-if(doc.exists){
-localStorage.setItem('offline_project_'+projectId,JSON.stringify({id:projectId,data:doc.data(),downloadedAt:new Date().toISOString()}));
+const projectData=await downloadProjectFromFirebase(projectId);
+localStorage.setItem('offline_project_'+projectId,JSON.stringify({id:projectId,data:projectData,downloadedAt:new Date().toISOString()}));
 downloaded++;
 const item=document.querySelector(`.offline-project-item[data-id="${projectId}"]`);
 if(item){item.style.background='#d1fae5';item.style.borderColor='#10b981';}
-}
-await new Promise(r=>setTimeout(r,200));
-}catch(error){console.error(error);}
+await new Promise(r=>setTimeout(r,300));
+}catch(error){console.error('❌ Chyba pri sťahovaní:',projectId,error);}
 }
 btn.disabled=false;
+btn.textContent=`⬇️ Stiahnuť (0)`;
 selectedProjects.clear();
 deselectAllProjects();
 showNotification(`✅ ${downloaded} projektov stiahnutých!`,'success');
@@ -10456,7 +10471,7 @@ function logout() {
 <span id="selectedSize" style="margin-left:10px;color:#999">(0 KB)</span>
 </div>
 <div style="font-size:12px;color:#999">
-Voľné: <span id="availableSpace">~10 MB</span>
+Voľné: <span id="availableSpace">~15 MB</span>
 </div>
 </div>
 <div style="display:flex;gap:10px;margin-bottom:10px">
