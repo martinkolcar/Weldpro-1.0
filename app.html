@@ -120,6 +120,61 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 .ribbon-group{display:flex;gap:4px;padding-right:12px;border-right:1px solid #D0D0D0;align-items:center}
 .ribbon-group:last-child{border-right:none}
 .toolbar-main{display:flex;gap:6px;padding:6px 12px;background:#F0F0F0;border-bottom:1px solid #D0D0D0;align-items:center}
+@keyframes pulse {
+0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+50% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+}
+#chatFloatingBtn:hover {
+transform: scale(1.1);
+box-shadow: 0 12px 32px rgba(102,126,234,0.5);
+}
+.chat-user-item {
+padding: 12px;
+border-radius: 8px;
+cursor: pointer;
+margin-bottom: 8px;
+transition: all 0.2s;
+background: white;
+border: 2px solid #e5e7eb;
+}
+.chat-user-item:hover {
+background: #f3f4f6;
+border-color: #667eea;
+}
+.chat-user-item.active {
+background: linear-gradient(135deg, #667eea, #764ba2);
+color: white;
+border-color: #667eea;
+}
+.chat-message {
+margin-bottom: 15px;
+display: flex;
+gap: 10px;
+}
+.chat-message.own {
+flex-direction: row-reverse;
+}
+.chat-bubble {
+max-width: 70%;
+padding: 12px 16px;
+border-radius: 16px;
+font-size: 14px;
+line-height: 1.4;
+}
+.chat-bubble.own {
+background: linear-gradient(135deg, #667eea, #764ba2);
+color: white;
+border-bottom-right-radius: 4px;
+}
+.chat-bubble.other {
+background: #f3f4f6;
+color: #1f2937;
+border-bottom-left-radius: 4px;
+}
+.new-chat-user-item:hover {
+background: #f3f4f6 !important;
+border-color: #667eea !important;
+}
 </style>
 <!-- QR Scanner Library -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -157,8 +212,12 @@ var jsPDF = window.jspdf.jsPDF;
     if (userData.role === 'admin') {
       window.addEventListener('DOMContentLoaded', function() {
         const adminBtn = document.getElementById('adminBtn');
+        const adminChatHistoryBtn = document.getElementById('adminChatHistoryBtn');
         if (adminBtn) {
           adminBtn.style.display = 'inline-block';
+        }
+        if (adminChatHistoryBtn) {
+          adminChatHistoryBtn.style.display = 'inline-block';
         }
       });
     }
@@ -282,10 +341,22 @@ async function listProjectsFromFirebase() {
 <button onclick="openMTO()" id="mtobtn" disabled>📊 MTO</button>
 <button onclick="saveProject()" id="saveproj" disabled>💾 Projekt</button>
 <button onclick="saveToLibrary()" id="savetolibrary" disabled style="background:#10b981;color:white">☁️ Do knižnice</button>
+<button onclick="openOfflinePackageModal()" style="background:#f59e0b;color:white">📦 Offline balík</button>
 <button onclick="document.getElementById('loadproj').click()" id="loadprojbtn" disabled>📂 Načítať</button>
 <button onclick="savePDF()" id="savepdf" disabled>📄 PDF</button>
 <button onclick="cl()" id="cl" disabled>🗑️ Zmazať</button>
 <button onclick="openAdminPanel()" id="adminBtn" style="background:#8b5cf6;color:white;margin-left:10px;display:none">⚙️ ADMIN</button>
+<button onclick="openAdminChatHistory()" id="adminChatHistoryBtn" style="background:#667eea;color:white;margin-left:5px;display:none">📜 Chat história</button>
+<button onclick="toggleNotificationsPanel()" id="notificationsBtn" style="position:relative;background:transparent;border:2px solid #e5e7eb;color:#6b7280;margin-left:10px;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:18px">
+🔔
+<span id="notificationsBadge" style="display:none;position:absolute;top:-5px;right:-5px;background:#ef4444;color:white;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:700;line-height:20px;text-align:center"></span>
+</button>
+<div id="offlineIndicator" style="display:inline-flex;align-items:center;gap:8px;margin-left:10px;padding:8px 16px;background:#10b981;color:white;border-radius:6px;font-weight:600;font-size:13px">
+<span id="connectionStatus">🟢 Online</span>
+<span id="pendingSyncCount" style="display:none;background:rgba(255,255,255,0.3);padding:2px 8px;border-radius:4px;font-size:11px"></span>
+</div>
+<button onclick="showPendingChangesModal()" id="detailsBtn" style="display:none;background:#6366f1;color:white;margin-left:10px">📋 Detaily</button>
+<button onclick="syncOfflineData()" id="syncBtn" style="display:none;background:#f59e0b;color:white;margin-left:10px;animation:pulse 2s infinite">📤 Nahrať zmeny</button>
 <button onclick="logout()" style="background:#ef4444;color:white;margin-left:10px">🚪 Odhlásiť</button>
 </div>
 
@@ -474,6 +545,17 @@ async function listProjectsFromFirebase() {
 </div>
 </div>
 <input type="file" id="f" accept=".pdf,image/*" style="display:none">
+</div>
+
+<!-- NOTIFIKAČNÝ PANEL -->
+<div id="notificationsPanel" style="display:none;position:fixed;top:120px;right:20px;width:350px;max-height:500px;background:white;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.2);border:2px solid #e5e7eb;z-index:9999;overflow:hidden">
+<div style="padding:15px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;display:flex;justify-content:space-between;align-items:center">
+<h3 style="margin:0;font-size:16px">🔔 Aktívni používatelia</h3>
+<button onclick="toggleNotificationsPanel()" style="background:transparent;border:none;color:white;font-size:20px;cursor:pointer;padding:0">✕</button>
+</div>
+<div id="notificationsContent" style="max-height:400px;overflow-y:auto;padding:10px">
+<div style="text-align:center;color:#999;padding:20px">Načítavam...</div>
+</div>
 </div>
 
 <div class="main">
@@ -9128,8 +9210,203 @@ alert('❌ Chyba: '+error.message);
 }
 }
 
-function editUser(username){
-alert('⚠️ Úprava používateľa - zatiaľ nie je implementovaná.\n\nAk potrebuješ zmeniť údaje:\n1. Vymaž používateľa\n2. Vytvor ho znova s novými údajmi');
+async function editUser(username){
+const contentEl=document.getElementById('adminContent');
+contentEl.innerHTML='<div style="text-align:center;padding:40px">⏳ Načítavam...</div>';
+
+try{
+const doc=await db.collection('users').doc(username).get();
+if(!doc.exists){
+contentEl.innerHTML='<div style="text-align:center;color:#ef4444;padding:40px">❌ Používateľ nenájdený</div>';
+return;
+}
+
+const user=doc.data();
+
+contentEl.innerHTML=`
+<div style="max-width:700px;margin:0 auto">
+<div style="background:linear-gradient(135deg,#3b82f6,#2563eb);padding:30px;border-radius:12px;color:white;margin-bottom:30px">
+<h2 style="margin:0 0 10px 0;font-size:28px">✏️ Upraviť používateľa</h2>
+<div style="font-size:14px;opacity:0.9">@${username}</div>
+</div>
+
+<form onsubmit="saveUserEdit(event,'${username}')" style="background:white;padding:30px;border-radius:12px;border:2px solid #ddd">
+
+<div style="margin-bottom:20px">
+<label style="display:block;font-weight:600;margin-bottom:8px;color:#333">Celé meno *</label>
+<input type="text" id="editDisplayName" value="${user.displayName||''}" required style="width:100%;padding:12px;border:2px solid #ddd;border-radius:8px;font-size:14px">
+</div>
+
+<div style="margin-bottom:20px">
+<label style="display:block;font-weight:600;margin-bottom:8px;color:#333">Email</label>
+<input type="email" id="editEmail" value="${user.email||''}" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:8px;font-size:14px">
+</div>
+
+<div style="margin-bottom:20px">
+<label style="display:block;font-weight:600;margin-bottom:8px;color:#333">Rola *</label>
+<select id="editRole" required style="width:100%;padding:12px;border:2px solid #ddd;border-radius:8px;font-size:14px" onchange="updatePermissionsPreview(this.value)">
+<option value="technik" ${user.role==='technik'?'selected':''}>Technik</option>
+<option value="otk" ${user.role==='otk'?'selected':''}>OTK (kontrola)</option>
+<option value="iwt" ${user.role==='iwt'?'selected':''}>IWT (inšpektor)</option>
+<option value="predak" ${user.role==='predak'?'selected':''}>Predák</option>
+</select>
+</div>
+
+<div style="margin-bottom:20px">
+<label style="display:block;font-weight:600;margin-bottom:12px;color:#333">🔑 Oprávnenia</label>
+<div style="background:#f9fafb;padding:20px;border-radius:8px;border:2px solid #e5e7eb">
+
+<div style="display:grid;gap:12px">
+
+<label style="display:flex;align-items:center;padding:12px;background:white;border-radius:6px;cursor:pointer;border:2px solid #ddd">
+<input type="checkbox" id="perm_canEdit" ${user.permissions?.canEdit?'checked':''} style="width:20px;height:20px;margin-right:12px;cursor:pointer;accent-color:#3b82f6">
+<div>
+<strong style="display:block;color:#333">Upravovať projekty</strong>
+<small style="color:#666">Označovanie zvarov, pridávanie spoolov</small>
+</div>
+</label>
+
+<label style="display:flex;align-items:center;padding:12px;background:white;border-radius:6px;cursor:pointer;border:2px solid #ddd">
+<input type="checkbox" id="perm_canDelete" ${user.permissions?.canDelete?'checked':''} style="width:20px;height:20px;margin-right:12px;cursor:pointer;accent-color:#3b82f6">
+<div>
+<strong style="display:block;color:#333">Mazať zvary/projekty</strong>
+<small style="color:#666">Odstránenie označení a projektov</small>
+</div>
+</label>
+
+<label style="display:flex;align-items:center;padding:12px;background:white;border-radius:6px;cursor:pointer;border:2px solid #ddd">
+<input type="checkbox" id="perm_canExport" ${user.permissions?.canExport?'checked':''} style="width:20px;height:20px;margin-right:12px;cursor:pointer;accent-color:#3b82f6">
+<div>
+<strong style="display:block;color:#333">Exportovať PDF</strong>
+<small style="color:#666">Generovanie PDF výstupov</small>
+</div>
+</label>
+
+<label style="display:flex;align-items:center;padding:12px;background:white;border-radius:6px;cursor:pointer;border:2px solid #ddd">
+<input type="checkbox" id="perm_canCreateProjects" ${user.permissions?.canCreateProjects?'checked':''} style="width:20px;height:20px;margin-right:12px;cursor:pointer;accent-color:#3b82f6">
+<div>
+<strong style="display:block;color:#333">Vytvárať projekty</strong>
+<small style="color:#666">Nové projekty a izometrie</small>
+</div>
+</label>
+
+<label style="display:flex;align-items:center;padding:12px;background:white;border-radius:6px;cursor:pointer;border:2px solid #ddd">
+<input type="checkbox" id="perm_canMarkWelds" ${user.permissions?.canMarkWelds?'checked':''} style="width:20px;height:20px;margin-right:12px;cursor:pointer;accent-color:#3b82f6">
+<div>
+<strong style="display:block;color:#333">Označovať zvary (krúžky)</strong>
+<small style="color:#666">Pridávanie zvarových bodov</small>
+</div>
+</label>
+
+<label style="display:flex;align-items:center;padding:12px;background:white;border-radius:6px;cursor:pointer;border:2px solid #ddd">
+<input type="checkbox" id="perm_canMarkCrosses" ${user.permissions?.canMarkCrosses?'checked':''} style="width:20px;height:20px;margin-right:12px;cursor:pointer;accent-color:#3b82f6">
+<div>
+<strong style="display:block;color:#333">Označovať kontrolu (krížiky)</strong>
+<small style="color:#666">OTK značenie vykonanej kontroly</small>
+</div>
+</label>
+
+<label style="display:flex;align-items:center;padding:12px;background:white;border-radius:6px;cursor:pointer;border:2px solid #ddd">
+<input type="checkbox" id="perm_canManageSpools" ${user.permissions?.canManageSpools?'checked':''} style="width:20px;height:20px;margin-right:12px;cursor:pointer;accent-color:#3b82f6">
+<div>
+<strong style="display:block;color:#333">Spravovať spooly</strong>
+<small style="color:#666">Vytváranie a správa spoolov</small>
+</div>
+</label>
+
+<label style="display:flex;align-items:center;padding:12px;background:white;border-radius:6px;cursor:pointer;border:2px solid #ddd">
+<input type="checkbox" id="perm_canViewAll" ${user.permissions?.canViewAll?'checked':''} style="width:20px;height:20px;margin-right:12px;cursor:pointer;accent-color:#3b82f6">
+<div>
+<strong style="display:block;color:#333">Zobrazovať všetky projekty</strong>
+<small style="color:#666">Prístup k všetkým projektom</small>
+</div>
+</label>
+
+</div>
+</div>
+</div>
+
+<div style="margin-bottom:25px">
+<label style="display:block;font-weight:600;margin-bottom:8px;color:#333">Nové heslo (ponechaj prázdne ak nemeníš)</label>
+<input type="password" id="editPassword" placeholder="Min. 6 znakov" minlength="6" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:8px;font-size:14px">
+<small style="color:#666">Zadaj len ak chceš zmeniť heslo</small>
+</div>
+
+<div style="display:flex;gap:10px">
+<button type="submit" style="flex:1;background:#3b82f6;color:white;border:none;padding:14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:15px">💾 Uložiť zmeny</button>
+<button type="button" onclick="showUserDetails('${username}')" style="flex:1;background:#6b7280;color:white;border:none;padding:14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:15px">Zrušiť</button>
+</div>
+
+</form>
+</div>
+`;
+
+}catch(error){
+console.error('❌ Chyba:',error);
+contentEl.innerHTML='<div style="text-align:center;color:#ef4444;padding:40px">❌ '+error.message+'</div>';
+}
+}
+
+async function saveUserEdit(event,username){
+event.preventDefault();
+
+const displayName=document.getElementById('editDisplayName').value.trim();
+const email=document.getElementById('editEmail').value.trim();
+const role=document.getElementById('editRole').value;
+const password=document.getElementById('editPassword').value;
+
+// Zbieranie oprávnení
+const permissions={
+canEdit:document.getElementById('perm_canEdit').checked,
+canDelete:document.getElementById('perm_canDelete').checked,
+canExport:document.getElementById('perm_canExport').checked,
+canCreateProjects:document.getElementById('perm_canCreateProjects').checked,
+canMarkWelds:document.getElementById('perm_canMarkWelds').checked,
+canMarkCrosses:document.getElementById('perm_canMarkCrosses').checked,
+canManageSpools:document.getElementById('perm_canManageSpools').checked,
+canViewAll:document.getElementById('perm_canViewAll').checked,
+canAdmin:false // Admin len pre hlavného admina
+};
+
+try{
+const updateData={
+displayName:displayName,
+email:email,
+role:role,
+permissions:permissions
+};
+
+// Ak je zadané nové heslo, aktualizuj ho
+if(password){
+updateData.password=password; // TODO: Hash this!
+}
+
+await db.collection('users').doc(username).update(updateData);
+
+alert('✅ Používateľ aktualizovaný!');
+loadAdminUsers();
+showUserDetails(username);
+
+console.log('✅ Používateľ upravený:',username);
+
+}catch(error){
+console.error('❌ Chyba:',error);
+alert('❌ Chyba: '+error.message);
+}
+}
+
+function updatePermissionsPreview(role){
+// Automaticky nastaviť checkboxy podľa role
+const defaultPerms=getDefaultPermissions(role);
+
+document.getElementById('perm_canEdit').checked=defaultPerms.canEdit;
+document.getElementById('perm_canDelete').checked=defaultPerms.canDelete;
+document.getElementById('perm_canExport').checked=defaultPerms.canExport;
+document.getElementById('perm_canCreateProjects').checked=defaultPerms.canCreateProjects;
+document.getElementById('perm_canMarkWelds').checked=defaultPerms.canMarkWelds;
+document.getElementById('perm_canMarkCrosses').checked=defaultPerms.canMarkCrosses;
+document.getElementById('perm_canManageSpools').checked=defaultPerms.canManageSpools;
+document.getElementById('perm_canViewAll').checked=defaultPerms.canViewAll;
 }
 
 function filterAdminUsers(){
@@ -9172,6 +9449,763 @@ canMarkCrosses:false,canManageSpools:true
 }
 };
 return permissions[role]||permissions.iwt;
+}
+
+// 🔔 REAL-TIME NOTIFIKÁCIE A PRESENCE SYSTEM
+let activeSessions=[];
+let heartbeatInterval=null;
+
+// Toggle notifikačný panel
+function toggleNotificationsPanel(){
+const panel=document.getElementById('notificationsPanel');
+if(panel.style.display==='none'){
+panel.style.display='block';
+loadActiveSessions();
+}else{
+panel.style.display='none';
+}
+}
+
+// Načítaj aktívne sessions
+async function loadActiveSessions(){
+const content=document.getElementById('notificationsContent');
+content.innerHTML='<div style="text-align:center;color:#999;padding:20px">⏳ Načítavam...</div>';
+
+try{
+if(!db){
+content.innerHTML='<div style="text-align:center;color:#ef4444;padding:20px;font-size:13px">❌ Firebase nedostupný</div>';
+return;
+}
+
+const fiveMinutesAgo=new Date(Date.now()-5*60*1000);
+
+const snapshot=await db.collection('active_sessions')
+.where('lastActivity','>',firebase.firestore.Timestamp.fromDate(fiveMinutesAgo))
+.get();
+
+if(snapshot.empty){
+content.innerHTML='<div style="text-align:center;color:#999;padding:30px;font-size:13px">📭 Žiadni aktívni<br><small>V posledných 5 minútach</small></div>';
+updateNotificationsBadge(0);
+return;
+}
+
+activeSessions=[];
+let html='';
+
+snapshot.forEach(doc=>{
+const session=doc.data();
+if(doc.id!==window.currentUser?.username){
+activeSessions.push({id:doc.id,...session});
+
+const timeAgo=getTimeAgo(session.lastActivity.toDate());
+const isCurrentProject=session.project===projectsData.currentProject && session.part===projectsData.currentPart;
+
+html+=`
+<div style="background:${isCurrentProject?'#fef3c7':'#f9fafb'};border:2px solid ${isCurrentProject?'#f59e0b':'#e5e7eb'};border-radius:8px;padding:12px;margin-bottom:8px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+<span style="font-size:20px">🟢</span>
+<div style="flex:1">
+<div style="font-weight:700;font-size:14px;color:#333">${session.displayName||doc.id}</div>
+<div style="font-size:11px;color:#666">${timeAgo}</div>
+</div>
+</div>
+${session.project?`
+<div style="background:white;padding:8px;border-radius:4px;font-size:12px">
+<strong style="color:#667eea">📁 ${session.project}</strong>
+${session.part?' / '+session.part:''}
+</div>
+`:''}
+${session.status?`<div style="font-size:11px;color:#999;margin-top:5px">💬 ${session.status}</div>`:''}
+${isCurrentProject?'<div style="margin-top:8px;padding:6px;background:#fbbf24;color:#78350f;border-radius:4px;font-size:11px;font-weight:600;text-align:center">⚠️ V ROVNAKOM PROJEKTE!</div>':''}
+</div>
+`;
+}
+});
+
+content.innerHTML=html;
+updateNotificationsBadge(activeSessions.length);
+
+console.log('🔔 Aktívnych:',activeSessions.length);
+
+}catch(error){
+console.error('❌ Chyba pri načítaní sessions:',error);
+content.innerHTML='<div style="text-align:center;color:#ef4444;padding:20px;font-size:13px">❌ '+error.message+'</div>';
+}
+}
+
+// Aktualizuj badge count
+function updateNotificationsBadge(count){
+const badge=document.getElementById('notificationsBadge');
+if(count>0){
+badge.textContent=count;
+badge.style.display='block';
+}else{
+badge.style.display='none';
+}
+}
+
+// Time ago helper
+function getTimeAgo(date){
+const seconds=Math.floor((new Date()-date)/1000);
+if(seconds<60)return 'pred chvíľou';
+if(seconds<120)return 'pred minútou';
+if(seconds<3600)return 'pred '+Math.floor(seconds/60)+' min';
+if(seconds<7200)return 'pred hodinou';
+return 'pred '+Math.floor(seconds/3600)+' hod';
+}
+
+// Aktualizuj vlastnú session (heartbeat)
+async function updateMySession(){
+if(!db||!window.currentUser||!isOnline)return;
+
+try{
+await db.collection('active_sessions').doc(window.currentUser.username).set({
+username:window.currentUser.username,
+displayName:window.currentUser.displayName||window.currentUser.username,
+project:projectsData.currentProject||null,
+part:projectsData.currentPart||null,
+status:getMyCurrentStatus(),
+lastActivity:firebase.firestore.FieldValue.serverTimestamp(),
+browser:navigator.userAgent.split('(')[1]?.split(')')[0]||'Unknown'
+},{merge:true});
+
+console.log('💓 Heartbeat sent');
+}catch(error){
+console.error('❌ Heartbeat chyba:',error);
+}
+}
+
+// Získaj aktuálny status
+function getMyCurrentStatus(){
+// Zisti čo používateľ práve robí
+if(document.getElementById('weldlogbtn')?.disabled===false){
+return 'Prezerá Weld Log';
+}
+if(document.getElementById('mtobtn')?.disabled===false){
+return 'Prezerá MTO';
+}
+return 'Pracuje v projekte';
+}
+
+// Skontroluj konflikt pri načítaní projektu
+async function checkProjectConflict(){
+if(!db||!projectsData.currentProject)return;
+
+try{
+const snapshot=await db.collection('active_sessions')
+.where('project','==',projectsData.currentProject)
+.where('part','==',projectsData.currentPart)
+.get();
+
+const others=[];
+snapshot.forEach(doc=>{
+if(doc.id!==window.currentUser?.username){
+const session=doc.data();
+const timeAgo=new Date()-session.lastActivity.toDate();
+if(timeAgo<5*60*1000){ // Posledných 5 minút
+others.push(session);
+}
+}
+});
+
+if(others.length>0){
+const names=others.map(s=>s.displayName||s.username).join(', ');
+const result=confirm(`⚠️ VAROVANIE!\n\n${names} ${others.length===1?'pracuje':'pracujú'} na tomto projekte!\n\nChceš pokračovať?`);
+
+if(!result){
+// Zatvor projekt
+cl();
+return false;
+}
+}
+
+return true;
+
+}catch(error){
+console.error('❌ Chyba pri check conflict:',error);
+return true; // Pokračuj aj pri chybe
+}
+}
+
+// Štart heartbeat systému
+function startHeartbeat(){
+if(heartbeatInterval)clearInterval(heartbeatInterval);
+
+// Update hneď
+updateMySession();
+
+// Každých 30 sekúnd
+heartbeatInterval=setInterval(updateMySession,30000);
+
+// Pri zatvorení stránky vymaž session
+window.addEventListener('beforeunload',async function(){
+if(db&&window.currentUser){
+try{
+await db.collection('active_sessions').doc(window.currentUser.username).delete();
+}catch(e){
+console.error('Chyba pri cleanup:',e);
+}
+}
+});
+}
+
+// Štart heartbeat pri načítaní
+if(window.currentUser){
+startHeartbeat();
+
+// Refresh notifikácií každú minútu
+setInterval(()=>{
+if(document.getElementById('notificationsPanel').style.display==='block'){
+loadActiveSessions();
+}
+},60000);
+}
+
+// 📱 OFFLINE MODE + SYNCHRONIZÁCIA
+let isOnline=navigator.onLine;
+let pendingChanges=[];
+
+// Načítaj pending changes z localStorage
+function loadPendingChanges(){
+try{
+const stored=localStorage.getItem('weldpro_pending_sync');
+if(stored){
+pendingChanges=JSON.parse(stored);
+updateSyncBadge();
+}
+}catch(e){
+console.error('Chyba pri načítaní pending changes:',e);
+pendingChanges=[];
+}
+}
+
+// Ulož pending changes do localStorage
+function savePendingChanges(){
+try{
+localStorage.setItem('weldpro_pending_sync',JSON.stringify(pendingChanges));
+updateSyncBadge();
+}catch(e){
+console.error('Chyba pri ukladaní pending changes:',e);
+}
+}
+
+// Aktualizuj badge s počtom zmien
+function updateSyncBadge(){
+const badge=document.getElementById('pendingSyncCount');
+const syncBtn=document.getElementById('syncBtn');
+const detailsBtn=document.getElementById('detailsBtn');
+
+if(pendingChanges.length>0){
+badge.textContent=pendingChanges.length+' zmien';
+badge.style.display='inline-block';
+if(isOnline){
+syncBtn.style.display='inline-block';
+detailsBtn.style.display='inline-block';
+}else{
+syncBtn.style.display='none';
+detailsBtn.style.display='inline-block'; // Ukáž aj offline
+}
+}else{
+badge.style.display='none';
+syncBtn.style.display='none';
+detailsBtn.style.display='none';
+}
+}
+
+// Monitor online/offline status
+window.addEventListener('online',function(){
+isOnline=true;
+document.getElementById('connectionStatus').innerHTML='🟢 Online';
+document.getElementById('offlineIndicator').style.background='#10b981';
+console.log('✅ Pripojený k internetu');
+
+// Ukáž sync tlačidlo ak sú pending changes
+if(pendingChanges.length>0){
+document.getElementById('syncBtn').style.display='inline-block';
+showNotification('✅ Online! Môžeš teraz nahrať zmeny ('+pendingChanges.length+')','success');
+}
+});
+
+window.addEventListener('offline',function(){
+isOnline=false;
+document.getElementById('connectionStatus').innerHTML='🔴 Offline';
+document.getElementById('offlineIndicator').style.background='#ef4444';
+document.getElementById('syncBtn').style.display='none';
+console.log('⚠️ Odpojený od internetu');
+showNotification('⚠️ Offline režim - zmeny sa uložia lokálne','warning');
+});
+
+// Ulož zmenu do pending queue
+function addPendingChange(type,data){
+const change={
+id:Date.now()+'_'+Math.random().toString(36).substr(2,9),
+type:type, // 'project', 'weld', 'cross', 'delivery', 'package'
+data:data,
+timestamp:new Date().toISOString(),
+user:window.currentUser?.username||'unknown'
+};
+
+pendingChanges.push(change);
+savePendingChanges();
+
+console.log('💾 Zmena uložená lokálne:',type);
+showNotification('💾 Zmena uložená lokálne (offline)','info');
+}
+
+// Zobraz pending changes modal s detailami
+function showPendingChangesModal(){
+document.getElementById('pendingChangesModal').style.display='block';
+buildPendingChangesList();
+}
+
+function closePendingChanges(){
+document.getElementById('pendingChangesModal').style.display='none';
+}
+
+// Zobraz zoznam pending changes
+function buildPendingChangesList(){
+const listEl=document.getElementById('pendingChangesList');
+
+if(pendingChanges.length===0){
+listEl.innerHTML='<div style="text-align:center;color:#999;padding:60px"><div style="font-size:64px;margin-bottom:20px">✅</div><h3>Žiadne neuložené zmeny</h3><p>Všetko je synchronizované</p></div>';
+return;
+}
+
+let html='<div style="margin-bottom:15px;padding:15px;background:#fef3c7;border-radius:8px;border-left:4px solid #f59e0b">';
+html+='<strong style="font-size:16px">📊 Celkom: '+pendingChanges.length+' zmien</strong>';
+html+='<p style="margin:5px 0 0 0;font-size:13px;color:#666">Tieto zmeny budú nahrané na server pri synchronizácii</p>';
+html+='</div>';
+
+pendingChanges.forEach((change,index)=>{
+const statusColor=change.status==='uploading'?'#3b82f6':change.status==='success'?'#10b981':change.status==='failed'?'#ef4444':'#6b7280';
+const statusIcon=change.status==='uploading'?'⏳':change.status==='success'?'✅':change.status==='failed'?'❌':'⏸️';
+const statusText=change.status==='uploading'?'Nahrávam...':change.status==='success'?'Nahraté':change.status==='failed'?'Chyba':'Čaká';
+
+const typeNames={
+project:'Projekt',
+weld_update:'Aktualizácia zvarov',
+delivery:'Dodací list',
+package:'Balík',
+cross_update:'Označenie kontroly'
+};
+
+const typeName=typeNames[change.type]||change.type;
+const typeIcon=change.type==='project'?'📁':change.type==='weld_update'?'⭕':change.type==='delivery'?'🚚':change.type==='package'?'📦':'📝';
+
+html+=`
+<div class="pending-change-item" data-id="${change.id}" style="background:white;border:2px solid ${statusColor};border-radius:8px;padding:15px;margin-bottom:12px">
+<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">
+<div style="flex:1">
+<div style="font-weight:700;font-size:15px;color:#333;margin-bottom:5px">${typeIcon} ${typeName}</div>
+<div style="font-size:12px;color:#666">
+${change.data.projectName||change.data.id||''}
+</div>
+</div>
+<div style="background:${statusColor};color:white;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap">
+${statusIcon} ${statusText}
+</div>
+</div>
+<div style="font-size:11px;color:#999">
+📅 ${new Date(change.timestamp).toLocaleString('sk-SK')} • 👤 ${change.user}
+</div>
+${change.status==='failed'?'<div style="margin-top:10px;padding:10px;background:#fee2e2;border-radius:4px;font-size:12px;color:#991b1b">⚠️ '+change.error+'</div>':''}
+${change.status==='uploading'?'<div style="margin-top:10px;height:4px;background:#e5e7eb;border-radius:2px;overflow:hidden"><div style="height:100%;background:'+statusColor+';width:'+change.progress+'%;transition:width 0.3s"></div></div>':''}
+</div>
+`;
+});
+
+listEl.innerHTML=html;
+}
+
+// Synchronizuj všetky pending changes
+async function syncOfflineData(){
+if(!isOnline){
+alert('❌ Nemáš internet! Pripoj sa najprv.');
+return;
+}
+
+if(pendingChanges.length===0){
+alert('✅ Žiadne zmeny na nahratie!');
+return;
+}
+
+// Otvor modal s progress
+showPendingChangesModal();
+
+const totalChanges=pendingChanges.length;
+const syncBtn=document.getElementById('syncBtn');
+const syncFromModal=document.getElementById('syncFromModal');
+syncBtn.disabled=true;
+syncFromModal.disabled=true;
+syncBtn.textContent='⏳ Nahrávam...';
+syncFromModal.textContent='⏳ Nahrávam...';
+
+let successCount=0;
+let failCount=0;
+const failedChanges=[];
+
+for(let i=0;i<pendingChanges.length;i++){
+const change=pendingChanges[i];
+
+// Nastav status
+change.status='uploading';
+change.progress=0;
+buildPendingChangesList();
+
+try{
+// Simuluj progress
+for(let p=0;p<=100;p+=25){
+change.progress=p;
+buildPendingChangesList();
+await new Promise(r=>setTimeout(r,100));
+}
+
+await uploadChange(change);
+
+change.status='success';
+successCount++;
+buildPendingChangesList();
+
+syncBtn.textContent='⏳ Nahrávam... ('+successCount+'/'+totalChanges+')';
+syncFromModal.textContent='⏳ Nahrávam... ('+successCount+'/'+totalChanges+')';
+
+}catch(error){
+console.error('❌ Chyba pri sync:',change.type,error);
+change.status='failed';
+change.error=error.message||'Neznáma chyba';
+failCount++;
+failedChanges.push(change);
+buildPendingChangesList();
+}
+
+// Pauza medzi requestami
+await new Promise(r=>setTimeout(r,300));
+}
+
+// Ulož len failed changes
+pendingChanges=failedChanges.map(c=>{
+const clean={...c};
+delete clean.status;
+delete clean.progress;
+delete clean.error;
+return clean;
+});
+savePendingChanges();
+
+syncBtn.disabled=false;
+syncFromModal.disabled=false;
+syncBtn.textContent='📤 Nahrať zmeny';
+
+buildPendingChangesList();
+
+if(failCount===0){
+showNotification('✅ Všetky zmeny ('+successCount+') nahrané!','success');
+setTimeout(()=>closePendingChanges(),2000);
+}else{
+syncFromModal.textContent='🔄 Skúsiť znova';
+showNotification('⚠️ Nahrané: '+successCount+', Chyba: '+failCount,'warning');
+}
+
+console.log('📤 Sync hotový:',successCount,'úspešných,',failCount,'chýb');
+}
+
+// Nahraj jednu zmenu do Firebase
+async function uploadChange(change){
+if(!db){
+throw new Error('Firebase nedostupný');
+}
+
+switch(change.type){
+case 'project':
+await db.collection('library').doc(change.data.id).set(change.data);
+break;
+
+case 'delivery':
+await db.collection('delivery_notes').doc(change.data.id).set(change.data);
+break;
+
+case 'package':
+const exportDataRef=db.collection('export_data').doc('packages');
+await exportDataRef.set({
+[change.data.id]:change.data
+},{merge:true});
+break;
+
+case 'weld_update':
+// Aktualizuj projekt s novými zvarmi
+await db.collection('library').doc(change.data.projectId).update({
+welds:change.data.welds,
+lastModified:firebase.firestore.FieldValue.serverTimestamp()
+});
+break;
+
+default:
+console.warn('Unknown change type:',change.type);
+}
+
+console.log('✅ Uploaded:',change.type,change.id);
+}
+
+// Notifikačný systém
+function showNotification(message,type){
+const notification=document.createElement('div');
+notification.style.cssText=`
+position:fixed;
+top:20px;
+right:20px;
+padding:15px 20px;
+background:${type==='success'?'#10b981':type==='warning'?'#f59e0b':type==='error'?'#ef4444':'#3b82f6'};
+color:white;
+border-radius:8px;
+box-shadow:0 4px 12px rgba(0,0,0,0.3);
+z-index:100000;
+font-weight:600;
+animation:slideInRight 0.3s;
+`;
+notification.textContent=message;
+document.body.appendChild(notification);
+
+setTimeout(()=>{
+notification.style.animation='slideOutRight 0.3s';
+setTimeout(()=>notification.remove(),300);
+},3000);
+}
+
+// Style pre slide animácie
+const notifStyle=document.createElement('style');
+notifStyle.textContent=`
+@keyframes slideInRight {
+from { transform: translateX(400px); opacity: 0; }
+to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideOutRight {
+from { transform: translateX(0); opacity: 1; }
+to { transform: translateX(400px); opacity: 0; }
+}
+`;
+document.head.appendChild(notifStyle);
+
+// Inicializuj offline mode pri štarte
+loadPendingChanges();
+
+// Override save functions pre offline support
+const originalSaveProject=saveProject;
+saveProject=function(){
+if(!isOnline){
+// Ulož lokálne
+addPendingChange('project',{
+id:projectsData.currentProject+'_'+projectsData.currentPart,
+data:exportData,
+timestamp:new Date().toISOString()
+});
+alert('💾 Projekt uložený lokálne (offline)');
+}else{
+// Normálne uloženie
+originalSaveProject();
+}
+};
+
+// 💬 CHAT SYSTÉM - KONVERZÁCIE + SKUPINA
+let currentChatId=null;
+let currentChatType=null;
+let chatUnreadCount=0;
+let chatListeners=[];
+const GROUP_CHAT_ID='group_all';
+
+function toggleChatPanel(){
+const panel=document.getElementById('chatPanel');
+const btn=document.getElementById('chatFloatingBtn');
+if(panel.style.display==='none'||panel.style.display===''){
+panel.style.display='flex';
+btn.style.display='none';
+loadConversations();
+}else{
+panel.style.display='none';
+btn.style.display='block';
+}
+}
+
+async function loadConversations(){
+const listEl=document.getElementById('chatConversationsList');
+listEl.innerHTML='<div style="text-align:center;color:#999;font-size:12px;padding:20px">⏳</div>';
+try{
+if(!db){listEl.innerHTML='<div style="text-align:center;color:#ef4444;font-size:12px;padding:20px">❌</div>';return;}
+let html='';
+const groupUnread=await getUnreadCountForChat(GROUP_CHAT_ID);
+const groupSnapshot=await db.collection('chats').doc(GROUP_CHAT_ID).collection('messages').orderBy('timestamp','desc').limit(1).get();
+let groupLastMsg='Žiadne správy';
+let groupTime='';
+if(!groupSnapshot.empty){
+const lastMsg=groupSnapshot.docs[0].data();
+groupLastMsg=(lastMsg.fromName||lastMsg.from)+': '+(lastMsg.text.length>20?lastMsg.text.substring(0,20)+'...':lastMsg.text);
+groupTime=lastMsg.timestamp?getTimeAgo(lastMsg.timestamp.toDate()):'';
+}
+html+=`<div onclick="openGroupChat()" style="padding:12px;border-radius:8px;cursor:pointer;margin-bottom:8px;background:${currentChatId===GROUP_CHAT_ID?'linear-gradient(135deg,#667eea,#764ba2)':'white'};color:${currentChatId===GROUP_CHAT_ID?'white':'#333'};border:2px solid ${currentChatId===GROUP_CHAT_ID?'#667eea':'#e5e7eb'}"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">💬</span><div style="flex:1"><div style="font-weight:700;font-size:14px">VŠETCI (Skupina)</div><div style="font-size:11px;opacity:0.8">${groupLastMsg}</div>${groupTime?`<div style="font-size:10px;opacity:0.6;margin-top:2px">${groupTime}</div>`:''}</div>${groupUnread>0?`<span style="background:#ef4444;color:white;border-radius:50%;width:22px;height:22px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">${groupUnread}</span>`:''}</div></div>`;
+const chatsSnapshot=await db.collection('chats').where('participants','array-contains',window.currentUser.username).orderBy('lastTimestamp','desc').get();
+for(const chatDoc of chatsSnapshot.docs){
+if(chatDoc.id===GROUP_CHAT_ID)continue;
+const chat=chatDoc.data();
+const otherUser=chat.participants.find(p=>p!==window.currentUser.username);
+if(!otherUser)continue;
+const userDoc=await db.collection('users').doc(otherUser).get();
+const userData=userDoc.exists?userDoc.data():{};
+const isOnline=activeSessions.some(s=>s.id===otherUser);
+const unread=await getUnreadCountForChat(chatDoc.id);
+const lastMsg=chat.lastMessage?(chat.lastMessage.length>25?chat.lastMessage.substring(0,25)+'...':chat.lastMessage):'Začni konverzáciu';
+const timeAgo=chat.lastTimestamp?getTimeAgo(chat.lastTimestamp.toDate()):'';
+html+=`<div onclick="openPrivateChat('${chatDoc.id}','${otherUser}','${userData.displayName||otherUser}')" style="padding:12px;border-radius:8px;cursor:pointer;margin-bottom:8px;background:${currentChatId===chatDoc.id?'linear-gradient(135deg,#667eea,#764ba2)':'white'};color:${currentChatId===chatDoc.id?'white':'#333'};border:2px solid ${currentChatId===chatDoc.id?'#667eea':'#e5e7eb'}"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:16px">${isOnline?'🟢':'🔴'}</span><div style="flex:1"><div style="font-weight:700;font-size:14px">${userData.displayName||otherUser}</div><div style="font-size:11px;opacity:0.8">${lastMsg}</div>${timeAgo?`<div style="font-size:10px;opacity:0.6;margin-top:2px">${timeAgo}</div>`:''}</div>${unread>0?`<span style="background:#ef4444;color:white;border-radius:50%;width:22px;height:22px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">${unread}</span>`:''}</div></div>`;
+}
+listEl.innerHTML=html||'<div style="text-align:center;color:#999;padding:20px;font-size:12px">Žiadne chaty</div>';
+updateTotalUnreadBadge();
+}catch(error){console.error(error);listEl.innerHTML='<div style="text-align:center;color:#ef4444;font-size:12px;padding:20px">❌</div>';}
+}
+
+function openGroupChat(){
+currentChatId=GROUP_CHAT_ID;
+currentChatType='group';
+document.getElementById('chatMessageInput').disabled=false;
+document.getElementById('chatSendBtn').disabled=false;
+loadConversations();
+loadChatMessages(GROUP_CHAT_ID,'group');
+}
+
+function openPrivateChat(chatId,otherUser,displayName){
+currentChatId=chatId;
+currentChatType='private';
+document.getElementById('chatMessageInput').disabled=false;
+document.getElementById('chatSendBtn').disabled=false;
+loadConversations();
+loadChatMessages(chatId,'private');
+markChatAsRead(chatId);
+}
+
+async function loadChatMessages(chatId,type){
+const messagesEl=document.getElementById('chatMessagesArea');
+messagesEl.innerHTML='<div style="text-align:center;color:#999;padding:20px">⏳</div>';
+try{
+if(!db){messagesEl.innerHTML='<div style="text-align:center;color:#ef4444;padding:20px">❌</div>';return;}
+chatListeners.forEach(u=>u());
+chatListeners=[];
+const unsubscribe=db.collection('chats').doc(chatId).collection('messages').orderBy('timestamp','asc').onSnapshot(s=>displayChatMessages(s,type));
+chatListeners.push(unsubscribe);
+}catch(error){console.error(error);messagesEl.innerHTML='<div style="text-align:center;color:#ef4444;padding:20px">❌</div>';}
+}
+
+function displayChatMessages(snapshot,type){
+const messagesEl=document.getElementById('chatMessagesArea');
+if(snapshot.empty){messagesEl.innerHTML=`<div style="text-align:center;color:#999;padding:40px;font-size:13px"><div style="font-size:48px;margin-bottom:10px">💬</div><p>${type==='group'?'Skupina VŠETCI':'Súkromný chat'}<br>Začni konverzáciu!</p></div>`;return;}
+let html='';
+snapshot.forEach(doc=>{
+const msg=doc.data();
+const isOwn=msg.from===window.currentUser.username;
+const timeStr=msg.timestamp?new Date(msg.timestamp.toDate()).toLocaleTimeString('sk-SK',{hour:'2-digit',minute:'2-digit'}):'';
+if(type==='group'){
+html+=`<div style="margin-bottom:15px"><div style="max-width:75%"><div style="font-size:11px;font-weight:600;color:#667eea;margin-bottom:4px">${msg.fromName||msg.from}</div><div style="padding:12px 16px;border-radius:16px;background:#f3f4f6;color:#1f2937;font-size:14px;line-height:1.4"><div>${msg.text}</div><div style="font-size:10px;opacity:0.7;margin-top:4px">${timeStr}</div></div></div></div>`;
+}else{
+html+=`<div style="margin-bottom:15px;display:flex;gap:10px;${isOwn?'flex-direction:row-reverse':''}"><div style="max-width:70%;padding:12px 16px;border-radius:16px;font-size:14px;line-height:1.4;${isOwn?'background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-bottom-right-radius:4px':'background:#f3f4f6;color:#1f2937;border-bottom-left-radius:4px'}"><div>${msg.text}</div><div style="font-size:10px;opacity:0.7;margin-top:4px">${timeStr}</div></div></div>`;
+}
+});
+messagesEl.innerHTML=html;
+messagesEl.scrollTop=messagesEl.scrollHeight;
+}
+
+async function sendChatMessage(){
+const input=document.getElementById('chatMessageInput');
+const text=input.value.trim();
+if(!text||!currentChatId)return;
+try{
+const messageData={from:window.currentUser.username,fromName:window.currentUser.displayName||window.currentUser.username,text:text,timestamp:firebase.firestore.FieldValue.serverTimestamp(),read:false};
+if(currentChatType==='group'){
+await db.collection('chats').doc(GROUP_CHAT_ID).set({type:'group',lastMessage:text,lastTimestamp:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+await db.collection('chats').doc(GROUP_CHAT_ID).collection('messages').add(messageData);
+}else{
+await db.collection('chats').doc(currentChatId).set({type:'private',participants:currentChatId.split('_'),lastMessage:text,lastTimestamp:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+await db.collection('chats').doc(currentChatId).collection('messages').add(messageData);
+}
+input.value='';
+}catch(error){console.error(error);alert('❌ '+error.message);}
+}
+
+function showNewChatModal(){
+document.getElementById('newChatModal').style.display='block';
+loadNewChatUsers();
+}
+
+function closeNewChatModal(){
+document.getElementById('newChatModal').style.display='none';
+}
+
+async function loadNewChatUsers(){
+const listEl=document.getElementById('newChatUsersList');
+listEl.innerHTML='<div style="text-align:center;color:#999;padding:20px">⏳</div>';
+try{
+if(!db){listEl.innerHTML='<div style="text-align:center;color:#ef4444;padding:20px">❌</div>';return;}
+const snapshot=await db.collection('users').get();
+let html='';
+snapshot.forEach(doc=>{
+if(doc.id!==window.currentUser?.username){
+const user=doc.data();
+const isOnline=activeSessions.some(s=>s.id===doc.id);
+html+=`<div class="new-chat-user-item" onclick="createNewPrivateChat('${doc.id}','${user.displayName||doc.id}')" style="padding:12px;border-radius:8px;cursor:pointer;margin-bottom:8px;background:white;border:2px solid #e5e7eb"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:16px">${isOnline?'🟢':'🔴'}</span><div style="flex:1"><div style="font-weight:600;font-size:14px;color:#333">${user.displayName||doc.id}</div><div style="font-size:11px;color:#666">${user.role||''}</div></div></div></div>`;
+}
+});
+listEl.innerHTML=html;
+}catch(error){console.error(error);listEl.innerHTML='<div style="text-align:center;color:#ef4444;padding:20px">❌</div>';}
+}
+
+function filterNewChatUsers(){
+const searchText=document.getElementById('newChatSearch').value.toLowerCase();
+document.querySelectorAll('.new-chat-user-item').forEach(item=>{
+item.style.display=item.textContent.toLowerCase().includes(searchText)?'block':'none';
+});
+}
+
+function createNewPrivateChat(otherUser,displayName){
+const chatId=getChatId(window.currentUser.username,otherUser);
+closeNewChatModal();
+toggleChatPanel();
+setTimeout(()=>{toggleChatPanel();openPrivateChat(chatId,otherUser,displayName);},100);
+}
+
+function getChatId(user1,user2){
+return user1<user2?user1+'_'+user2:user2+'_'+user1;
+}
+
+async function getUnreadCountForChat(chatId){
+try{
+if(!db||!window.currentUser)return 0;
+const snapshot=await db.collection('chats').doc(chatId).collection('messages').where('from','!=',window.currentUser.username).where('read','==',false).get();
+return snapshot.size;
+}catch(error){return 0;}
+}
+
+async function markChatAsRead(chatId){
+try{
+const snapshot=await db.collection('chats').doc(chatId).collection('messages').where('from','!=',window.currentUser.username).where('read','==',false).get();
+snapshot.forEach(async doc=>await doc.ref.update({read:true}));
+updateTotalUnreadBadge();
+}catch(error){console.error(error);}
+}
+
+async function updateTotalUnreadBadge(){
+try{
+if(!db||!window.currentUser)return;
+let totalUnread=0;
+totalUnread+=await getUnreadCountForChat(GROUP_CHAT_ID);
+const chatsSnapshot=await db.collection('chats').where('participants','array-contains',window.currentUser.username).get();
+for(const chatDoc of chatsSnapshot.docs){
+if(chatDoc.id!==GROUP_CHAT_ID){
+totalUnread+=await getUnreadCountForChat(chatDoc.id);
+}
+}
+chatUnreadCount=totalUnread;
+const floatingBadge=document.getElementById('chatUnreadBadge');
+if(chatUnreadCount>0){floatingBadge.textContent=chatUnreadCount;floatingBadge.style.display='block';}else{floatingBadge.style.display='none';}
+}catch(error){console.error(error);}
+}
+if(window.currentUser){
+setInterval(updateUnreadCount,60000);
+updateUnreadCount();
 }
 
 // 🚪 LOGOUT funkcia
@@ -9221,6 +10255,28 @@ function logout() {
 </div>
 </div>
 
+<!-- MODAL: Pending Changes Details -->
+<div id="pendingChangesModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000" onclick="if(event.target.id==='pendingChangesModal')closePendingChanges()">
+<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.4);width:90%;max-width:900px;height:85%;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+<div style="padding:25px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center">
+<div>
+<h2 style="margin:0;color:white;font-size:24px">📋 Neuložené zmeny</h2>
+<p style="margin:5px 0 0 0;color:rgba(255,255,255,0.9);font-size:14px">Tieto zmeny sa nahrá pri synchronizácii</p>
+</div>
+<button onclick="closePendingChanges()" style="background:transparent;border:none;font-size:32px;cursor:pointer;color:white;padding:5px 10px">✕</button>
+</div>
+
+<div id="pendingChangesList" style="flex:1;overflow-y:auto;padding:20px">
+<div style="text-align:center;color:#999;padding:40px">Načítavam...</div>
+</div>
+
+<div style="padding:20px;background:#f5f5f5;border-top:2px solid #ddd;display:flex;gap:10px">
+<button onclick="closePendingChanges()" style="flex:1;background:#6b7280;color:white;border:none;padding:14px;border-radius:8px;cursor:pointer;font-weight:600">Zavrieť</button>
+<button onclick="closePendingChanges();syncOfflineData()" id="syncFromModal" style="flex:2;background:#f59e0b;color:white;border:none;padding:14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:15px">📤 Nahrať teraz</button>
+</div>
+</div>
+</div>
+
 <!-- MODAL: História dodacích listov -->
 <div id="deliveryHistoryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000" onclick="if(event.target.id==='deliveryHistoryModal')closeDeliveryHistory()">
 <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.3);width:90%;max-width:1200px;max-height:85%;overflow:hidden;display:flex;flex-direction:column">
@@ -9232,6 +10288,123 @@ function logout() {
 <input type="text" id="deliveryHistorySearch" placeholder="🔍 Hľadať podľa čísla, dátumu alebo projektu..." style="width:100%;padding:12px;font-size:14px;border:2px solid #8b5cf6;border-radius:8px" oninput="filterDeliveryHistory()">
 </div>
 <div id="deliveryHistoryContent" style="padding:20px;overflow-y:auto;flex:1">
+<div style="text-align:center;color:#999;padding:40px">Načítavam...</div>
+</div>
+</div>
+</div>
+
+<!-- FLOATING CHAT BUTTON -->
+<button onclick="toggleChatPanel()" id="chatFloatingBtn" style="position:fixed;bottom:30px;right:30px;width:65px;height:65px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;box-shadow:0 8px 24px rgba(102,126,234,0.4);cursor:pointer;font-size:28px;z-index:9998;transition:all 0.3s">
+💬
+<span id="chatUnreadBadge" style="display:none;position:absolute;top:-5px;right:-5px;background:#ef4444;color:white;border-radius:50%;width:24px;height:24px;font-size:12px;font-weight:700;line-height:24px;text-align:center;border:3px solid white"></span>
+</button>
+
+<!-- CHAT PANEL -->
+<div id="chatPanel" style="display:none;position:fixed;bottom:30px;right:30px;width:380px;height:600px;background:white;border-radius:16px;box-shadow:0 12px 48px rgba(0,0,0,0.3);z-index:9999;display:flex;flex-direction:column;overflow:hidden;border:2px solid #e5e7eb">
+<!-- Header -->
+<div style="padding:20px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;display:flex;justify-content:space-between;align-items:center">
+<h3 style="margin:0;font-size:18px">💬 Chat</h3>
+<button onclick="toggleChatPanel()" style="background:transparent;border:none;color:white;font-size:24px;cursor:pointer;padding:0">✕</button>
+</div>
+
+<!-- Conversations List -->
+<div id="chatConversationsList" style="padding:10px;background:#f9fafb;border-bottom:1px solid #e5e7eb;max-height:400px;overflow-y:auto">
+<div style="text-align:center;color:#999;font-size:12px;padding:20px">Načítavam chaty...</div>
+</div>
+
+<!-- New Chat Button -->
+<div style="padding:10px;background:#f5f5f5;border-bottom:1px solid #e5e7eb">
+<button onclick="showNewChatModal()" style="width:100%;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;padding:10px;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">➕ Nový chat</button>
+</div>
+
+<!-- Messages Area -->
+<div id="chatMessagesArea" style="flex:1;overflow-y:auto;padding:15px;background:#ffffff">
+<div style="text-align:center;color:#999;padding:40px;font-size:13px">
+<div style="font-size:48px;margin-bottom:10px">💬</div>
+<p>Vyber konverzáciu<br>alebo vytvor novú</p>
+</div>
+</div>
+
+<!-- Message Input -->
+<div style="padding:15px;background:#f9fafb;border-top:2px solid #e5e7eb">
+<div style="display:flex;gap:10px">
+<input type="text" id="chatMessageInput" placeholder="Napíš správu..." style="flex:1;padding:12px;border:2px solid #e5e7eb;border-radius:8px;font-size:14px" onkeypress="if(event.key==='Enter')sendChatMessage()" disabled>
+<button onclick="sendChatMessage()" id="chatSendBtn" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;padding:12px 20px;border-radius:8px;cursor:pointer;font-weight:600" disabled>📤</button>
+</div>
+<div id="chatTypingIndicator" style="display:none;font-size:11px;color:#999;margin-top:5px">💭 Píše...</div>
+</div>
+</div>
+
+<!-- OFFLINE PACKAGE MODAL -->
+<div id="offlinePackageModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000" onclick="if(event.target.id==='offlinePackageModal')closeOfflinePackage()">
+<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.4);width:90%;max-width:700px;max-height:85%;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+<div style="padding:25px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center">
+<div>
+<h2 style="margin:0;color:white;font-size:24px">📦 Pripraviť projekty pre offline</h2>
+<p style="margin:5px 0 0 0;color:rgba(255,255,255,0.9);font-size:13px">Stiahni projekty do prehliadača pre prácu bez internetu</p>
+</div>
+<button onclick="closeOfflinePackage()" style="background:transparent;border:none;font-size:32px;cursor:pointer;color:white;padding:5px 10px">✕</button>
+</div>
+
+<div style="padding:20px;background:#fef3c7;border-bottom:1px solid #fcd34d">
+<div style="font-size:13px;color:#78350f">
+<strong>💡 Tip:</strong> Vyber projekty ktoré budeš potrebovať na stavbe. Budú uložené v prehliadači a dostupné aj bez internetu.
+</div>
+</div>
+
+<div id="offlineProjectsList" style="flex:1;overflow-y:auto;padding:20px">
+<div style="text-align:center;color:#999;padding:40px">⏳ Načítavam projekty...</div>
+</div>
+
+<div style="padding:15px 20px;background:#f9fafb;border-top:2px solid #e5e7eb">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+<div style="font-size:14px;color:#666">
+<strong id="selectedCount">0 projektov</strong> vybraných
+<span id="selectedSize" style="margin-left:10px;color:#999">(0 KB)</span>
+</div>
+<div style="font-size:12px;color:#999">
+Voľné: <span id="availableSpace">~10 MB</span>
+</div>
+</div>
+<div style="display:flex;gap:10px;margin-bottom:10px">
+<button onclick="selectAllProjects()" style="flex:1;background:#6b7280;color:white;border:none;padding:10px;border-radius:6px;cursor:pointer;font-size:13px">☑️ Vybrať všetky</button>
+<button onclick="deselectAllProjects()" style="flex:1;background:#6b7280;color:white;border:none;padding:10px;border-radius:6px;cursor:pointer;font-size:13px">☐ Zrušiť výber</button>
+</div>
+<div style="display:flex;gap:10px">
+<button onclick="closeOfflinePackage()" style="flex:1;background:#6b7280;color:white;border:none;padding:14px;border-radius:8px;cursor:pointer;font-weight:600">Zrušiť</button>
+<button onclick="downloadSelectedProjects()" id="downloadOfflineBtn" style="flex:2;background:#f59e0b;color:white;border:none;padding:14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:15px" disabled>⬇️ Stiahnuť vybrané (0)</button>
+</div>
+</div>
+</div>
+</div>
+
+<!-- NEW CHAT MODAL -->
+<div id="newChatModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10001" onclick="if(event.target.id==='newChatModal')closeNewChatModal()">
+<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.4);width:90%;max-width:450px" onclick="event.stopPropagation()">
+<div style="padding:20px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center">
+<h3 style="margin:0;color:white;font-size:18px">➕ Nový chat</h3>
+<button onclick="closeNewChatModal()" style="background:transparent;border:none;color:white;font-size:24px;cursor:pointer;padding:0">✕</button>
+</div>
+<div style="padding:20px">
+<input type="text" id="newChatSearch" placeholder="🔍 Hľadať používateľa..." style="width:100%;padding:10px;border:2px solid #e5e7eb;border-radius:6px;margin-bottom:15px;font-size:14px" oninput="filterNewChatUsers()">
+<div id="newChatUsersList" style="max-height:400px;overflow-y:auto">
+<div style="text-align:center;color:#999;padding:20px">Načítavam...</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- ADMIN CHAT HISTORY MODAL -->
+<div id="adminChatHistoryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000" onclick="if(event.target.id==='adminChatHistoryModal')closeAdminChatHistory()">
+<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.4);width:95%;max-width:1200px;height:90%;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+<div style="padding:25px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center">
+<h2 style="margin:0;color:white;font-size:24px">📜 História všetkých chatov (ADMIN)</h2>
+<button onclick="closeAdminChatHistory()" style="background:transparent;border:none;font-size:32px;cursor:pointer;color:white;padding:5px 10px">✕</button>
+</div>
+<div style="padding:15px;background:#f5f5f5;border-bottom:1px solid #ddd">
+<input type="text" id="adminChatSearch" placeholder="🔍 Hľadať v správach, menách, dátumoch..." style="width:100%;padding:12px;border:2px solid #667eea;border-radius:8px;font-size:14px" oninput="filterAdminChats()">
+</div>
+<div id="adminChatHistoryContent" style="flex:1;overflow-y:auto;padding:20px">
 <div style="text-align:center;color:#999;padding:40px">Načítavam...</div>
 </div>
 </div>
