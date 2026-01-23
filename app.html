@@ -4599,11 +4599,12 @@ function deletePackage(packageId){
 if(!confirm('Naozaj chcete zmazať tento balík?')){
 return;
 }
+console.log('🗑️ Mažem balík:',packageId);
 delete exportData.packages[packageId];
 saveExportData();
 buildPackageList();
-alert('✅ Balík zmazaný!');
-console.log('🗑️ Balík zmazaný:',packageId);
+showNotification('✅ Balík zmazaný!','success');
+console.log('✅ Balík zmazaný:',packageId);
 }
 
 function filterPackages(){
@@ -8333,7 +8334,7 @@ window.tempMTOItems=items;
 </div>
 
 <!-- MODAL: Dodací list -->
-<div id="deliveryNoteModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000" onclick="closeDeliveryNote()">
+<div id="deliveryNoteModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000" onclick="if(event.target.id==='deliveryNoteModal')closeDeliveryNote()">
 <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.3);width:90%;max-width:900px;max-height:80%;overflow:auto" onclick="event.stopPropagation()">
 <div style="padding:20px;border-bottom:2px solid #0078D4;background:#f5f5f5;display:flex;justify-content:space-between;align-items:center">
 <h2 style="margin:0;color:#0078D4">🚚 Vytvoriť dodací list</h2>
@@ -10206,6 +10207,98 @@ if(chatUnreadCount>0){floatingBadge.textContent=chatUnreadCount;floatingBadge.st
 if(window.currentUser){
 setInterval(updateUnreadCount,60000);
 updateUnreadCount();
+}
+
+// 📦 OFFLINE PACKAGE SYSTÉM
+let selectedProjects=new Set();
+function openOfflinePackageModal(){
+document.getElementById('offlinePackageModal').style.display='block';
+loadProjectsForOffline();
+}
+function closeOfflinePackage(){
+document.getElementById('offlinePackageModal').style.display='none';
+selectedProjects.clear();
+}
+async function loadProjectsForOffline(){
+const listEl=document.getElementById('offlineProjectsList');
+listEl.innerHTML='<div style="text-align:center;color:#999;padding:40px">⏳ Načítavam...</div>';
+try{
+if(!db){listEl.innerHTML='<div style="text-align:center;color:#ef4444;padding:40px">❌ Firebase nedostupný</div>';return;}
+const snapshot=await db.collection('library').orderBy('uploadedAt','desc').get();
+if(snapshot.empty){listEl.innerHTML='<div style="text-align:center;color:#999;padding:40px">📭 Žiadne projekty</div>';return;}
+let html='';
+snapshot.forEach(doc=>{
+const project=doc.data();
+const size=JSON.stringify(project).length;
+const isDownloaded=localStorage.getItem('offline_project_'+doc.id)!==null;
+html+=`<div class="offline-project-item" data-id="${doc.id}" data-size="${size}" style="background:${isDownloaded?'#d1fae5':'white'};border:2px solid ${isDownloaded?'#10b981':'#e5e7eb'};border-radius:8px;padding:15px;margin-bottom:12px;cursor:pointer" onclick="toggleProjectSelection('${doc.id}')"><div style="display:flex;align-items:center;gap:15px"><input type="checkbox" class="project-checkbox" data-id="${doc.id}" onclick="event.stopPropagation();toggleProjectSelection('${doc.id}')" style="width:20px;height:20px;cursor:pointer"><div style="flex:1"><div style="font-weight:700;font-size:15px;color:#333">${project.projectName||doc.id}${isDownloaded?' <span style="background:#10b981;color:white;padding:2px 8px;border-radius:4px;font-size:11px">✅</span>':''}</div><div style="font-size:12px;color:#666">${project.partName||''} • ${(size/1024).toFixed(1)} KB</div></div></div></div>`;
+});
+listEl.innerHTML=html;
+}catch(error){console.error(error);listEl.innerHTML='<div style="text-align:center;color:#ef4444;padding:40px">❌</div>';}
+}
+function toggleProjectSelection(projectId){
+const checkbox=document.querySelector(`.project-checkbox[data-id="${projectId}"]`);
+const item=document.querySelector(`.offline-project-item[data-id="${projectId}"]`);
+if(selectedProjects.has(projectId)){
+selectedProjects.delete(projectId);
+checkbox.checked=false;
+if(!localStorage.getItem('offline_project_'+projectId)){item.style.background='white';item.style.borderColor='#e5e7eb';}
+}else{
+selectedProjects.add(projectId);
+checkbox.checked=true;
+item.style.background='#fef3c7';
+item.style.borderColor='#f59e0b';
+}
+updateSelectionStats();
+}
+function selectAllProjects(){
+document.querySelectorAll('.project-checkbox').forEach(checkbox=>{
+selectedProjects.add(checkbox.dataset.id);
+checkbox.checked=true;
+document.querySelector(`.offline-project-item[data-id="${checkbox.dataset.id}"]`).style.cssText='background:#fef3c7;border-color:#f59e0b;border:2px solid;border-radius:8px;padding:15px;margin-bottom:12px;cursor:pointer';
+});
+updateSelectionStats();
+}
+function deselectAllProjects(){
+selectedProjects.clear();
+document.querySelectorAll('.project-checkbox').forEach(checkbox=>{
+checkbox.checked=false;
+const item=document.querySelector(`.offline-project-item[data-id="${checkbox.dataset.id}"]`);
+if(!localStorage.getItem('offline_project_'+checkbox.dataset.id)){item.style.background='white';item.style.borderColor='#e5e7eb';}
+});
+updateSelectionStats();
+}
+function updateSelectionStats(){
+const count=selectedProjects.size;
+let totalSize=0;
+selectedProjects.forEach(id=>{const item=document.querySelector(`.offline-project-item[data-id="${id}"]`);if(item)totalSize+=parseInt(item.dataset.size)||0;});
+document.getElementById('selectedCount').textContent=count+' '+(count===1?'projekt':count<5?'projekty':'projektov');
+document.getElementById('selectedSize').textContent='('+(totalSize/1024).toFixed(1)+' KB)';
+const btn=document.getElementById('downloadOfflineBtn');
+if(count>0){btn.disabled=false;btn.textContent=`⬇️ Stiahnuť (${count})`;}else{btn.disabled=true;btn.textContent='⬇️ Stiahnuť (0)';}
+}
+async function downloadSelectedProjects(){
+if(selectedProjects.size===0)return;
+const btn=document.getElementById('downloadOfflineBtn');
+btn.disabled=true;
+let downloaded=0;
+for(const projectId of selectedProjects){
+try{
+btn.textContent=`⏳ Sťahujem... (${downloaded+1}/${selectedProjects.size})`;
+const doc=await db.collection('library').doc(projectId).get();
+if(doc.exists){
+localStorage.setItem('offline_project_'+projectId,JSON.stringify({id:projectId,data:doc.data(),downloadedAt:new Date().toISOString()}));
+downloaded++;
+const item=document.querySelector(`.offline-project-item[data-id="${projectId}"]`);
+if(item){item.style.background='#d1fae5';item.style.borderColor='#10b981';}
+}
+await new Promise(r=>setTimeout(r,200));
+}catch(error){console.error(error);}
+}
+btn.disabled=false;
+selectedProjects.clear();
+deselectAllProjects();
+showNotification(`✅ ${downloaded} projektov stiahnutých!`,'success');
 }
 
 // 🚪 LOGOUT funkcia
