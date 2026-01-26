@@ -9643,13 +9643,15 @@ return;
 
 const fiveMinutesAgo=new Date(Date.now()-5*60*1000);
 
-const snapshot=await db.collection('active_sessions')
+// ✅ REAL-TIME LISTENER namiesto get()
+const unsubscribe=db.collection('active_sessions')
 .where('lastActivity','>',firebase.firestore.Timestamp.fromDate(fiveMinutesAgo))
-.get();
+.onSnapshot(snapshot=>{
 
 if(snapshot.empty){
 content.innerHTML='<div style="text-align:center;color:#999;padding:30px;font-size:13px">📭 Žiadni aktívni<br><small>V posledných 5 minútach</small></div>';
 updateNotificationsBadge(0);
+activeSessions=[];
 return;
 }
 
@@ -9689,7 +9691,18 @@ ${isCurrentProject?'<div style="margin-top:8px;padding:6px;background:#fbbf24;co
 content.innerHTML=html;
 updateNotificationsBadge(activeSessions.length);
 
-console.log('🔔 Aktívnych:',activeSessions.length);
+console.log('🔔 Aktívnych:',activeSessions.length,'→',activeSessions.map(s=>s.id));
+
+// ✅ Ak máš otvorený chat modal, refresh zoznam používateľov
+const chatModal=document.getElementById('newChatModal');
+if(chatModal && chatModal.style.display==='block'){
+loadNewChatUsers();
+}
+
+},error=>{
+console.error('❌ Chyba pri onSnapshot sessions:',error);
+content.innerHTML='<div style="text-align:center;color:#ef4444;padding:20px;font-size:13px">❌ '+error.message+'</div>';
+});
 
 }catch(error){
 console.error('❌ Chyba pri načítaní sessions:',error);
@@ -10301,20 +10314,27 @@ document.getElementById('newChatModal').style.display='none';
 
 async function loadNewChatUsers(){
 const listEl=document.getElementById('newChatUsersList');
-listEl.innerHTML='<div style="text-align:center;color:#999;padding:20px">⏳</div>';
+listEl.innerHTML='<div style="text-align:center;color:#999;padding:20px">⏳ Načítavam používateľov...</div>';
 try{
-if(!db){listEl.innerHTML='<div style="text-align:center;color:#ef4444;padding:20px">❌</div>';return;}
+if(!db){listEl.innerHTML='<div style="text-align:center;color:#ef4444;padding:20px">❌ Firebase chyba</div>';return;}
 const snapshot=await db.collection('users').get();
 let html='';
 snapshot.forEach(doc=>{
+// Zobraz VŠETKÝCH okrem seba
 if(doc.id!==window.currentUser?.username){
 const user=doc.data();
 const isOnline=activeSessions.some(s=>s.id===doc.id);
-html+=`<div class="new-chat-user-item" onclick="createNewPrivateChat('${doc.id}','${user.displayName||doc.id}')" style="padding:12px;border-radius:8px;cursor:pointer;margin-bottom:8px;background:white;border:2px solid #e5e7eb"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:16px">${isOnline?'🟢':'🔴'}</span><div style="flex:1"><div style="font-weight:600;font-size:14px;color:#333">${user.displayName||doc.id}</div><div style="font-size:11px;color:#666">${user.role||''}</div></div></div></div>`;
+const displayName=user.displayName||doc.id;
+const role=user.role||'';
+html+=`<div class="new-chat-user-item" onclick="createNewPrivateChat('${doc.id}','${displayName}')" style="padding:12px;border-radius:8px;cursor:pointer;margin-bottom:8px;background:white;border:2px solid #e5e7eb;transition:all 0.2s" onmouseover="this.style.borderColor='#667eea';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e5e7eb';this.style.transform='translateY(0)'"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:16px">${isOnline?'🟢':'🔴'}</span><div style="flex:1"><div style="font-weight:600;font-size:14px;color:#333">${displayName}</div><div style="font-size:11px;color:#666">${role}</div></div></div></div>`;
 }
 });
+if(html===''){
+html='<div style="text-align:center;color:#999;padding:20px">👤 Žiadni ďalší používatelia</div>';
+}
 listEl.innerHTML=html;
-}catch(error){console.error(error);listEl.innerHTML='<div style="text-align:center;color:#ef4444;padding:20px">❌</div>';}
+console.log('✅ Načítaní používatelia:', snapshot.size - 1); // -1 lebo nepočítame seba
+}catch(error){console.error('❌ Chyba načítania users:',error);listEl.innerHTML='<div style="text-align:center;color:#ef4444;padding:20px">❌ Chyba</div>';}
 }
 
 function filterNewChatUsers(){
