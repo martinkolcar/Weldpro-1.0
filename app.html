@@ -10404,8 +10404,8 @@ if(chatUnreadCount>0){floatingBadge.textContent=chatUnreadCount;floatingBadge.st
 }catch(error){console.error(error);}
 }
 if(window.currentUser){
-setInterval(updateUnreadCount,60000);
-updateUnreadCount();
+setInterval(updateTotalUnreadBadge,60000);
+updateTotalUnreadBadge();
 }
 
 // 📦 OFFLINE PACKAGE SYSTÉM
