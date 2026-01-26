@@ -8509,12 +8509,16 @@ window.tempMTOItems=items;
 <!-- ONLINE KNIŽNICA (localStorage) -->
 <div id="libraryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999">
 <div style="background:white;width:90%;max-width:1200px;height:90%;margin:5% auto;border-radius:12px;overflow:hidden;display:flex;flex-direction:column">
-<div style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:20px;display:flex;justify-content:space-between">
+<div style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:20px;display:flex;justify-content:space-between;align-items:center">
+<div>
 <h2 style="margin:0">📚 Online Knižnica Projektov</h2>
+<div id="libraryCounter" style="font-size:14px;margin-top:5px;opacity:0.9">Projektov: 0</div>
+</div>
 <button onclick="closeLibrary()" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:10px 20px;border-radius:6px;cursor:pointer">✕ Zavrieť</button>
 </div>
 <div style="padding:20px;border-bottom:1px solid #ddd">
 <button onclick="uploadToLibrary()" style="background:#10b981;color:white;border:none;padding:12px 24px;border-radius:6px;cursor:pointer;margin-right:10px">📤 Upload JSON</button>
+<button onclick="deleteAllProjects()" style="background:#ef4444;color:white;border:none;padding:12px 24px;border-radius:6px;cursor:pointer;margin-right:10px">🗑️ Vymazať všetky</button>
 <input type="text" id="librarySearch" placeholder="🔍 Hľadať projekt..." style="padding:10px;border:1px solid #ddd;border-radius:6px;width:300px" oninput="filterLibrary()">
 </div>
 <div id="libraryGrid" style="flex:1;overflow:auto;padding:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:20px">
@@ -8554,6 +8558,8 @@ async function loadLibrary() {
     const projects = await listProjectsFromFirebase();
     
     if (projects.length === 0) {
+      const counterEl = document.getElementById('libraryCounter');
+      if(counterEl) counterEl.textContent = 'Projektov: 0';
       grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px;color:#999"><div style="font-size:48px">📚</div><div style="font-size:18px;margin-top:10px">Žiadne projekty pre túto časť</div><div style="font-size:14px;color:#666;margin-top:10px">Aktuálna časť: '+projectsData.currentPart+'</div></div>';
       return;
     }
@@ -8571,6 +8577,13 @@ async function loadLibrary() {
       </div>
     `}).join('');
     
+    // Aktualizuj počítadlo
+    const counterEl = document.getElementById('libraryCounter');
+    if(counterEl) {
+      const partInfo = projectsData.currentPart ? ` (časť: ${projectsData.currentPart})` : '';
+      counterEl.textContent = `Projektov: ${projects.length}${partInfo}`;
+    }
+    
     // Zobraz delete tlačidlá pri hover
     document.querySelectorAll('#libraryGrid > div').forEach(card => {
       card.addEventListener('mouseenter', function() {
@@ -8586,6 +8599,80 @@ async function loadLibrary() {
   } catch(e) {
     grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px;color:#f00">❌ Chyba: ' + e.message + '</div>';
   }
+}
+
+// Vymazanie VŠETKÝCH projektov
+async function deleteAllProjects() {
+  const projects = await listProjectsFromFirebase();
+  
+  if(projects.length === 0) {
+    alert('Knižnica je prázdna!');
+    return;
+  }
+  
+  const partInfo = projectsData.currentPart ? ` v časti "${projectsData.currentPart}"` : '';
+  if (!confirm(`⚠️ POZOR!\n\nNaozaj vymazať VŠETKY projekty${partInfo}?\n\nPočet projektov: ${projects.length}\n\nTáto akcia je NEVRATNÁ!`)) {
+    return;
+  }
+  
+  // Progress modal
+  const progressDiv = document.createElement('div');
+  progressDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:30px;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,0.3);z-index:30000;min-width:400px;';
+  progressDiv.innerHTML = `
+    <h3 style="margin:0 0 20px 0;color:#ef4444;">🗑️ Mažem projekty...</h3>
+    <div style="background:#e0e0e0;height:30px;border-radius:15px;overflow:hidden;margin-bottom:15px;">
+      <div id="deleteProgressBar" style="background:#ef4444;height:100%;width:0%;transition:width 0.3s;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;"></div>
+    </div>
+    <div id="deleteProgressText" style="text-align:center;color:#666;font-size:14px;">Pripravujem...</div>
+  `;
+  document.body.appendChild(progressDiv);
+  
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  const progressBar = document.getElementById('deleteProgressBar');
+  const progressText = document.getElementById('deleteProgressText');
+  
+  let deleted = 0;
+  let errors = 0;
+  
+  for(let i = 0; i < projects.length; i++) {
+    const p = projects[i];
+    const docId = p.part ? (p.name + '_' + p.part) : p.name;
+    
+    try {
+      const percent = Math.round(((i + 1) / projects.length) * 100);
+      progressBar.style.width = percent + '%';
+      progressBar.textContent = percent + '%';
+      progressText.innerHTML = `🗑️ Mažem: <strong>${docId}</strong><br>${i + 1}/${projects.length}`;
+      
+      // Vymaž projekt
+      await db.collection('projects').doc(docId).delete();
+      
+      // Vymaž chunky
+      try {
+        const chunksSnapshot = await db.collection('projects').doc(docId).collection('data').get();
+        const deletePromises = chunksSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(deletePromises);
+      } catch(e) {}
+      
+      deleted++;
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+    } catch(e) {
+      console.error('Chyba pri mazaní:', docId, e);
+      errors++;
+    }
+  }
+  
+  progressBar.style.width = '100%';
+  progressBar.style.background = '#10b981';
+  progressBar.textContent = '✅ 100%';
+  progressText.innerHTML = `<strong style="color:#10b981;">✅ Hotovo!</strong><br>Vymazané: ${deleted}, Chyby: ${errors}`;
+  
+  setTimeout(() => {
+    document.body.removeChild(progressDiv);
+    loadLibrary();
+  }, 2000);
 }
 
 // Vymazanie projektu z Firebase
@@ -8641,7 +8728,7 @@ function uploadToLibrary() {
     
     // Vytvor progress dialog
     const progressDiv = document.createElement('div');
-    progressDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:30px;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,0.3);z-index:10000;min-width:400px;';
+    progressDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:30px;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,0.3);z-index:20000;min-width:400px;';
     progressDiv.innerHTML = `
       <h3 style="margin:0 0 20px 0;color:#333;">📤 Nahrávam projekty do knižnice</h3>
       <div style="background:#e0e0e0;height:30px;border-radius:15px;overflow:hidden;margin-bottom:15px;">
