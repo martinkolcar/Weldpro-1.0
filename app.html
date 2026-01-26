@@ -208,6 +208,22 @@ var jsPDF = window.jspdf.jsPDF;
     // Ulož do globálnej premennej
     window.currentUser = userData;
     
+    // ✅ ŠTART HEARTBEAT HNEĎ!
+    window.addEventListener('DOMContentLoaded', function() {
+      console.log('🚀 Starting heartbeat for:', userData.username);
+      if(typeof startHeartbeat === 'function'){
+        startHeartbeat();
+      } else {
+        // Ak funkcia ešte neexistuje, počkaj a skús znova
+        setTimeout(function(){
+          if(typeof startHeartbeat === 'function'){
+            startHeartbeat();
+            console.log('✅ Heartbeat started (delayed)');
+          }
+        }, 2000);
+      }
+    });
+    
     // Zobraz ADMIN tlačidlo ak je admin
     if (userData.role === 'admin') {
       window.addEventListener('DOMContentLoaded', function() {
@@ -9826,11 +9842,11 @@ console.error('Chyba pri cleanup:',e);
 });
 }
 
-// Štart heartbeat pri načítaní
-if(window.currentUser){
-startHeartbeat();
+// Heartbeat sa spúšťa automaticky v session check!
+// (riadok ~210)
 
 // Refresh notifikácií každú minútu
+if(window.currentUser){
 setInterval(()=>{
 if(document.getElementById('notificationsPanel').style.display==='block'){
 loadActiveSessions();
