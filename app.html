@@ -261,17 +261,8 @@ async function uploadProjectToFirebase(projectData) {
   const CHUNK_SIZE = 800 * 1024;
   const chunks = [];
   for (let i = 0; i < jsonString.length; i += CHUNK_SIZE) chunks.push(jsonString.slice(i, i + CHUNK_SIZE));
-  
-  if(window.updateUploadProgress)updateUploadProgress(50,'Ukladám metadata...');
   await db.collection('projects').doc(docId).set({name: projectName, part: partName, chunks: chunks.length, size: jsonString.length, date: new Date().toISOString()});
-  
-  for (let i = 0; i < chunks.length; i++) {
-    const progress = 50 + Math.floor((i / chunks.length) * 40);
-    if(window.updateUploadProgress)updateUploadProgress(progress,`Nahrávam časť ${i+1}/${chunks.length}...`);
-    await db.collection('projects').doc(docId).collection('data').doc('c' + i).set({d: chunks[i]});
-  }
-  
-  if(window.updateUploadProgress)updateUploadProgress(90,'Dokončujem...');
+  for (let i = 0; i < chunks.length; i++) await db.collection('projects').doc(docId).collection('data').doc('c' + i).set({d: chunks[i]});
   console.log('✅ Uploaded:',docId);
 }
 
@@ -6270,16 +6261,10 @@ alert('✅ Projekt uložený!\n\nSúbor: '+(originalFileName||'zvary')+'_projekt
 
 // Uložiť do Firebase knižnice
 async function saveToLibrary(){
-// Zobraz progress modal
-showUploadProgress();
-
 var pdfDataUrl='';
 
 // Funkcia na uloženie dát
 async function uploadData(){
-  try{
-  updateUploadProgress(20,'Pripravujem dáta...');
-  
   var projectData={
   welds:ws,
   spools:spools,
@@ -6298,22 +6283,16 @@ async function uploadData(){
   pdfData:pdfDataUrl,
   savedDate:new Date().toISOString()
   };
-  
-  updateUploadProgress(40,'Nahrávam do Firebase...');
+  try{
   await uploadProjectToFirebase(projectData);
-  
-  updateUploadProgress(100,'Hotovo!');
-  hideUploadProgress();
   alert('✅ Projekt uložený do knižnice!');
   }catch(e){
-  hideUploadProgress();
   alert('❌ Chyba pri ukladaní:\n'+e.message);
   }
 }
 
 if(pd){
   // PDF v plnom rozlíšení
-  updateUploadProgress(5,'Renderujem PDF...');
   var canvas=document.createElement('canvas');
   var ctx=canvas.getContext('2d');
   pd.getPage(1).then(function(pg){
@@ -6321,7 +6300,6 @@ if(pd){
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     ctx.imageSmoothingEnabled = false;
-    updateUploadProgress(10,'Konvertujem PDF...');
     pg.render({canvasContext: ctx, viewport: viewport}).promise.then(function(){
       pdfDataUrl = canvas.toDataURL('image/png', 0.95);
       uploadData();
@@ -6329,37 +6307,18 @@ if(pd){
   });
 } else if(loadedImage && baseImageWidth > 0){
   // Originálna veľkosť z knižnice
-  updateUploadProgress(5,'Konvertujem obrázok...');
   var canvas=document.createElement('canvas');
+  var ctx=canvas.getContext('2d');
   canvas.width = baseImageWidth;
   canvas.height = baseImageHeight;
-  var ctx=canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
   ctx.drawImage(loadedImage, 0, 0, baseImageWidth, baseImageHeight);
   pdfDataUrl = canvas.toDataURL('image/png', 0.95);
-  uploadData();
-} else {
-  // Bez PDF
-  updateUploadProgress(10,'Bez PDF, nahrávam dáta...');
-  uploadData();
+  await uploadData();
+} else if(ca.width>0){
+  pdfDataUrl=ca.toDataURL('image/png', 0.95);
+  await uploadData();
 }
-}
-
-function showUploadProgress(){
-const modal=document.getElementById('uploadProgressModal');
-if(modal){modal.style.display='flex';console.log('✅ Modal shown');}
-}
-
-function hideUploadProgress(){
-const modal=document.getElementById('uploadProgressModal');
-if(modal){modal.style.display='none';console.log('✅ Modal hidden');}
-}
-
-function updateUploadProgress(percent,text){
-const bar=document.getElementById('uploadProgressBar');
-const txt=document.getElementById('uploadProgressText');
-if(bar)bar.style.width=percent+'%';
-if(txt)txt.textContent=text||'Nahrávam...';
-console.log('📤',percent+'%',text);
 }
 
 document.getElementById('loadproj').onchange=function(e){
@@ -10612,17 +10571,4 @@ Voľné: <span id="availableSpace">~10 MB</span>
 </div>
 </div>
 
-<!-- UPLOAD PROGRESS MODAL -->
-<div id="uploadProgressModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:20000;align-items:center;justify-content:center">
-<div style="background:white;border-radius:12px;padding:30px;width:90%;max-width:500px;box-shadow:0 8px 40px rgba(0,0,0,0.4)">
-<div style="text-align:center;margin-bottom:20px">
-<div style="font-size:48px;margin-bottom:10px">📤</div>
-<h2 style="margin:0 0 10px 0;color:#333">Nahrávam projekty do knižnice</h2>
-<p id="uploadProgressText" style="color:#666;margin:0">Pripravujem...</p>
-</div>
-<div style="width:100%;height:30px;background:#e5e7eb;border-radius:15px;overflow:hidden">
-<div id="uploadProgressBar" style="width:0%;height:100%;background:linear-gradient(90deg,#10b981,#059669);transition:width 0.3s"></div>
-</div>
-</div>
-</div>
 </body></html>
