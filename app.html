@@ -261,8 +261,17 @@ async function uploadProjectToFirebase(projectData) {
   const CHUNK_SIZE = 800 * 1024;
   const chunks = [];
   for (let i = 0; i < jsonString.length; i += CHUNK_SIZE) chunks.push(jsonString.slice(i, i + CHUNK_SIZE));
+  
+  if(window.updateUploadProgress)updateUploadProgress(50,'Ukladám metadata...');
   await db.collection('projects').doc(docId).set({name: projectName, part: partName, chunks: chunks.length, size: jsonString.length, date: new Date().toISOString()});
-  for (let i = 0; i < chunks.length; i++) await db.collection('projects').doc(docId).collection('data').doc('c' + i).set({d: chunks[i]});
+  
+  for (let i = 0; i < chunks.length; i++) {
+    const progress = 50 + Math.floor((i / chunks.length) * 40);
+    if(window.updateUploadProgress)updateUploadProgress(progress,`Nahrávam časť ${i+1}/${chunks.length}...`);
+    await db.collection('projects').doc(docId).collection('data').doc('c' + i).set({d: chunks[i]});
+  }
+  
+  if(window.updateUploadProgress)updateUploadProgress(90,'Dokončujem...');
   console.log('✅ Uploaded:',docId);
 }
 
@@ -6337,12 +6346,12 @@ if(pd){
 
 function showUploadProgress(){
 const modal=document.getElementById('uploadProgressModal');
-if(modal)modal.style.display='block';
+if(modal){modal.style.display='flex';console.log('✅ Modal shown');}
 }
 
 function hideUploadProgress(){
 const modal=document.getElementById('uploadProgressModal');
-if(modal)modal.style.display='none';
+if(modal){modal.style.display='none';console.log('✅ Modal hidden');}
 }
 
 function updateUploadProgress(percent,text){
@@ -10604,7 +10613,7 @@ Voľné: <span id="availableSpace">~10 MB</span>
 </div>
 
 <!-- UPLOAD PROGRESS MODAL -->
-<div id="uploadProgressModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:20000;display:flex;align-items:center;justify-content:center">
+<div id="uploadProgressModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:20000;align-items:center;justify-content:center">
 <div style="background:white;border-radius:12px;padding:30px;width:90%;max-width:500px;box-shadow:0 8px 40px rgba(0,0,0,0.4)">
 <div style="text-align:center;margin-bottom:20px">
 <div style="font-size:48px;margin-bottom:10px">📤</div>
