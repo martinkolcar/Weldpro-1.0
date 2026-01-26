@@ -9659,9 +9659,8 @@ return;
 
 const fiveMinutesAgo=new Date(Date.now()-5*60*1000);
 
-// ✅ REAL-TIME LISTENER namiesto get()
+// ✅ REAL-TIME LISTENER BEZ where() (nepotrebuje index!)
 const unsubscribe=db.collection('active_sessions')
-.where('lastActivity','>',firebase.firestore.Timestamp.fromDate(fiveMinutesAgo))
 .onSnapshot(snapshot=>{
 
 if(snapshot.empty){
@@ -9676,6 +9675,12 @@ let html='';
 
 snapshot.forEach(doc=>{
 const session=doc.data();
+
+// ✅ Filter v kóde namiesto Firebase query
+if(!session.lastActivity)return;
+const lastActivityTime=session.lastActivity.toDate();
+if(lastActivityTime<fiveMinutesAgo)return; // Starší ako 5 minút → preskočiť
+
 if(doc.id!==window.currentUser?.username){
 activeSessions.push({id:doc.id,...session});
 
