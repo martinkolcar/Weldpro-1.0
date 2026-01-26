@@ -9484,9 +9484,15 @@ contentEl.innerHTML=`
 </div>
 </div>
 
+<div style="margin-bottom:20px">
+<label style="display:block;font-weight:600;margin-bottom:8px;color:#333">Aktuálne heslo</label>
+<input type="text" value="${user.password||''}" readonly style="width:100%;padding:12px;border:2px solid #e5e7eb;border-radius:8px;font-size:14px;background:#f9fafb;color:#059669;font-weight:600">
+<small style="color:#666">Len na zobrazenie</small>
+</div>
+
 <div style="margin-bottom:25px">
 <label style="display:block;font-weight:600;margin-bottom:8px;color:#333">Nové heslo (ponechaj prázdne ak nemeníš)</label>
-<input type="password" id="editPassword" placeholder="Min. 6 znakov" minlength="6" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:8px;font-size:14px">
+<input type="text" id="editPassword" placeholder="Min. 6 znakov" minlength="6" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:8px;font-size:14px">
 <small style="color:#666">Zadaj len ak chceš zmeniť heslo</small>
 </div>
 
