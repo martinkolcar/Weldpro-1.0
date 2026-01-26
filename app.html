@@ -255,13 +255,15 @@ window.addEventListener('load', function() {
 async function uploadProjectToFirebase(projectData) {
   if (!db) throw new Error('Firebase not ready');
   const projectName = projectData.projectName || 'project';
+  const partName = projectData.partName || 'part1';
+  const docId = projectName + '_' + partName;
   const jsonString = JSON.stringify(projectData);
   const CHUNK_SIZE = 800 * 1024;
   const chunks = [];
   for (let i = 0; i < jsonString.length; i += CHUNK_SIZE) chunks.push(jsonString.slice(i, i + CHUNK_SIZE));
-  await db.collection('projects').doc(projectName).set({name: projectName, chunks: chunks.length, size: jsonString.length, date: new Date().toISOString()});
-  for (let i = 0; i < chunks.length; i++) await db.collection('projects').doc(projectName).collection('data').doc('c' + i).set({d: chunks[i]});
-  console.log('✅ Uploaded!');
+  await db.collection('projects').doc(docId).set({name: projectName, part: partName, chunks: chunks.length, size: jsonString.length, date: new Date().toISOString()});
+  for (let i = 0; i < chunks.length; i++) await db.collection('projects').doc(docId).collection('data').doc('c' + i).set({d: chunks[i]});
+  console.log('✅ Uploaded:',docId);
 }
 
 async function downloadProjectFromFirebase(projectName) {
@@ -279,8 +281,14 @@ async function downloadProjectFromFirebase(projectName) {
 
 async function listProjectsFromFirebase() {
   if (!db) return [];
+  const currentPart = projectsData.currentPart;
   const snap = await db.collection('projects').get();
-  return snap.docs.map(d => d.data());
+  return snap.docs
+    .map(d => d.data())
+    .filter(p => {
+      if (!currentPart) return true;
+      return p.part === currentPart;
+    });
 }
 </script>
 
@@ -6267,7 +6275,8 @@ async function uploadData(){
   weldAssignments:weldAssignments,
   currentNumber:cn,
   startNumber:startNum,
-  projectName:originalFileName||'zvary',
+  projectName:projectsData.currentProject||originalFileName||'zvary',
+  partName:projectsData.currentPart||'part1',
   scale:sc,
   canvasWidth:baseImageWidth || ca.width,
   canvasHeight:baseImageHeight || ca.height,
@@ -8528,17 +8537,18 @@ async function loadLibrary() {
     const projects = await listProjectsFromFirebase();
     
     if (projects.length === 0) {
-      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px;color:#999"><div style="font-size:48px">📚</div><div style="font-size:18px;margin-top:10px">Žiadne projekty</div></div>';
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px;color:#999"><div style="font-size:48px">📚</div><div style="font-size:18px;margin-top:10px">Žiadne projekty pre túto časť</div><div style="font-size:14px;color:#666;margin-top:10px">Aktuálna časť: '+projectsData.currentPart+'</div></div>';
       return;
     }
     
     grid.innerHTML = projects.map((p, i) => {
-      const safeName = p.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
+      const docId = (p.name + '_' + p.part).replace(/'/g, "\\'").replace(/"/g, '\\"');
+      const displayName = p.name + (p.part ? ' / '+p.part : '');
       return `
-      <div onclick="loadFromLibraryFirebase('${safeName}')" style="position:relative;border:2px solid #ddd;border-radius:8px;padding:15px;cursor:pointer;transition:all 0.3s;background:white" onmouseover="this.style.borderColor='#667eea';this.style.transform='translateY(-5px)'" onmouseout="this.style.borderColor='#ddd';this.style.transform='translateY(0)'">
-        <button onclick="deleteFromFirebase('${safeName}'); event.stopPropagation();" style="position:absolute;top:10px;right:10px;background:#dc3545;color:white;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:14px;opacity:0;transition:opacity 0.3s;z-index:10;" onmouseover="this.style.background='#c82333';this.parentElement.onmouseout=null;this.parentElement.onmouseover=null;" onmouseout="this.style.background='#dc3545';">🗑️</button>
+      <div onclick="loadFromLibraryFirebase('${docId}')" style="position:relative;border:2px solid #ddd;border-radius:8px;padding:15px;cursor:pointer;transition:all 0.3s;background:white" onmouseover="this.style.borderColor='#667eea';this.style.transform='translateY(-5px)'" onmouseout="this.style.borderColor='#ddd';this.style.transform='translateY(0)'">
+        <button onclick="deleteFromFirebase('${docId}'); event.stopPropagation();" style="position:absolute;top:10px;right:10px;background:#dc3545;color:white;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:14px;opacity:0;transition:opacity 0.3s;z-index:10;" onmouseover="this.style.background='#c82333';this.parentElement.onmouseout=null;this.parentElement.onmouseover=null;" onmouseout="this.style.background='#dc3545';">🗑️</button>
         <div style="font-size:60px;text-align:center;margin-bottom:10px">📄</div>
-        <div style="font-weight:600;font-size:14px;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.name}">${p.name}</div>
+        <div style="font-weight:600;font-size:14px;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${displayName}">${displayName}</div>
         <div style="font-size:12px;color:#666">${(p.size/1024/1024).toFixed(1)} MB</div>
         <div style="font-size:11px;color:#999;margin-top:5px">${new Date(p.date).toLocaleDateString('sk')}</div>
       </div>
