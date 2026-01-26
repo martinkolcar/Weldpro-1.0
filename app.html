@@ -255,13 +255,27 @@ window.addEventListener('load', function() {
 async function uploadProjectToFirebase(projectData) {
   if (!db) throw new Error('Firebase not ready');
   const projectName = projectData.projectName || 'project';
-  const partName = projectData.partName || 'part1';
-  const docId = projectName + '_' + partName;
+  const partName = projectData.partName;
+  
+  // Ak je časť definovaná, použi projectName_partName, inak len projectName
+  const docId = partName ? (projectName + '_' + partName) : projectName;
+  
   const jsonString = JSON.stringify(projectData);
   const CHUNK_SIZE = 800 * 1024;
   const chunks = [];
   for (let i = 0; i < jsonString.length; i += CHUNK_SIZE) chunks.push(jsonString.slice(i, i + CHUNK_SIZE));
-  await db.collection('projects').doc(docId).set({name: projectName, part: partName, chunks: chunks.length, size: jsonString.length, date: new Date().toISOString()});
+  
+  const metadata = {
+    name: projectName, 
+    chunks: chunks.length, 
+    size: jsonString.length, 
+    date: new Date().toISOString()
+  };
+  
+  // Pridaj part len ak je definovaný
+  if(partName) metadata.part = partName;
+  
+  await db.collection('projects').doc(docId).set(metadata);
   for (let i = 0; i < chunks.length; i++) await db.collection('projects').doc(docId).collection('data').doc('c' + i).set({d: chunks[i]});
   console.log('✅ Uploaded:',docId);
 }
@@ -6276,7 +6290,7 @@ async function uploadData(){
   currentNumber:cn,
   startNumber:startNum,
   projectName:projectsData.currentProject||originalFileName||'zvary',
-  partName:projectsData.currentPart||'part1',
+  partName:projectsData.currentPart,
   scale:sc,
   canvasWidth:baseImageWidth || ca.width,
   canvasHeight:baseImageHeight || ca.height,
@@ -6288,6 +6302,7 @@ async function uploadData(){
   alert('✅ Projekt uložený do knižnice!');
   }catch(e){
   alert('❌ Chyba pri ukladaní:\n'+e.message);
+  console.error('Upload error:',e);
   }
 }
 
@@ -8544,7 +8559,7 @@ async function loadLibrary() {
     }
     
     grid.innerHTML = projects.map((p, i) => {
-      const docId = (p.name + '_' + p.part).replace(/'/g, "\\'").replace(/"/g, '\\"');
+      const docId = (p.part ? (p.name + '_' + p.part) : p.name).replace(/'/g, "\\'").replace(/"/g, '\\"');
       const displayName = p.name + (p.part ? ' / '+p.part : '');
       return `
       <div onclick="loadFromLibraryFirebase('${docId}')" style="position:relative;border:2px solid #ddd;border-radius:8px;padding:15px;cursor:pointer;transition:all 0.3s;background:white" onmouseover="this.style.borderColor='#667eea';this.style.transform='translateY(-5px)'" onmouseout="this.style.borderColor='#ddd';this.style.transform='translateY(0)'">
@@ -8614,6 +8629,15 @@ function uploadToLibrary() {
     const files = Array.from(e.target.files);
     let processed = 0;
     let errors = 0;
+    let duplicates = 0;
+    
+    // Načítaj existujúce projekty pre kontrolu duplicít
+    const existingProjects = await listProjectsFromFirebase();
+    const existingIds = new Set();
+    existingProjects.forEach(p => {
+      const docId = p.part ? (p.name + '_' + p.part) : p.name;
+      existingIds.add(docId);
+    });
     
     // Vytvor progress dialog
     const progressDiv = document.createElement('div');
@@ -8641,6 +8665,21 @@ function uploadToLibrary() {
         
         const text = await file.text();
         const data = JSON.parse(text);
+        
+        // Nastav projectName z názvu súboru (bez .json)
+        const fileName = file.name.replace('.json', '');
+        if(!data.projectName) data.projectName = fileName;
+        
+        // Nastav partName z aktuálnej časti
+        data.partName = projectsData.currentPart;
+        
+        // Skontroluj duplicitu
+        const docId = data.partName ? (data.projectName + '_' + data.partName) : data.projectName;
+        if(existingIds.has(docId)){
+          console.warn('⚠️ Duplicita:', docId, '- prepíšem!');
+          duplicates++;
+        }
+        
         await uploadProjectToFirebase(data);
         processed++;
         
@@ -8657,7 +8696,7 @@ function uploadToLibrary() {
     progressBar.style.width = '100%';
     progressBar.style.background = '#10b981';
     progressBar.textContent = '✅ 100%';
-    progressText.innerHTML = `<strong style="color:#10b981;">✅ Hotovo!</strong><br>Úspešne: ${processed}, Chyby: ${errors}`;
+    progressText.innerHTML = `<strong style="color:#10b981;">✅ Hotovo!</strong><br>Úspešne: ${processed}, Chyby: ${errors}${duplicates>0?', Prepísané: '+duplicates:''}`;
     
     setTimeout(() => {
       document.body.removeChild(progressDiv);
