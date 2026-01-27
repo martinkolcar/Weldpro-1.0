@@ -705,8 +705,7 @@ async function listProjectsFromFirebase() {
       <div class="section-label">Projekt:</div>
       <div id="projectsList" class="parts-list"></div>
       <button class="btn-panel" onclick="promptNewProject()">➕ Nový projekt</button>
-      <button class="btn-panel" onclick="restoreProjectsFromIsometrics()" style="background:#10b981;color:white;margin-top:5px">🔄 Obnov projekty</button>
-      <button class="btn-panel" onclick="cleanupFirebaseProjects()" style="background:#ef4444;color:white;margin-top:5px">🧹 Vyčistiť Firebase</button>
+      <button class="btn-panel" onclick="fullResetAndRestore()" style="background:#ef4444;color:white;margin-top:5px;font-weight:bold">🔥 FULL RESET</button>
     </div>
     
     <div class="panel-section">
@@ -7877,6 +7876,97 @@ async function loadProjectsFromFirebase() {
 }
 
 // Obnoviť projekty z existujúcich izometrií
+// KOMPLETNÝ RESET A OBNOVA Z IZOMETRIÍ
+async function fullResetAndRestore() {
+  if(!db) {
+    alert('❌ Firebase nie je dostupný!');
+    return;
+  }
+  
+  if(!confirm('🔥 KOMPLETNÝ RESET!\n\nTáto akcia:\n1. VYMAŽE všetky projekty z Firebase\n2. VYMAŽE všetky časti\n3. OBNOVÍ Monsteras z izometrií\n4. OBNOVÍ 5 častí: Dry, FLA, Sul, Lig, Lht\n5. Izometrie OSTANÚ!\n\nPokračovať?')) {
+    return;
+  }
+  
+  try {
+    console.log('🔥 FULL RESET - Začínam...');
+    
+    // 1. VYMAZAŤ VŠETKO Z projects_structure
+    console.log('🗑️ Vymazávam projects_structure...');
+    const allProjects = await db.collection('projects_structure').get();
+    
+    for(const projectDoc of allProjects.docs) {
+      // Vymazať časti
+      const parts = await projectDoc.ref.collection('parts').get();
+      for(const partDoc of parts.docs) {
+        await partDoc.ref.delete();
+        console.log('🗑️ Vymazaná časť:', projectDoc.id, '/', partDoc.id);
+      }
+      
+      // Vymazať projekt
+      await projectDoc.ref.delete();
+      console.log('🗑️ Vymazaný projekt:', projectDoc.id);
+    }
+    
+    // 2. VYČISTIŤ PAMÄŤ
+    projectsData.projects = {};
+    console.log('🧹 Pamäť vyčistená');
+    
+    // 3. OBNOVIŤ Z IZOMETRIÍ
+    console.log('🔄 Obnovovanie z izometrií...');
+    
+    const isometricsSnapshot = await db.collection('projects').get();
+    const partsFound = new Set();
+    
+    isometricsSnapshot.forEach(doc => {
+      const data = doc.data();
+      if(data.part) {
+        partsFound.add(data.part);
+        console.log('✅ Našiel som časť:', data.part);
+      }
+    });
+    
+    // 4. VYTVORIŤ PROJEKT MONSTERAS
+    projectsData.projects['Monsteras'] = {
+      parts: {},
+      created: new Date().toISOString(),
+      createdBy: window.currentUser?.username || 'system'
+    };
+    
+    // 5. VYTVORIŤ 5 ČASTÍ
+    const allParts = ['Dry', 'FLA', 'Sul', 'Lig', 'Lht'];
+    
+    for(const partName of allParts) {
+      projectsData.projects['Monsteras'].parts[partName] = {
+        weldBookData: [],
+        created: new Date().toISOString(),
+        lastModified: new Date().toISOString()
+      };
+      console.log('✅ Vytvorená časť:', partName);
+    }
+    
+    // 6. ULOŽIŤ DO FIREBASE
+    console.log('💾 Ukladám do Firebase...');
+    await saveProjectsToFirebase();
+    
+    // 7. NAČÍTAŤ SPÄŤ
+    console.log('📥 Načítavam späť...');
+    await loadProjectsFromFirebase();
+    
+    // 8. PREPNÚŤ NA MONSTERAS
+    projectsData.currentProject = 'Monsteras';
+    projectsData.currentPart = 'Dry';
+    
+    // 9. REFRESH UI
+    updateProjectsUI();
+    
+    alert(`✅ RESET HOTOVÝ!\n\nProjekt: Monsteras\nČasti: 5\n\nDry, FLA, Sul, Lig, Lht\n\nIzometrie: ${isometricsSnapshot.size}\nČasti z izometrií: ${partsFound.size}`);
+    
+  } catch(err) {
+    console.error('❌ Chyba pri resete:', err);
+    alert('❌ Chyba: ' + err.message);
+  }
+}
+
 // Vyčistiť Firebase od zlých projektov a duplicít
 async function cleanupFirebaseProjects() {
   if(!db) {
