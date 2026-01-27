@@ -270,16 +270,28 @@ window.addEventListener('load', function() {
 
 async function uploadProjectToFirebase(projectData) {
   if (!db) throw new Error('Firebase not ready');
+  
+  console.log('🔥 UPLOAD TO FIREBASE - DEBUG:');
+  console.log('  projectData.welds.length:', projectData.welds?.length || 0);
+  console.log('  projectData.projectName:', projectData.projectName);
+  console.log('  projectData.partName:', projectData.partName);
+  
   const projectName = projectData.projectName || 'project';
   const partName = projectData.partName;
   
   // Ak je časť definovaná, použi projectName_partName, inak len projectName
   const docId = partName ? (projectName + '_' + partName) : projectName;
   
+  console.log('🔥 Budem ukladať ako docId:', docId);
+  
   const jsonString = JSON.stringify(projectData);
+  console.log('🔥 JSON string size:', (jsonString.length / 1024).toFixed(1), 'KB');
+  
   const CHUNK_SIZE = 800 * 1024;
   const chunks = [];
   for (let i = 0; i < jsonString.length; i += CHUNK_SIZE) chunks.push(jsonString.slice(i, i + CHUNK_SIZE));
+  
+  console.log('🔥 Počet chunkov:', chunks.length);
   
   const metadata = {
     name: projectName, 
@@ -294,12 +306,19 @@ async function uploadProjectToFirebase(projectData) {
   // VYMAZAŤ STARÉ CHUNKY PRED ULOŽENÍM NOVÝCH!
   console.log('🗑️ Vymazávam staré chunky pre:', docId);
   const oldChunks = await db.collection('projects').doc(docId).collection('data').get();
+  console.log('🗑️ Našiel som', oldChunks.docs.length, 'starých chunkov');
   for(const chunkDoc of oldChunks.docs) {
     await chunkDoc.ref.delete();
   }
+  console.log('🗑️ Staré chunky vymazané');
   
+  console.log('💾 Ukladám metadata...');
   await db.collection('projects').doc(docId).set(metadata);
-  for (let i = 0; i < chunks.length; i++) await db.collection('projects').doc(docId).collection('data').doc('c' + i).set({d: chunks[i]});
+  console.log('💾 Ukladám chunky...');
+  for (let i = 0; i < chunks.length; i++) {
+    await db.collection('projects').doc(docId).collection('data').doc('c' + i).set({d: chunks[i]});
+    console.log('💾 Chunk', i+1, '/', chunks.length, 'uložený');
+  }
   console.log('✅ Uploaded:',docId);
 }
 
@@ -6317,6 +6336,13 @@ var pdfDataUrl='';
 
 // Funkcia na uloženie dát
 async function uploadData(){
+  console.log('💾 UKLADANIE DO KNIŽNICE - DEBUG:');
+  console.log('  ws.length:', ws.length);
+  console.log('  spools.length:', spools.length);
+  console.log('  arrows.length:', arrows.length);
+  console.log('  texts.length:', texts.length);
+  console.log('  lines.length:', lines.length);
+  
   var projectData={
   welds:ws,
   spools:spools,
@@ -6339,6 +6365,12 @@ async function uploadData(){
   pdfData:pdfDataUrl,
   savedDate:new Date().toISOString()
   };
+  
+  console.log('💾 ProjectData vytvorené:', {
+    welds: projectData.welds.length,
+    projectName: projectData.projectName,
+    partName: projectData.partName
+  });
   try{
   await uploadProjectToFirebase(projectData);
   alert('✅ Projekt uložený do knižnice!');
