@@ -1157,6 +1157,15 @@ var yy=param<0?y1:param>1?y2:y1+param*D;
 if(Math.sqrt(Math.pow(x-xx,2)+Math.pow(y-yy,2))<15)return {type:'curve',index:i,object:curve};
 }
 }
+
+// Dimensions (domerky)
+for(var i=dimensions.length-1;i>=0;i--){
+var dim=dimensions[i];
+var dimX=dim.x*ca.width;
+var dimY=dim.y*ca.height;
+if(Math.sqrt(Math.pow(x-dimX,2)+Math.pow(y-dimY,2))<40)return {type:'dimension',index:i,object:dim};
+}
+
 return null;
 }
 
@@ -1194,10 +1203,10 @@ return;
 var detected=detectObjectAt(x,y);
 
 if(detected){
-// Ak je to text, nastav ho ako vybraný pre rotáciu
-if(detected.type==='text'){
-selectedTextForRotation={type:'text',object:detected.object};
-console.log('✅ Text vybraný pre rotáciu:', detected.object.text);
+// Ak je to text, šípka alebo domerok, nastav ho ako vybraný pre rotáciu
+if(detected.type==='text' || detected.type==='arrow' || detected.type==='dimension'){
+selectedTextForRotation={type:detected.type,object:detected.object};
+console.log('✅',detected.type,'vybraný pre rotáciu');
 dw(); // Prekreslenie aby sa zobrazila rotačná ikona
 }
 
@@ -1273,6 +1282,9 @@ var centerY=sumY/dragObject.points.length;
 var dx=newX-centerX;
 var dy=newY-centerY;
 dragObject.points.forEach(function(pt){pt.x+=dx;pt.y+=dy;});
+}else if(dragType==='dimension'){
+dragObject.x=newX;
+dragObject.y=newY;
 }
 dw();
 }
@@ -1350,7 +1362,10 @@ dw();
 if(isRotating){
 isRotating=false;
 ca.style.cursor='default';
+justFinishedDrag=true; // Zabráni clicku hneď po rotácii
+setTimeout(function(){justFinishedDrag=false;},100);
 console.log('✅ Rotácia ukončená:',selectedTextForRotation.object.rotation+'°');
+dw();
 }
 };
 
@@ -2398,12 +2413,30 @@ t.textContent=txt.text;
 ov.appendChild(t);
 });
 
-// Rámček + rotation ikona pre vybraný text
-if(selectedTextForRotation && selectedTextForRotation.type==='text'){
-var txt=selectedTextForRotation.object;
-var txtX=txt.x*ca.width;
-var txtY=txt.y*ca.height;
-var bbox={x:txtX-10,y:txtY-txt.size,width:txt.text.length*txt.size*0.6+20,height:txt.size*2};
+// Rámček + rotation ikona pre vybraný objekt (text, arrow, dimension)
+if(selectedTextForRotation){
+var obj=selectedTextForRotation.object;
+var objX=obj.x*ca.width;
+var objY=obj.y*ca.height;
+var bbox;
+
+if(selectedTextForRotation.type==='text'){
+bbox={x:objX-10,y:objY-obj.size,width:obj.text.length*obj.size*0.6+20,height:obj.size*2};
+}else if(selectedTextForRotation.type==='dimension'){
+bbox={x:objX-10,y:objY-20,width:obj.text.length*12+20,height:40};
+}else if(selectedTextForRotation.type==='arrow'){
+var x1=obj.start.x*ca.width;
+var y1=obj.start.y*ca.height;
+var x2=obj.end.x*ca.width;
+var y2=obj.end.y*ca.height;
+var minX=Math.min(x1,x2)-10;
+var minY=Math.min(y1,y2)-10;
+var maxX=Math.max(x1,x2)+10;
+var maxY=Math.max(y1,y2)+10;
+bbox={x:minX,y:minY,width:maxX-minX,height:maxY-minY};
+objX=(x1+x2)/2;
+objY=(y1+y2)/2;
+}
 
 var rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
 rect.setAttribute('x',bbox.x);
