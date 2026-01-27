@@ -6366,6 +6366,10 @@ async function uploadData(){
   spools:spools,
   crosses:crosses,
   dimensions:dimensions,
+  lines:lines,
+  arrows:arrows,
+  texts:texts,
+  curves:curves,
   spoolData:spoolData,
   materials:weldLogMaterials,
   weldAssignments:weldAssignments,
@@ -6433,6 +6437,10 @@ ws=projectData.welds||[];
 spools=projectData.spools||[];
 crosses=projectData.crosses||[];
 dimensions=projectData.dimensions||[];
+lines=projectData.lines||[];
+arrows=projectData.arrows||[];
+texts=projectData.texts||[];
+curves=projectData.curves||[];
 spoolData=projectData.spoolData||[];
 weldLogMaterials=projectData.materials||[];
 weldAssignments=projectData.weldAssignments||{};
@@ -6679,6 +6687,79 @@ tempCtx.textAlign='center';
 tempCtx.textBaseline='middle';
 tempCtx.fillText(s.displayNum,endX,endY);
 });
+
+// Palličky
+lines.forEach(function(line){
+var x1=line.start.x*ca.width;
+var y1=line.start.y*ca.height;
+var x2=line.end.x*ca.width;
+var y2=line.end.y*ca.height;
+tempCtx.strokeStyle=line.color;
+tempCtx.lineWidth=line.width;
+tempCtx.beginPath();
+tempCtx.moveTo(x1,y1);
+tempCtx.lineTo(x2,y2);
+tempCtx.stroke();
+});
+
+// Šípky
+arrows.forEach(function(arrow){
+var x1=arrow.start.x*ca.width;
+var y1=arrow.start.y*ca.height;
+var x2=arrow.end.x*ca.width;
+var y2=arrow.end.y*ca.height;
+tempCtx.strokeStyle=arrow.color||'#FF0000';
+tempCtx.lineWidth=arrow.width||2;
+tempCtx.beginPath();
+tempCtx.moveTo(x1,y1);
+tempCtx.lineTo(x2,y2);
+tempCtx.stroke();
+// Šípka
+var angle=Math.atan2(y2-y1,x2-x1);
+var arrowSize=15;
+var a1x=x2-arrowSize*Math.cos(angle-Math.PI/6);
+var a1y=y2-arrowSize*Math.sin(angle-Math.PI/6);
+var a2x=x2-arrowSize*Math.cos(angle+Math.PI/6);
+var a2y=y2-arrowSize*Math.sin(angle+Math.PI/6);
+tempCtx.beginPath();
+tempCtx.moveTo(x2,y2);
+tempCtx.lineTo(a1x,a1y);
+tempCtx.moveTo(x2,y2);
+tempCtx.lineTo(a2x,a2y);
+tempCtx.stroke();
+});
+
+// Texty
+texts.forEach(function(txt){
+var txtX=txt.x*ca.width;
+var txtY=txt.y*ca.height;
+tempCtx.save();
+tempCtx.translate(txtX,txtY);
+if(txt.rotation)tempCtx.rotate(txt.rotation*Math.PI/180);
+tempCtx.fillStyle=txt.color;
+tempCtx.font='bold '+txt.size+'px Arial';
+tempCtx.textAlign='start';
+tempCtx.textBaseline='middle';
+tempCtx.fillText(txt.text,0,0);
+tempCtx.restore();
+});
+
+// Oblúčiky
+curves.forEach(function(curve){
+if(curve.points.length<2)return;
+tempCtx.strokeStyle=curve.color||'#FF0000';
+tempCtx.lineWidth=curve.width||2;
+tempCtx.beginPath();
+var firstPt=curve.points[0];
+tempCtx.moveTo(firstPt.x*ca.width,firstPt.y*ca.height);
+for(var i=1;i<curve.points.length;i++){
+var pt=curve.points[i];
+tempCtx.lineTo(pt.x*ca.width,pt.y*ca.height);
+}
+tempCtx.closePath();
+tempCtx.stroke();
+});
+
 }else{
 console.log('✏️ PDF export: RED PEN mode - len zvary');
 }
