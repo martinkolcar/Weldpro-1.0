@@ -784,7 +784,10 @@ function saveKontrolaData(){
   if(!projectsData.currentProject || !projectsData.currentPart)return;
   var key='kontrola_'+projectsData.currentProject+'_'+projectsData.currentPart;
   localStorage.setItem(key,JSON.stringify(kontrolaData));
-  console.log('💾 Kontrola data uložené');
+  console.log('💾 Kontrola data uložené do localStorage');
+  
+  // Uložiť aj do Firebase
+  saveProjectsToFirebase();
 }
 
 function loadKontrolaData(){
@@ -4321,7 +4324,10 @@ function saveMTOData(){
 if(!projectsData.currentProject || !projectsData.currentPart)return;
 var key='mto_'+projectsData.currentProject+'_'+projectsData.currentPart;
 localStorage.setItem(key,JSON.stringify(mtoData));
-console.log('💾 MTO data uložené');
+console.log('💾 MTO data uložené do localStorage');
+
+// Uložiť aj do Firebase
+saveProjectsToFirebase();
 }
 
 // ============= EXPORT SYSTÉM - BALÍKY A DODACIE LISTY =============
@@ -4352,7 +4358,10 @@ function saveExportData(){
 if(!projectsData.currentProject || !projectsData.currentPart)return;
 var key='export_'+projectsData.currentProject+'_'+projectsData.currentPart;
 localStorage.setItem(key,JSON.stringify(exportData));
-console.log('💾 Export data uložené');
+console.log('💾 Export data uložené do localStorage');
+
+// Uložiť aj do Firebase
+saveProjectsToFirebase();
 }
 
 function getNextPackageNumber(){
@@ -5999,7 +6008,10 @@ function saveVyrobaData(){
 if(!projectsData.currentProject)return;
 var key='vyroba_'+projectsData.currentProject;
 localStorage.setItem(key,JSON.stringify(vyrobaData));
-console.log('💾 Výroba data uložené');
+console.log('💾 Výroba data uložené do localStorage');
+
+// Uložiť aj do Firebase
+saveProjectsToFirebase();
 }
 
 function loadIsometries(files){
@@ -7682,9 +7694,22 @@ async function saveProjectsToFirebase() {
     for(const projectName in projectsData.projects) {
       const project = projectsData.projects[projectName];
       
+      // Načítať Výroba data pre tento projekt
+      const vyrobaKey = 'vyroba_' + projectName;
+      let vyrobaDataForProject = {};
+      try {
+        const saved = localStorage.getItem(vyrobaKey);
+        if(saved) {
+          vyrobaDataForProject = JSON.parse(saved);
+        }
+      } catch(e) {
+        console.warn('⚠️ Chyba pri načítaní Výroba pre', projectName, e);
+      }
+      
       await db.collection('projects_structure').doc(projectName).set({
         name: projectName,
         parts: Object.keys(project.parts),
+        vyrobaData: vyrobaDataForProject,
         created: project.created || new Date().toISOString(),
         lastModified: new Date().toISOString(),
         createdBy: project.createdBy || window.currentUser.username
@@ -7693,6 +7718,43 @@ async function saveProjectsToFirebase() {
       // Uložiť časti projektu
       for(const partName in project.parts) {
         const part = project.parts[partName];
+        
+        // Načítať MTO data pre túto časť z localStorage
+        const mtoKey = 'mto_' + projectName + '_' + partName;
+        let mtoDataForPart = {materials:[],isometricMaterials:{},deliveryNotes:[],stock:[]};
+        try {
+          const saved = localStorage.getItem(mtoKey);
+          if(saved) {
+            mtoDataForPart = JSON.parse(saved);
+          }
+        } catch(e) {
+          console.warn('⚠️ Chyba pri načítaní MTO pre', partName, e);
+        }
+        
+        // Načítať Kontrola data pre túto časť z localStorage
+        const kontrolaKey = 'kontrola_' + projectName + '_' + partName;
+        let kontrolaDataForPart = {expandedRoutes:{},expandedSpools:{},completedWelds:{},welderData:{},dateData:{},qrCodes:{}};
+        try {
+          const saved = localStorage.getItem(kontrolaKey);
+          if(saved) {
+            kontrolaDataForPart = JSON.parse(saved);
+          }
+        } catch(e) {
+          console.warn('⚠️ Chyba pri načítaní Kontrola pre', partName, e);
+        }
+        
+        // Načítať Export data pre túto časť z localStorage
+        const exportKey = 'export_' + projectName + '_' + partName;
+        let exportDataForPart = {packages:{},deliveryNotes:[]};
+        try {
+          const saved = localStorage.getItem(exportKey);
+          if(saved) {
+            exportDataForPart = JSON.parse(saved);
+          }
+        } catch(e) {
+          console.warn('⚠️ Chyba pri načítaní Export pre', partName, e);
+        }
+        
         await db.collection('projects_structure')
           .doc(projectName)
           .collection('parts')
@@ -7700,6 +7762,9 @@ async function saveProjectsToFirebase() {
           .set({
             name: partName,
             weldBookData: part.weldBookData || [],
+            mtoData: mtoDataForPart,
+            kontrolaData: kontrolaDataForPart,
+            exportData: exportDataForPart,
             created: part.created || new Date().toISOString(),
             lastModified: part.lastModified || new Date().toISOString()
           });
@@ -7745,6 +7810,13 @@ async function loadProjectsFromFirebase() {
         createdBy: projectData.createdBy
       };
       
+      // Uložiť Výroba data do localStorage
+      if(projectData.vyrobaData) {
+        const vyrobaKey = 'vyroba_' + projectName;
+        localStorage.setItem(vyrobaKey, JSON.stringify(projectData.vyrobaData));
+        console.log('🏭 Výroba data načítané pre', projectName);
+      }
+      
       // Načítať časti projektu
       const partsSnapshot = await db.collection('projects_structure')
         .doc(projectName)
@@ -7758,6 +7830,27 @@ async function loadProjectsFromFirebase() {
           created: partData.created,
           lastModified: partData.lastModified
         };
+        
+        // Uložiť MTO data do localStorage pre túto časť
+        if(partData.mtoData) {
+          const mtoKey = 'mto_' + projectName + '_' + partDoc.id;
+          localStorage.setItem(mtoKey, JSON.stringify(partData.mtoData));
+          console.log('📋 MTO načítané pre', projectName, '/', partDoc.id);
+        }
+        
+        // Uložiť Kontrola data do localStorage
+        if(partData.kontrolaData) {
+          const kontrolaKey = 'kontrola_' + projectName + '_' + partDoc.id;
+          localStorage.setItem(kontrolaKey, JSON.stringify(partData.kontrolaData));
+          console.log('✅ Kontrola data načítané pre', projectName, '/', partDoc.id);
+        }
+        
+        // Uložiť Export data do localStorage
+        if(partData.exportData) {
+          const exportKey = 'export_' + projectName + '_' + partDoc.id;
+          localStorage.setItem(exportKey, JSON.stringify(partData.exportData));
+          console.log('📦 Export data načítané pre', projectName, '/', partDoc.id);
+        }
       }
       
       hasValidProject = true;
@@ -7789,64 +7882,84 @@ async function restoreProjectsFromIsometrics() {
     return;
   }
   
-  if(!confirm('🔄 Obnoviť projekty z existujúcich izometrií?\n\nTáto akcia načíta všetky projekty a časti z Firebase knižnice izometrií.')) {
+  const projectNameInput = prompt('📝 Zadaj názov projektu:\n\n(Všetky izometrie budú priradené k tomuto projektu)', 'Monsteras');
+  
+  if(!projectNameInput || projectNameInput.trim() === '') {
+    alert('❌ Názov projektu nemôže byť prázdny!');
     return;
   }
   
+  const mainProjectName = projectNameInput.trim();
+  
   try {
-    console.log('🔄 Obnovovanie projektov...');
+    console.log('🔄 Obnovovanie projektu:', mainProjectName);
     
     const snapshot = await db.collection('projects').get();
-    const projectsFound = new Set();
-    const partsFound = {};
+    const partsFound = new Set();
     
     snapshot.forEach(doc => {
       const data = doc.data();
-      if(data.name) {
-        // Extrahuj projekt z názvu (napr. "FLA_PIPE_ISOMETRIC" -> "FLA")
-        const projectName = data.name.split('_')[0];
-        projectsFound.add(projectName);
-        
-        if(data.part) {
-          if(!partsFound[projectName]) partsFound[projectName] = new Set();
-          partsFound[projectName].add(data.part);
-        }
+      
+      // Pridaj všetky časti ktoré majú part field
+      if(data.part) {
+        partsFound.add(data.part);
+        console.log('✅ Nájdená časť:', data.part, 'z dokumentu:', doc.id);
       }
     });
     
-    console.log('📊 Nájdené projekty:', Array.from(projectsFound));
-    console.log('📊 Nájdené časti:', partsFound);
+    console.log('📊 Nájdené časti:', Array.from(partsFound));
     
-    // Vytvoriť projekty v Firebase
-    for(const projectName of projectsFound) {
-      if(!projectsData.projects[projectName]) {
-        projectsData.projects[projectName] = {
-          parts: {},
+    if(partsFound.size === 0) {
+      alert('❌ Žiadne časti nenájdené!\n\nIzometrie nemajú nastavené pole "part".');
+      return;
+    }
+    
+    // Vytvoriť projekt
+    if(!projectsData.projects[mainProjectName]) {
+      projectsData.projects[mainProjectName] = {
+        parts: {},
+        created: new Date().toISOString(),
+        createdBy: window.currentUser?.username || 'system'
+      };
+    }
+    
+    // Vytvoriť časti
+    for(const partName of partsFound) {
+      if(!projectsData.projects[mainProjectName].parts[partName]) {
+        projectsData.projects[mainProjectName].parts[partName] = {
+          weldBookData: [],
           created: new Date().toISOString(),
-          createdBy: window.currentUser?.username || 'system'
+          lastModified: new Date().toISOString()
         };
+        console.log('✅ Vytvorená časť:', partName);
       }
-      
-      // Vytvor časti
-      const parts = partsFound[projectName] || new Set(['Časť 1']);
-      for(const partName of parts) {
-        if(!projectsData.projects[projectName].parts[partName]) {
-          projectsData.projects[projectName].parts[partName] = {
-            weldBookData: [],
-            created: new Date().toISOString(),
-            lastModified: new Date().toISOString()
-          };
-        }
+    }
+    
+    // Pridaj aj prázdne časti Lig a Lht ak chýbajú
+    const standardParts = ['Dry', 'FLA', 'Sul', 'Lig', 'Lht'];
+    for(const partName of standardParts) {
+      if(!projectsData.projects[mainProjectName].parts[partName]) {
+        projectsData.projects[mainProjectName].parts[partName] = {
+          weldBookData: [],
+          created: new Date().toISOString(),
+          lastModified: new Date().toISOString()
+        };
+        console.log('➕ Pridaná štandardná časť:', partName);
       }
     }
     
     // Uložiť do Firebase
     await saveProjectsToFirebase();
     
+    // Prepnúť na tento projekt
+    projectsData.currentProject = mainProjectName;
+    projectsData.currentPart = Array.from(partsFound)[0] || 'Dry';
+    
     // Refresh UI
     updateProjectsUI();
     
-    alert(`✅ Obnovené!\n\nProjekty: ${projectsFound.size}\nČasti: ${Object.values(partsFound).reduce((sum, set) => sum + set.size, 0)}`);
+    const totalParts = Object.keys(projectsData.projects[mainProjectName].parts).length;
+    alert(`✅ Obnovené!\n\nProjekt: ${mainProjectName}\nČasti: ${totalParts}\n\n${Array.from(Object.keys(projectsData.projects[mainProjectName].parts)).join(', ')}`);
     
   } catch(err) {
     console.error('❌ Chyba pri obnove:', err);
