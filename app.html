@@ -703,7 +703,7 @@ async function listProjectsFromFirebase() {
     
     <div class="panel-section">
       <div class="section-label">Projekt:</div>
-      <div id="currentProjectDisplay" class="current-display">-</div>
+      <div id="projectsList" class="parts-list"></div>
       <button class="btn-panel" onclick="promptNewProject()">➕ Nový projekt</button>
       <button class="btn-panel" onclick="restoreProjectsFromIsometrics()" style="background:#10b981;color:white;margin-top:5px">🔄 Obnov projekty</button>
     </div>
@@ -8123,83 +8123,94 @@ function promptNewPart() {
 }
 
 function updateProjectsUI() {
-  // Update project display
-  document.getElementById('currentProjectDisplay').textContent = projectsData.currentProject || '-';
+  // Update projects list
+  var projectsList = document.getElementById('projectsList');
+  if(projectsList) {
+    projectsList.innerHTML = '';
+    
+    var projectNames = Object.keys(projectsData.projects);
+    
+    if(projectNames.length === 0) {
+      projectsList.innerHTML = '<div style="text-align:center;color:#999;padding:10px;font-size:12px">Žiadne projekty</div>';
+    } else {
+      projectNames.forEach(function(projectName) {
+        var isActive = projectName === projectsData.currentProject;
+        
+        var div = document.createElement('div');
+        div.className = 'part-item' + (isActive ? ' active' : '');
+        div.style.cursor = 'pointer';
+        
+        var nameSpan = document.createElement('span');
+        nameSpan.textContent = '📁 ' + projectName;
+        nameSpan.style.flex = '1';
+        
+        div.appendChild(nameSpan);
+        
+        div.onclick = function() {
+          if (switchToProject(projectName)) {
+            updateProjectsUI();
+            alert('✅ Prepnuté na projekt: ' + projectName);
+          }
+        };
+        
+        projectsList.appendChild(div);
+      });
+    }
+  }
   
-  // Update part display
-  document.getElementById('currentPartDisplay').textContent = projectsData.currentPart || '-';
+  // Update part display (keep for info)
+  var currentPartDisplay = document.getElementById('currentPartDisplay');
+  if(currentPartDisplay) {
+    currentPartDisplay.textContent = projectsData.currentPart || '-';
+  }
   
   // Update parts list
   var partsList = document.getElementById('partsList');
-  partsList.innerHTML = '';
-  
-  if (projectsData.currentProject && projectsData.projects[projectsData.currentProject]) {
-    var currentProj = projectsData.projects[projectsData.currentProject];
-    var parts = Object.keys(currentProj.parts);
+  if(partsList) {
+    partsList.innerHTML = '';
     
-    parts.forEach(function(partName) {
-      var part = currentProj.parts[partName];
-      var weldCount = part.weldBookData ? part.weldBookData.length : 0;
-      var isActive = partName === projectsData.currentPart;
+    if (projectsData.currentProject && projectsData.projects[projectsData.currentProject]) {
+      var currentProj = projectsData.projects[projectsData.currentProject];
+      var parts = Object.keys(currentProj.parts);
       
-      var div = document.createElement('div');
-      div.className = 'part-item' + (isActive ? ' active' : '');
-      
-      var nameSpan = document.createElement('span');
-      nameSpan.textContent = '📁 ' + partName;
-      nameSpan.style.flex = '1';
-      nameSpan.style.cursor = 'pointer';
-      nameSpan.onclick = function() {
-        if (switchToPart(partName)) {
-          updateProjectsUI();
-          if (weldBookGrid && weldBookGrid.api) {
-            weldBookGrid.api.setRowData(weldBookData);
-          }
-          alert('✅ Prepnuté na: ' + partName + '\n\nZvarov: ' + weldCount);
-        }
-      };
-      nameSpan.ondblclick = function(e) {
-        e.stopPropagation();
-        promptRenamePart(partName);
-      };
-      
-      var buttonsDiv = document.createElement('div');
-      buttonsDiv.style.display = 'flex';
-      buttonsDiv.style.gap = '5px';
-      buttonsDiv.style.alignItems = 'center';
-      
-      var countSpan = document.createElement('span');
-      countSpan.className = 'part-count';
-      countSpan.textContent = weldCount;
-      
-      var editBtn = document.createElement('button');
-      editBtn.textContent = '✏️';
-      editBtn.style.cssText = 'background:rgba(255,255,255,0.2);border:none;color:white;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:11px';
-      editBtn.onclick = function(e) {
-        e.stopPropagation();
-        promptRenamePart(partName);
-      };
-      
-      var delBtn = document.createElement('button');
-      delBtn.textContent = '🗑️';
-      delBtn.style.cssText = 'background:rgba(239,68,68,0.6);border:none;color:white;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:11px';
-      delBtn.onclick = function(e) {
-        e.stopPropagation();
-        promptDeletePart(partName);
-      };
-      
-      buttonsDiv.appendChild(countSpan);
-      buttonsDiv.appendChild(editBtn);
-      buttonsDiv.appendChild(delBtn);
-      
-      div.appendChild(nameSpan);
-      div.appendChild(buttonsDiv);
-      
-      partsList.appendChild(div);
-    });
-    
-    if (parts.length === 0) {
-      partsList.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.5);font-size:12px">Žiadne časti<br><small>Kliknite "➕ Nová časť"</small></div>';
+      if(parts.length === 0) {
+        partsList.innerHTML = '<div style="text-align:center;color:#999;padding:10px;font-size:12px">Žiadne časti</div>';
+      } else {
+        parts.forEach(function(partName) {
+          var part = currentProj.parts[partName];
+          var weldCount = part.weldBookData ? part.weldBookData.length : 0;
+          var isActive = partName === projectsData.currentPart;
+          
+          var div = document.createElement('div');
+          div.className = 'part-item' + (isActive ? ' active' : '');
+          
+          var nameSpan = document.createElement('span');
+          nameSpan.textContent = '📂 ' + partName;
+          nameSpan.style.flex = '1';
+          nameSpan.style.cursor = 'pointer';
+          nameSpan.onclick = function() {
+            if (switchToPart(partName)) {
+              updateProjectsUI();
+              if (weldBookGrid && weldBookGrid.api) {
+                weldBookGrid.api.setRowData(weldBookData);
+              }
+              alert('✅ Prepnuté na: ' + partName + '\n\nZvarov: ' + weldCount);
+            }
+          };
+          
+          var countSpan = document.createElement('span');
+          countSpan.textContent = '(' + weldCount + ')';
+          countSpan.style.fontSize = '11px';
+          countSpan.style.color = '#999';
+          
+          div.appendChild(nameSpan);
+          div.appendChild(countSpan);
+          
+          partsList.appendChild(div);
+        });
+      }
+    } else {
+      partsList.innerHTML = '<div style="text-align:center;color:#999;padding:10px;font-size:12px">Vyber projekt</div>';
     }
   }
 }
