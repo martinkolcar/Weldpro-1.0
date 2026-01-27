@@ -938,8 +938,12 @@ currentTool=tool;
 pt=null;
 crossPt=null;
 linePt=null;
+arrowPt=null; // Reset arrow point
+curvePts=[]; // Reset curve points
 dimensionMode=false;
 moveLineMode=false;
+
+console.log('🔧 Tool changed to:', tool);
 
 // Skry draw tool menu pri prepnutí
 document.getElementById('lineOptions').style.display='none';
@@ -967,9 +971,11 @@ dw();
 
 function setWeldMode(oneClick){
 oneClickMode=oneClick;
+currentTool=''; // Reset tool aby fungoval oneClickMode
 pt=null;
 document.getElementById('oneclickbtn').style.opacity=oneClick?'1':'0.7';
 document.getElementById('twoclickbtn').style.opacity=oneClick?'0.7':'1';
+console.log('⚙️ Weld mode:', oneClick?'ONE-CLICK':'TWO-CLICK', '| currentTool:', currentTool);
 dw();
 }
 
@@ -6383,6 +6389,20 @@ if(!projectData.welds){
 alert('❌ Neplatný projekt súbor!');
 return;
 }
+// VYČISTIŤ VŠETKO PRED NAČÍTANÍM NOVÉHO PROJEKTU!
+console.log('🧹 Čistenie starých dát pred načítaním...');
+ws=[];
+spools=[];
+crosses=[];
+dimensions=[];
+lines=[];
+arrows=[];
+texts=[];
+curves=[];
+spoolData=[];
+weldLogMaterials=[];
+weldAssignments={};
+
 ws=projectData.welds||[];
 spools=projectData.spools||[];
 crosses=projectData.crosses||[];
