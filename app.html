@@ -1791,7 +1791,7 @@ dw();
 return;
 }
 
-if(oneClickMode){
+if(oneClickMode && currentTool!=='select'){
 if(!pt){
 var clickPos={x:x,y:y};
 var id=Date.now()+'_'+Math.random();
@@ -3849,89 +3849,37 @@ function undo(){
 if(pt){
 pt=null;
 dw();
+console.log('↩️ Undo - zrušený dočasný bod');
 return;
 }
 if(linePt){
 linePt=null;
 dw();
+console.log('↩️ Undo - zrušená dočasná palička');
 return;
 }
 if(arrowPt){
 arrowPt=null;
 dw();
+console.log('↩️ Undo - zrušená dočasná šípka');
 return;
 }
 if(crossPt){
 crossPt=null;
 dw();
+console.log('↩️ Undo - zrušený dočasný krížik');
 return;
 }
 if(curvePts.length>0){
 curvePts=[];
 dw();
+console.log('↩️ Undo - zrušený dočasný oblúčik');
 return;
 }
 
-// Skús zmazať poslednú šípku
-if(arrows.length>0){
-arrows.pop();
-dw();
-console.log('↩️ Undo - zmazaná šípka');
-return;
-}
-
-// Skús zmazať posledný oblúčik
-if(curves.length>0){
-curves.pop();
-dw();
-console.log('↩️ Undo - zmazaný oblúčik');
-return;
-}
-
-// Skús zmazať posledný text
-if(texts.length>0){
-texts.pop();
-dw();
-console.log('↩️ Undo - zmazaný text');
-return;
-}
-
-// Skús zmazať poslednú palička
-if(lines.length>0){
-lines.pop();
-dw();
-console.log('↩️ Undo - zmazaná palička');
-if(lines.length===0 && weldHistory.length===0 && crosses.length===0){
-document.getElementById('undo').disabled=true;
-}
-return;
-}
-
-// Skús zmazať posledný krížik
-if(crosses.length>0){
-crosses.pop();
-dw();
-console.log('↩️ Undo - zmazaný krížik');
-if(crosses.length===0 && weldHistory.length===0){
-document.getElementById('undo').disabled=true;
-}
-return;
-}
-
-// Skús zmazať posledný zvar
-if(weldHistory.length>0){
-var lastWeld=weldHistory.pop();
-ws=ws.filter(function(w){return w.id!==lastWeld.id;});
-removeWeldFromWeldBook(lastWeld.displayNum);
-cn--;
-if(cn<startNum)cn=startNum;
-up();
-dw();
-console.log('↩️ Undo - zmazaný zvar',lastWeld.displayNum);
-if(weldHistory.length===0){
-document.getElementById('undo').disabled=true;
-}
-return;
+// HOTOVÉ OBJEKTY SA NEMAŽÚ - LEN MANUÁLNE CEZ EDITÁCIU
+console.log('⚠️ Undo: Hotové objekty sa mažú len manuálne v editačnom móde');
+alert('⚠️ Undo funguje len pre nedokončené veci.\n\nHotové zvary, texty, šípky sa mažú manuálne:\n1. Click na objekt\n2. Delete key');
 }
 
 alert('⚠️ Nič na zmazanie!');
