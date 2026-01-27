@@ -706,6 +706,7 @@ async function listProjectsFromFirebase() {
       <div id="projectsList" class="parts-list"></div>
       <button class="btn-panel" onclick="promptNewProject()">➕ Nový projekt</button>
       <button class="btn-panel" onclick="restoreProjectsFromIsometrics()" style="background:#10b981;color:white;margin-top:5px">🔄 Obnov projekty</button>
+      <button class="btn-panel" onclick="cleanupFirebaseProjects()" style="background:#ef4444;color:white;margin-top:5px">🧹 Vyčistiť Firebase</button>
     </div>
     
     <div class="panel-section">
@@ -7876,6 +7877,81 @@ async function loadProjectsFromFirebase() {
 }
 
 // Obnoviť projekty z existujúcich izometrií
+// Vyčistiť Firebase od zlých projektov a duplicít
+async function cleanupFirebaseProjects() {
+  if(!db) {
+    alert('❌ Firebase nie je dostupný!');
+    return;
+  }
+  
+  if(!confirm('🧹 Vyčistiť Firebase?\n\nTáto akcia:\n1. Vymaže zlé projekty (DRY, FLA, SUL, "Môj prvý projekt")\n2. Vymaže duplicitné časti v Monsteras\n3. Zachová len správnu štruktúru\n\nPokračovať?')) {
+    return;
+  }
+  
+  try {
+    console.log('🧹 Čistenie Firebase...');
+    
+    // 1. Vymazať zlé projekty z Firebase
+    const badProjects = ['DRY', 'FLA', 'SUL', 'Môj prvý projekt', 'Moj prvý projekt', 'My first project'];
+    
+    for(const badProject of badProjects) {
+      try {
+        // Vymazať subcollection parts
+        const partsSnapshot = await db.collection('projects_structure')
+          .doc(badProject)
+          .collection('parts')
+          .get();
+        
+        for(const partDoc of partsSnapshot.docs) {
+          await partDoc.ref.delete();
+          console.log('🗑️ Vymazaná časť:', badProject, '/', partDoc.id);
+        }
+        
+        // Vymazať hlavný dokument
+        await db.collection('projects_structure').doc(badProject).delete();
+        console.log('🗑️ Vymazaný projekt:', badProject);
+      } catch(e) {
+        console.log('⚠️ Projekt', badProject, 'neexistuje alebo už bol vymazaný');
+      }
+    }
+    
+    // 2. Vymazať duplicitné časti v Monsteras
+    const monsterasPartsSnapshot = await db.collection('projects_structure')
+      .doc('Monsteras')
+      .collection('parts')
+      .get();
+    
+    const correctParts = ['Dry', 'FLA', 'Sul', 'Lig', 'Lht'];
+    
+    for(const partDoc of monsterasPartsSnapshot.docs) {
+      const partName = partDoc.id;
+      
+      // Ak časť NIE JE v zozname správnych častí → vymaž
+      if(!correctParts.includes(partName)) {
+        await partDoc.ref.delete();
+        console.log('🗑️ Vymazaná duplicitná časť:', partName);
+      }
+    }
+    
+    // 3. Vyčistiť projectsData v pamäti
+    for(const badProject of badProjects) {
+      if(projectsData.projects[badProject]) {
+        delete projectsData.projects[badProject];
+        console.log('🗑️ Vymazaný z pamäte:', badProject);
+      }
+    }
+    
+    // 4. Refresh UI
+    updateProjectsUI();
+    
+    alert('✅ Vyčistené!\n\nProjekt Monsteras má teraz 5 častí:\nDry, FLA, Sul, Lig, Lht');
+    
+  } catch(err) {
+    console.error('❌ Chyba pri čistení:', err);
+    alert('❌ Chyba: ' + err.message);
+  }
+}
+
 async function restoreProjectsFromIsometrics() {
   if(!db) {
     alert('❌ Firebase nie je dostupný!');
