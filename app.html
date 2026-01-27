@@ -2267,8 +2267,7 @@ ov.appendChild(ln);
 });
 } // End lines filter
 
-// Kreslenie šípok - len v PREFABRIKÁCIA
-if(activeTab==='prefab'){
+// Kreslenie šípok - VŠUDE (RED PEN aj PREFAB)
 arrows.forEach(function(arrow){
 var x1=arrow.start.x*ca.width;
 var y1=arrow.start.y*ca.height;
@@ -2389,7 +2388,6 @@ p4.setAttribute('stroke-dasharray','5,5');p4.setAttribute('opacity','0.7');
 ov.appendChild(p4);
 }
 }
-} // End arrows filter
 
 // Dočasná palička (pri kreslení) - čiara ide k myši
 if(linePt && currentTool==='line'){
@@ -2405,8 +2403,7 @@ ln.setAttribute('opacity','0.7');
 ov.appendChild(ln);
 }
 
-// Kreslenie textov - len v PREFABRIKÁCIA
-if(activeTab==='prefab'){
+// Kreslenie textov - VŠADE (RED PEN aj PREFAB)
 texts.forEach(function(txt){
 var txtX=txt.x*ca.width;
 var txtY=txt.y*ca.height;
@@ -2426,7 +2423,6 @@ t.setAttribute('transform','rotate('+txt.rotation+' '+txtX+' '+txtY+')');
 t.textContent=txt.text;
 ov.appendChild(t);
 });
-} // End texts filter
 
 // Rámček + rotation ikona pre vybraný objekt (text, arrow, dimension)
 if(selectedTextForRotation){
@@ -6770,7 +6766,48 @@ tempCtx.stroke();
 });
 
 }else{
-console.log('✏️ PDF export: RED PEN mode - len zvary');
+console.log('✏️ PDF export: RED PEN mode - zvary + text + šípky');
+
+// RED PEN: Texty
+texts.forEach(function(txt){
+var txtX=txt.x*ca.width;
+var txtY=txt.y*ca.height;
+tempCtx.save();
+tempCtx.translate(txtX,txtY);
+if(txt.rotation)tempCtx.rotate(txt.rotation*Math.PI/180);
+tempCtx.fillStyle=txt.color;
+tempCtx.font='bold '+txt.size+'px Arial';
+tempCtx.textAlign='start';
+tempCtx.textBaseline='middle';
+tempCtx.fillText(txt.text,0,0);
+tempCtx.restore();
+});
+
+// RED PEN: Šípky
+arrows.forEach(function(arrow){
+var x1=arrow.start.x*ca.width;
+var y1=arrow.start.y*ca.height;
+var x2=arrow.end.x*ca.width;
+var y2=arrow.end.y*ca.height;
+tempCtx.strokeStyle=arrow.color||'#FF0000';
+tempCtx.lineWidth=arrow.width||2;
+tempCtx.beginPath();
+tempCtx.moveTo(x1,y1);
+tempCtx.lineTo(x2,y2);
+tempCtx.stroke();
+var angle=Math.atan2(y2-y1,x2-x1);
+var arrowSize=15;
+var a1x=x2-arrowSize*Math.cos(angle-Math.PI/6);
+var a1y=y2-arrowSize*Math.sin(angle-Math.PI/6);
+var a2x=x2-arrowSize*Math.cos(angle+Math.PI/6);
+var a2y=y2-arrowSize*Math.sin(angle+Math.PI/6);
+tempCtx.beginPath();
+tempCtx.moveTo(x2,y2);
+tempCtx.lineTo(a1x,a1y);
+tempCtx.moveTo(x2,y2);
+tempCtx.lineTo(a2x,a2y);
+tempCtx.stroke();
+});
 }
 
 tempCtx.restore();
