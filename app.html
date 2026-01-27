@@ -1194,11 +1194,22 @@ return;
 var detected=detectObjectAt(x,y);
 
 if(detected){
+// Ak je to text, nastav ho ako vybraný pre rotáciu
+if(detected.type==='text'){
+selectedTextForRotation={type:'text',object:detected.object};
+console.log('✅ Text vybraný pre rotáciu:', detected.object.text);
+dw(); // Prekreslenie aby sa zobrazila rotačná ikona
+}
+
 isDragging=true;
 dragType=detected.type;
 dragObject=detected.object;
 ca.style.cursor='grabbing';
 }else{
+// Ak klik mimo - zruš výber
+selectedTextForRotation=null;
+dw();
+
 isPanning=true;
 panStartX=e.clientX;
 panStartY=e.clientY;
