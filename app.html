@@ -705,6 +705,7 @@ async function listProjectsFromFirebase() {
       <div class="section-label">Projekt:</div>
       <div id="currentProjectDisplay" class="current-display">-</div>
       <button class="btn-panel" onclick="promptNewProject()">➕ Nový projekt</button>
+      <button class="btn-panel" onclick="restoreProjectsFromIsometrics()" style="background:#10b981;color:white;margin-top:5px">🔄 Obnov projekty</button>
     </div>
     
     <div class="panel-section">
@@ -7662,10 +7663,201 @@ function closeWeldBook() {
 
 // ============= PROJEKTY & ČASTI - localStorage =============
 
+// 🔥 FIREBASE PROJEKT MANAGEMENT (nahradza localStorage)
+
+async function saveProjectsToFirebase() {
+  if(!db || !window.currentUser) {
+    console.warn('⚠️ Firebase alebo user nie je dostupný');
+    return;
+  }
+  
+  try {
+    // Uložiť štruktúru projektov do Firebase
+    await db.collection('projects_structure').doc('_metadata').set({
+      lastModified: firebase.firestore.FieldValue.serverTimestamp(),
+      modifiedBy: window.currentUser.username
+    });
+    
+    // Uložiť každý projekt
+    for(const projectName in projectsData.projects) {
+      const project = projectsData.projects[projectName];
+      
+      await db.collection('projects_structure').doc(projectName).set({
+        name: projectName,
+        parts: Object.keys(project.parts),
+        created: project.created || new Date().toISOString(),
+        lastModified: new Date().toISOString(),
+        createdBy: project.createdBy || window.currentUser.username
+      });
+      
+      // Uložiť časti projektu
+      for(const partName in project.parts) {
+        const part = project.parts[partName];
+        await db.collection('projects_structure')
+          .doc(projectName)
+          .collection('parts')
+          .doc(partName)
+          .set({
+            name: partName,
+            weldBookData: part.weldBookData || [],
+            created: part.created || new Date().toISOString(),
+            lastModified: part.lastModified || new Date().toISOString()
+          });
+      }
+    }
+    
+    console.log('✅ Projekty uložené do Firebase');
+  } catch(err) {
+    console.error('❌ Chyba pri ukladaní do Firebase:', err);
+  }
+}
+
+async function loadProjectsFromFirebase() {
+  if(!db) {
+    console.warn('⚠️ Firebase nie je dostupný, používam localStorage');
+    loadProjectsFromStorage();
+    return;
+  }
+  
+  try {
+    console.log('📥 Načítavam projekty z Firebase...');
+    
+    const projectsSnapshot = await db.collection('projects_structure').get();
+    
+    if(projectsSnapshot.empty || projectsSnapshot.size === 1) { // Len _metadata
+      console.log('📭 Žiadne projekty v Firebase, vytvárám default');
+      await createDefaultProject();
+      return;
+    }
+    
+    projectsData.projects = {};
+    let hasValidProject = false;
+    
+    for(const doc of projectsSnapshot.docs) {
+      if(doc.id === '_metadata') continue;
+      
+      const projectData = doc.data();
+      const projectName = doc.id;
+      
+      projectsData.projects[projectName] = {
+        parts: {},
+        created: projectData.created,
+        createdBy: projectData.createdBy
+      };
+      
+      // Načítať časti projektu
+      const partsSnapshot = await db.collection('projects_structure')
+        .doc(projectName)
+        .collection('parts')
+        .get();
+      
+      for(const partDoc of partsSnapshot.docs) {
+        const partData = partDoc.data();
+        projectsData.projects[projectName].parts[partDoc.id] = {
+          weldBookData: partData.weldBookData || [],
+          created: partData.created,
+          lastModified: partData.lastModified
+        };
+      }
+      
+      hasValidProject = true;
+    }
+    
+    if(!hasValidProject) {
+      await createDefaultProject();
+    } else {
+      // Nastav prvý projekt ako aktívny
+      const firstProject = Object.keys(projectsData.projects)[0];
+      projectsData.currentProject = firstProject;
+      const firstPart = Object.keys(projectsData.projects[firstProject].parts)[0];
+      projectsData.currentPart = firstPart;
+    }
+    
+    console.log('✅ Projekty načítané z Firebase:', Object.keys(projectsData.projects).length);
+    updateProjectsUI();
+    
+  } catch(err) {
+    console.error('❌ Chyba pri načítaní z Firebase:', err);
+    loadProjectsFromStorage(); // Fallback na localStorage
+  }
+}
+
+// Obnoviť projekty z existujúcich izometrií
+async function restoreProjectsFromIsometrics() {
+  if(!db) {
+    alert('❌ Firebase nie je dostupný!');
+    return;
+  }
+  
+  if(!confirm('🔄 Obnoviť projekty z existujúcich izometrií?\n\nTáto akcia načíta všetky projekty a časti z Firebase knižnice izometrií.')) {
+    return;
+  }
+  
+  try {
+    console.log('🔄 Obnovovanie projektov...');
+    
+    const snapshot = await db.collection('projects').get();
+    const projectsFound = new Set();
+    const partsFound = {};
+    
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if(data.name) {
+        // Extrahuj projekt z názvu (napr. "FLA_PIPE_ISOMETRIC" -> "FLA")
+        const projectName = data.name.split('_')[0];
+        projectsFound.add(projectName);
+        
+        if(data.part) {
+          if(!partsFound[projectName]) partsFound[projectName] = new Set();
+          partsFound[projectName].add(data.part);
+        }
+      }
+    });
+    
+    console.log('📊 Nájdené projekty:', Array.from(projectsFound));
+    console.log('📊 Nájdené časti:', partsFound);
+    
+    // Vytvoriť projekty v Firebase
+    for(const projectName of projectsFound) {
+      if(!projectsData.projects[projectName]) {
+        projectsData.projects[projectName] = {
+          parts: {},
+          created: new Date().toISOString(),
+          createdBy: window.currentUser?.username || 'system'
+        };
+      }
+      
+      // Vytvor časti
+      const parts = partsFound[projectName] || new Set(['Časť 1']);
+      for(const partName of parts) {
+        if(!projectsData.projects[projectName].parts[partName]) {
+          projectsData.projects[projectName].parts[partName] = {
+            weldBookData: [],
+            created: new Date().toISOString(),
+            lastModified: new Date().toISOString()
+          };
+        }
+      }
+    }
+    
+    // Uložiť do Firebase
+    await saveProjectsToFirebase();
+    
+    // Refresh UI
+    updateProjectsUI();
+    
+    alert(`✅ Obnovené!\n\nProjekty: ${projectsFound.size}\nČasti: ${Object.values(partsFound).reduce((sum, set) => sum + set.size, 0)}`);
+    
+  } catch(err) {
+    console.error('❌ Chyba pri obnove:', err);
+    alert('❌ Chyba: ' + err.message);
+  }
+}
+
 function saveProjectsToStorage() {
   try {
     localStorage.setItem('projectsData', JSON.stringify(projectsData));
-    console.log('💾 Projekty uložené do localStorage');
+    console.log('💾 Projekty uložené do localStorage (backup)');
   } catch(err) {
     console.error('❌ Chyba pri ukladaní projektov:', err);
   }
@@ -7690,7 +7882,7 @@ function loadProjectsFromStorage() {
   }
 }
 
-function createDefaultProject() {
+async function createDefaultProject() {
   console.log('🆕 Vytváram default projekt...');
   var defaultProjectName = "Môj prvý projekt";
   var defaultPartName = "Časť 1";
@@ -7698,7 +7890,9 @@ function createDefaultProject() {
   projectsData.currentProject = defaultProjectName;
   projectsData.currentPart = defaultPartName;
   projectsData.projects[defaultProjectName] = {
-    parts: {}
+    parts: {},
+    created: new Date().toISOString(),
+    createdBy: window.currentUser?.username || 'system'
   };
   projectsData.projects[defaultProjectName].parts[defaultPartName] = {
     weldBookData: [],
@@ -7706,11 +7900,16 @@ function createDefaultProject() {
     lastModified: new Date().toISOString().slice(0,10)
   };
   
+  // Uložiť do Firebase
+  await saveProjectsToFirebase();
+  
+  // Backup do localStorage
   saveProjectsToStorage();
+  
   console.log('✅ Default projekt vytvorený:', defaultProjectName);
 }
 
-function createNewProject(projectName) {
+async function createNewProject(projectName) {
   if (!projectName || projectName.trim() === '') {
     alert('❌ Názov projektu nemôže byť prázdny!');
     return false;
@@ -7725,7 +7924,9 @@ function createNewProject(projectName) {
   
   var defaultPartName = "Časť 1";
   projectsData.projects[projectName] = {
-    parts: {}
+    parts: {},
+    created: new Date().toISOString(),
+    createdBy: window.currentUser?.username || 'system'
   };
   projectsData.projects[projectName].parts[defaultPartName] = {
     weldBookData: [],
@@ -7736,7 +7937,12 @@ function createNewProject(projectName) {
   projectsData.currentProject = projectName;
   projectsData.currentPart = defaultPartName;
   
+  // Uložiť do Firebase
+  await saveProjectsToFirebase();
+  
+  // Backup do localStorage
   saveProjectsToStorage();
+  
   console.log('✅ Projekt vytvorený:', projectName);
   return true;
 }
@@ -7768,7 +7974,12 @@ function createNewPart(partName) {
   
   projectsData.currentPart = partName;
   
+  // Uložiť do Firebase
+  saveProjectsToFirebase();
+  
+  // Backup do localStorage
   saveProjectsToStorage();
+  
   console.log('✅ Časť vytvorená:', partName);
   return true;
 }
@@ -8078,8 +8289,10 @@ function promptDeletePart(partName) {
 }
 
 // ============= NAČÍTANIE PRI ŠTARTE PROGRAMU =============
-window.addEventListener('DOMContentLoaded', function() {
-  loadProjectsFromStorage();
+window.addEventListener('DOMContentLoaded', async function() {
+  // ✅ Načítať projekty z Firebase (online)
+  await loadProjectsFromFirebase();
+  
   loadCurrentPartWeldBook();
   loadKontrolaData();
   loadVyrobaData();
