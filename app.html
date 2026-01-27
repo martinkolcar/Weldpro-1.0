@@ -2238,7 +2238,8 @@ ov.appendChild(tx);
 });
 }
 
-// Kreslenie palíčok
+// Kreslenie palíčok - len v PREFABRIKÁCIA
+if(activeTab==='prefab'){
 lines.forEach(function(line){
 var startX=line.start.x*ca.width;
 var startY=line.start.y*ca.height;
@@ -2255,8 +2256,10 @@ ln.setAttribute('stroke-width',line.width);
 ln.setAttribute('data-line-id',line.id);
 ov.appendChild(ln);
 });
+} // End lines filter
 
-// Kreslenie šípok
+// Kreslenie šípok - len v PREFABRIKÁCIA
+if(activeTab==='prefab'){
 arrows.forEach(function(arrow){
 var x1=arrow.start.x*ca.width;
 var y1=arrow.start.y*ca.height;
@@ -2377,6 +2380,7 @@ p4.setAttribute('stroke-dasharray','5,5');p4.setAttribute('opacity','0.7');
 ov.appendChild(p4);
 }
 }
+} // End arrows filter
 
 // Dočasná palička (pri kreslení) - čiara ide k myši
 if(linePt && currentTool==='line'){
@@ -2392,7 +2396,8 @@ ln.setAttribute('opacity','0.7');
 ov.appendChild(ln);
 }
 
-// Kreslenie textov
+// Kreslenie textov - len v PREFABRIKÁCIA
+if(activeTab==='prefab'){
 texts.forEach(function(txt){
 var txtX=txt.x*ca.width;
 var txtY=txt.y*ca.height;
@@ -2412,6 +2417,7 @@ t.setAttribute('transform','rotate('+txt.rotation+' '+txtX+' '+txtY+')');
 t.textContent=txt.text;
 ov.appendChild(t);
 });
+} // End texts filter
 
 // Rámček + rotation ikona pre vybraný objekt (text, arrow, dimension)
 if(selectedTextForRotation){
@@ -2663,6 +2669,8 @@ cr.setAttribute('stroke-width','2');cr.setAttribute('opacity','0.5');
 ov.appendChild(cr);
 }
 
+// Domerky - len v PREFABRIKÁCIA
+if(activeTab==='prefab'){
 dimensions.forEach(function(dim){
 var dimX=dim.x*ca.width;
 var dimY=dim.y*ca.height;
@@ -2681,6 +2689,7 @@ tx.setAttribute('transform','rotate('+dim.rotation+' '+dimX+' '+dimY+')');
 tx.textContent=dim.text;
 ov.appendChild(tx);
 });
+} // End dimensions filter
 
 // Rámček + rotation ikona pre vybraný domerok
 if(selectedTextForRotation && selectedTextForRotation.type==='dimension'){
