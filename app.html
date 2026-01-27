@@ -9481,10 +9481,28 @@ async function loadFromLibraryFirebase(projectName) {
     const projectData = await downloadProjectFromFirebase(projectName);
     console.log('🔵 Project downloaded:', projectData);
     
+    // 🧹 VYČISTIŤ VŠETKO PRED NAČÍTANÍM NOVÉHO PROJEKTU!
+    console.log('🧹 Čistenie starých dát pred načítaním...');
+    ws = [];
+    spools = [];
+    crosses = [];
+    dimensions = [];
+    lines = [];
+    arrows = [];
+    texts = [];
+    curves = [];
+    spoolData = [];
+    weldLogMaterials = [];
+    weldAssignments = {};
+    
     ws = projectData.welds || [];
     spools = projectData.spools || [];
     crosses = projectData.crosses || [];
     dimensions = projectData.dimensions || [];
+    lines = projectData.lines || [];
+    arrows = projectData.arrows || [];
+    texts = projectData.texts || [];
+    curves = projectData.curves || [];
     cn = projectData.currentNumber || 1;
     startNum = projectData.startNumber || 1;
     originalFileName = projectData.projectName || 'zvary';
