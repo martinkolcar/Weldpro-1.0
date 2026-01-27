@@ -426,7 +426,7 @@ async function listProjectsFromFirebase() {
 <option value="#f97316">🟠 Oranžová</option>
 <option value="#FFD700">🟡 Žltá</option>
 </select>
-<select id="lineWidth" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
+<select id="lineWidth" onchange="lineWidth=parseFloat(this.value);console.log('📏 Line width:',lineWidth)" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
 <option value="0.5">0.5px</option>
 <option value="1">1px</option>
 <option value="1.5">1.5px</option>
@@ -445,7 +445,7 @@ async function listProjectsFromFirebase() {
 <option value="#10b981">🟢 Zelená</option>
 <option value="#f97316">🟠 Oranžová</option>
 </select>
-<select id="textSize" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
+<select id="textSize" onchange="textSize=parseInt(this.value);console.log('📏 Text size:',textSize)" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
 <option value="10">10px</option>
 <option value="12" selected>12px</option>
 <option value="14">14px</option>
@@ -1363,7 +1363,7 @@ if(isRotating){
 isRotating=false;
 ca.style.cursor='default';
 justFinishedDrag=true; // Zabráni clicku hneď po rotácii
-setTimeout(function(){justFinishedDrag=false;},100);
+setTimeout(function(){justFinishedDrag=false;},200); // Zvýšené z 100 na 200ms
 console.log('✅ Rotácia ukončená:',selectedTextForRotation.object.rotation+'°');
 dw();
 }
