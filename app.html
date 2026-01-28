@@ -689,12 +689,14 @@ async function listProjectsFromFirebase() {
 <div class="ribbon-group">
 <button onclick="activateDrawTool('line')" id="prefab_linebtn" disabled>📏 Palička</button>
 <button onclick="activateDrawTool('text')" id="prefab_textbtn" disabled>📝 Text</button>
+<button onclick="activateDrawTool('curve')" id="prefab_curvebtn" disabled>☁️ Oblačik</button>
 <button onclick="activateDrawTool('arrow')" id="prefab_arrowbtn" disabled>➡️ Šípka</button>
 <button onclick="activateDrawTool('doublearrow')" id="prefab_doublearrowbtn" disabled>⬌ Dvojšípka</button>
 </div>
 <div class="ribbon-group">
 <button onclick="ex()" id="ex" disabled>💾 Export CSV</button>
 </div>
+
 </div>
 
 <div id="ribbonVyroba" class="ribbon-content">
@@ -1054,49 +1056,54 @@ function switchRibbonTab(tabName) {
 // ============= SET TOOL =============
 // ============= PALIČKA - NASTAVENIA =============
 function activateDrawTool(tool) {
-  // Skry všetky option menu
-  document.getElementById('lineOptions').style.display = 'none';
-  document.getElementById('textOptions').style.display = 'none';
-  document.getElementById('curveOptions').style.display = 'none';
-  document.getElementById('arrowOptions').style.display = 'none';
+  // Skry všetky option menu (bezpečne)
+  var optionsToHide = ['lineOptions', 'textOptions', 'curveOptions', 'arrowOptions', 'dimensionOptions'];
+  optionsToHide.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
   
-  // Resetuj opacity všetkých tlačidiel
-  document.getElementById('linebtn').style.opacity = '0.7';
-  document.getElementById('textbtn').style.opacity = '0.7';
-  document.getElementById('curvebtn').style.opacity = '0.7';
-  document.getElementById('arrowbtn').style.opacity = '0.7';
-  document.getElementById('doublearrowbtn').style.opacity = '0.7';
+  // Resetuj opacity všetkých tlačidiel (bezpečne)
+  var buttonsToReset = ['linebtn', 'textbtn', 'curvebtn', 'arrowbtn', 'doublearrowbtn'];
+  buttonsToReset.forEach(function(id) {
+    var btn = document.getElementById(id);
+    if (btn) btn.style.opacity = '0.7';
+  });
   
   // Aktivuj vybraný nástroj
   if (tool === 'line') {
     document.getElementById('lineOptions').style.display = 'flex';
-    document.getElementById('linebtn').style.opacity = '1';
+    var btn = document.getElementById('linebtn');
+    if (btn) btn.style.opacity = '1';
     currentTool = 'line';
     lineColor = document.getElementById('lineColor').value;
     lineWidth = parseFloat(document.getElementById('lineWidth').value);
   } else if (tool === 'text') {
     document.getElementById('textOptions').style.display = 'flex';
-    document.getElementById('textbtn').style.opacity = '1';
+    var btn = document.getElementById('textbtn');
+    if (btn) btn.style.opacity = '1';
     currentTool = 'text';
     textColor = document.getElementById('textColor').value;
     textSize = parseInt(document.getElementById('textSize').value);
   } else if (tool === 'curve') {
-    document.getElementById('curveOptions').style.display = 'flex';
-    document.getElementById('curvebtn').style.opacity = '1';
+    var curveOpt = document.getElementById('curveOptions');
+    if (curveOpt) curveOpt.style.display = 'flex';
+    var btn = document.getElementById('curvebtn');
+    if (btn) btn.style.opacity = '1';
     currentTool = 'curve';
-    curveColor = document.getElementById('curveColor').value;
-    curveWidth = parseFloat(document.getElementById('curveWidth').value);
     curvePts = [];
   } else if (tool === 'arrow') {
     document.getElementById('arrowOptions').style.display = 'flex';
-    document.getElementById('arrowbtn').style.opacity = '1';
+    var btn = document.getElementById('arrowbtn');
+    if (btn) btn.style.opacity = '1';
     currentTool = 'arrow';
     arrowType = 'single';
     arrowColor = document.getElementById('arrowColor').value;
     arrowWidth = parseFloat(document.getElementById('arrowWidth').value);
   } else if (tool === 'doublearrow') {
     document.getElementById('arrowOptions').style.display = 'flex';
-    document.getElementById('doublearrowbtn').style.opacity = '1';
+    var btn = document.getElementById('doublearrowbtn');
+    if (btn) btn.style.opacity = '1';
     currentTool = 'arrow';
     arrowType = 'double';
     arrowColor = document.getElementById('arrowColor').value;
@@ -1216,7 +1223,7 @@ document.getElementById('spoolbtn').disabled=false;document.getElementById('spoo
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
 document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
-document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
+document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
 pd.getPage(1).then(function(firstPage){
 var totalPages=pd.numPages;
 console.log('PDF má',totalPages,'strán');
@@ -1284,7 +1291,7 @@ document.getElementById('spoolbtn').disabled=false;document.getElementById('spoo
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
 document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
-document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
+document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
 dw();
 };
 im.src=ev.target.result;
@@ -3713,7 +3720,7 @@ var xOffset=0;
 var yOffset=0;
 
 window.addEventListener('load',function(){
-document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
+document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
 });
 
 mtoHeader.addEventListener('mousedown',function(e){
@@ -6814,7 +6821,7 @@ document.getElementById('spoolbtn').disabled=false;document.getElementById('spoo
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
 document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
-document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
+document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
 dw();
 up();
 var weldLogPanel=document.getElementById('weldLogPanel');
@@ -10090,7 +10097,7 @@ async function loadFromLibraryFirebase(projectName) {
           if(document.getElementById('oneclickbtn')) document.getElementById('oneclickbtn').disabled=false;
           if(document.getElementById('twoclickbtn')) document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
           if(document.getElementById('mtobtn')) document.getElementById('mtobtn').disabled=false;
-          if(document.getElementById('dimensionbtn')) document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;
+          if(document.getElementById('dimensionbtn')) document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;
           if(document.getElementById('linebtn')) document.getElementById('linebtn').disabled=false;
           if(document.getElementById('textbtn')) document.getElementById('textbtn').disabled=false;
           if(document.getElementById('curvebtn')) document.getElementById('curvebtn').disabled=false;
