@@ -4135,16 +4135,16 @@ spoolsByIso[isoName].push(spool);
 
 // Pomocná funkcia - získaj zvary pre spool (BOČNÝ PANEL LOGIKA)
 function getSpoolWelds(spool){
-// KROK 1: Získaj zvary z ws array (nakreslené zvary)
+// Nájdi všetky krížiky a ich pozície v zozname zvarov
 var allWelds=[];
 for(var i=0;i<ws.length;i++){
-allWelds.push({num:ws[i].displayNum,id:ws[i].id,weld:ws[i],source:'ws'});
+allWelds.push({num:ws[i].displayNum,id:ws[i].id,weld:ws[i]});
 }
 allWelds.sort(function(a,b){
 return naturalSort(a.num,b.num);
 });
 
-// KROK 2: Nájdi hranice (krížiky)
+// Nájdi hranice (krížiky)
 var boundaries=[];
 for(var i=0;i<crosses.length;i++){
 var cross=crosses[i];
@@ -4161,7 +4161,8 @@ return naturalSort(a.num,b.num);
 
 console.log('🔍 Spool',spool.displayNum,'- krížiky:',boundaries.map(function(b){return b.num;}));
 
-// KROK 3: Nájdi ktoré zvary patria MEDZI krížiky pre tento spool
+// Nájdi ktoré zvary patria MEDZI krížiky pre tento spool
+// Predpokladáme že spool má poradie podľa spoolNum
 var spoolIndex=parseInt(spool.displayNum.replace('SP',''))-1;
 
 if(boundaries.length===0){
@@ -4181,38 +4182,6 @@ if(i<allWelds.length && allWelds[i]){
 result.push(allWelds[i].weld);
 }
 }
-
-// KROK 4: PRIDAJ zvary z WeldBook ktoré NIE SÚ v ws array
-// Získaj currentIso
-var currentIso = originalFileName || projectsData.currentPart || '';
-var splitName = splitIsometricName(currentIso);
-var isoName = splitName.isometric;
-
-// Nájdi zvary v WeldBook pre túto izometriu
-var weldBookWelds = weldBookData.filter(function(w){
-return w.isometric === isoName;
-});
-
-// Nájdi ktoré zvary z WeldBook NIE SÚ v result (nie sú nakreslené)
-var resultNums = result.map(function(w){return w.displayNum;});
-var missingWelds = weldBookWelds.filter(function(w){
-return resultNums.indexOf(w.weldId) === -1;
-});
-
-// Pridaj chýbajúce zvary do result
-missingWelds.forEach(function(wbWeld){
-// Vytvor virtual weld objekt
-result.push({
-id: wbWeld.weldId + '_virtual',
-displayNum: wbWeld.weldId,
-source: 'weldbook'
-});
-});
-
-// Zoradi result podľa displayNum
-result.sort(function(a,b){
-return naturalSort(a.displayNum, b.displayNum);
-});
 
 console.log('✅ Spool',spool.displayNum,'- našiel',result.length,'zvarov:',result.map(function(w){return w.displayNum;}));
 return result;
@@ -4412,9 +4381,7 @@ return;
 // Zvar sa musí nakresliť ručne v RED PEN
 
 // Pridaj do WeldBook s inteligentným radením
-// OPRAVA: Používame originalFileName namiesto projectsData.currentPart
-var splitName=splitIsometricName(originalFileName || 'Unknown');
-console.log('📝 addWeldToSpool - pridávam do WeldBook:', {part: splitName.part, isometric: splitName.isometric, weldId: weldNum});
+var splitName=splitIsometricName(projectsData.currentPart||'Unknown');
 addWeldToWeldBook({
 part: splitName.part,
 isometric: splitName.isometric,
@@ -4481,15 +4448,30 @@ saveKontrolaData();
 console.log('👷 Zvarač nastavený:',welderKey,'=',value);
 
 // Aktualizuj WeldBook
-var weldNum = welderKey.split('_')[1]; // "SP1_#1" → "#1"
+// welderKey má formát "SP1_1_welder" alebo "SP1_5A_welder"
+// Potrebujeme extrahovať číslo zvaru (1, 5A, atď)
+var parts = welderKey.split('_');
+var weldNum = parts.length >= 3 ? parts[1] : null; // Druhá časť je číslo zvaru
+
+console.log('🔍 Hľadám zvar v WeldBook:', weldNum);
+
 if(weldNum){
+var updated = false;
 for(var i=0; i<weldBookData.length; i++){
-if(weldBookData[i].weldId === weldNum){
+if(String(weldBookData[i].weldId) === String(weldNum)){
 weldBookData[i].welderId = value;
-console.log('✅ WeldBook aktualizovaný: welderId =', value);
-saveWeldBookToFirebase();
+console.log('✅ WeldBook aktualizovaný: weldId='+weldNum+', welderId='+value);
+updated = true;
+// Refresh WeldBook grid ak je otvorený
+if(weldBookGrid && weldBookGrid.api){
+weldBookGrid.api.setGridOption('rowData', weldBookData);
+}
+saveCurrentPartWeldBook();
 break;
 }
+}
+if(!updated){
+console.log('⚠️ Zvar '+weldNum+' nenájdený v WeldBook');
 }
 }
 }
@@ -4500,15 +4482,30 @@ saveKontrolaData();
 console.log('📅 Dátum nastavený:',dateKey,'=',value);
 
 // Aktualizuj WeldBook
-var weldNum = dateKey.split('_')[1]; // "SP1_#1" → "#1"
+// dateKey má formát "SP1_1_date" alebo "SP1_5A_date"
+// Potrebujeme extrahovať číslo zvaru (1, 5A, atď)
+var parts = dateKey.split('_');
+var weldNum = parts.length >= 3 ? parts[1] : null; // Druhá časť je číslo zvaru
+
+console.log('🔍 Hľadám zvar v WeldBook:', weldNum);
+
 if(weldNum){
+var updated = false;
 for(var i=0; i<weldBookData.length; i++){
-if(weldBookData[i].weldId === weldNum){
+if(String(weldBookData[i].weldId) === String(weldNum)){
 weldBookData[i].dateWelding = value;
-console.log('✅ WeldBook aktualizovaný: dateWelding =', value);
-saveWeldBookToFirebase();
+console.log('✅ WeldBook aktualizovaný: weldId='+weldNum+', dateWelding='+value);
+updated = true;
+// Refresh WeldBook grid ak je otvorený
+if(weldBookGrid && weldBookGrid.api){
+weldBookGrid.api.setGridOption('rowData', weldBookData);
+}
+saveCurrentPartWeldBook();
 break;
 }
+}
+if(!updated){
+console.log('⚠️ Zvar '+weldNum+' nenájdený v WeldBook');
 }
 }
 }
@@ -7456,66 +7453,16 @@ return {part:'',isometric:fullName.trim()};
 }
 }
 
-// Helper funkcia: parsuje weld ID na numerickú hodnotu pre sortovanie
-function parseWeldId(weldId) {
-  if (!weldId) return 0;
-  
-  // Príklady: "5" → 5.0, "5A" → 5.1, "5B" → 5.2, "10C" → 10.3
-  var str = String(weldId).trim();
-  
-  // Extrahuj číselnú časť (napr. "5A" → "5")
-  var numMatch = str.match(/^(\d+)/);
-  var baseNum = numMatch ? parseInt(numMatch[1]) : 0;
-  
-  // Extrahuj písmenovú časť (napr. "5A" → "A")
-  var letterMatch = str.match(/[A-Za-z]+$/);
-  var letterPart = 0;
-  
-  if (letterMatch) {
-    // A=0.1, B=0.2, C=0.3, atď.
-    var letter = letterMatch[0].toUpperCase();
-    letterPart = (letter.charCodeAt(0) - 64) / 10; // A=1→0.1, B=2→0.2
-  }
-  
-  return baseNum + letterPart;
-}
-
 function addWeldToWeldBook(weldData) {
   console.log('➕ Pridávam zvar do WeldBook:', weldData);
   
-  // Parse weld number pre sorted insert
-  var newWeldNum = parseWeldId(weldData.weldId);
-  var newIso = weldData.isometric || '';
+  // Pridaj do dát
+  weldBookData.push(weldData);
   
-  // Nájdi správne miesto v poli (sorted insert v rámci tej istej izometrie)
-  var insertIndex = weldBookData.length; // Default: na koniec
-  
-  for (var i = 0; i < weldBookData.length; i++) {
-    var existingIso = weldBookData[i].isometric || '';
-    
-    // Ak je to tá istá izometria, porovnaj čísla
-    if (existingIso === newIso) {
-      var existingNum = parseWeldId(weldBookData[i].weldId);
-      if (newWeldNum < existingNum) {
-        insertIndex = i;
-        break;
-      }
-    }
-    // Ak je existujúca izometria "väčšia" (abecedne), vlož pred ňu
-    else if (newIso < existingIso) {
-      insertIndex = i;
-      break;
-    }
-  }
-  
-  // Vlož na správne miesto
-  weldBookData.splice(insertIndex, 0, weldData);
-  console.log('✅ Zvar vložený na index:', insertIndex, '(iso:', newIso, ', weldId:', weldData.weldId, '→', newWeldNum + ')');
-  
-  // Ak je grid otvorený, RELOAD celý dataset (aby sa zobrazil v správnom poradí)
+  // Ak je grid otvorený, updatni ho
   if (weldBookGrid && weldBookGrid.api) {
-    weldBookGrid.api.setGridOption('rowData', weldBookData);
-    console.log('✅ WeldBook tabuľka aktualizovaná');
+    weldBookGrid.api.applyTransaction({ add: [weldData] });
+    console.log('✅ Zvar pridaný do tabuľky');
   }
   
   // Ulož do aktívnej časti projektu
@@ -7807,29 +7754,11 @@ function saveWeldBookToStorage() {
 }
 
 // ============= NAČÍTANIE Z LOCALSTORAGE =============
-// Helper funkcia: zoradí weldBookData podľa weldId
-function sortWeldBookData() {
-  weldBookData.sort(function(a, b) {
-    // Najprv zoradi podľa izometrie
-    var isoA = a.isometric || '';
-    var isoB = b.isometric || '';
-    if (isoA < isoB) return -1;
-    if (isoA > isoB) return 1;
-    
-    // Potom podľa weldId
-    var numA = parseWeldId(a.weldId);
-    var numB = parseWeldId(b.weldId);
-    return numA - numB;
-  });
-  console.log('🔄 WeldBook zoradený podľa izometrie a weldId');
-}
-
 function loadWeldBookFromStorage() {
   try {
     var saved = localStorage.getItem('weldBookData');
     if (saved) {
       weldBookData = JSON.parse(saved);
-      sortWeldBookData(); // Zoradi po načítaní
       console.log('📂 Načítaných', weldBookData.length, 'zvarov z localStorage');
     }
   } catch(err) {
@@ -8904,9 +8833,6 @@ function loadCurrentPartWeldBook() {
     console.log('🔄 Migrácia: Rozdelené názvy v', weldBookData.length, 'riadkoch');
     saveCurrentPartWeldBook();
   }
-  
-  // Zoradi po načítaní
-  sortWeldBookData();
   
   console.log('📂 Načítaný WeldBook pre:', projectsData.currentProject, '/', projectsData.currentPart);
   console.log('   Zvarov:', weldBookData.length);
