@@ -4274,8 +4274,8 @@ var currentDate=kontrolaData.dateData[dateKey]||(new Date().toISOString().split(
 var html='<td colspan="4" style="padding:8px 8px 8px 60px;border:1px solid #ddd">';
 html+='<span onclick="toggleWeldComplete(\''+weldKey+'\')" style="cursor:pointer;font-size:16px;color:'+checkColor+'">'+checkIcon+'</span> ';
 html+='<span style="margin-left:10px;'+(isCompleted?'text-decoration:line-through;color:#999':'')+';font-weight:600">Zvar #'+weld.displayNum+'</span> ';
-html+='<input type="text" placeholder="Číslo zvarača" value="'+currentWelder+'" onchange="setWelderForWeld(\''+welderKey+'\',this.value)" style="width:100px;margin-left:10px;padding:3px;border:1px solid #ddd;border-radius:3px;font-size:11px"> ';
-html+='<input type="date" value="'+currentDate+'" onchange="setDateForWeld(\''+dateKey+'\',this.value)" style="margin-left:5px;padding:3px;border:1px solid #ddd;border-radius:3px;font-size:11px"> ';
+html+='<input type="text" placeholder="Číslo zvarača" value="'+currentWelder+'" oninput="setWelderForWeld(\''+welderKey+'\',this.value)" onblur="setWelderForWeld(\''+welderKey+'\',this.value)" style="width:100px;margin-left:10px;padding:3px;border:1px solid #ddd;border-radius:3px;font-size:11px"> ';
+html+='<input type="date" value="'+currentDate+'" onchange="setDateForWeld(\''+dateKey+'\',this.value)" onblur="setDateForWeld(\''+dateKey+'\',this.value)" style="margin-left:5px;padding:3px;border:1px solid #ddd;border-radius:3px;font-size:11px"> ';
 html+='<button onclick="event.stopPropagation();removeWeldFromSpool(\''+weld.id+'\',\''+weld.displayNum+'\')" style="margin-left:10px;background:#ef4444;color:white;border:none;padding:3px 8px;border-radius:3px;cursor:pointer;font-size:10px">🗑️</button>';
 html+='</td>';
 
