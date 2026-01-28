@@ -1813,6 +1813,26 @@ if(confirm('Zmazať?')){
 var deletedWeld = clickedWeld;
 ws=ws.filter(function(w){return w.id!==clickedWeld.id;});
 removeWeldFromWeldBook(deletedWeld.displayNum);
+
+// Odstráň aj z kontrolaData (všetky kľúče obsahujúce displayNum)
+for(var key in kontrolaData.completedWelds){
+if(key.indexOf('_'+deletedWeld.displayNum)>-1){
+delete kontrolaData.completedWelds[key];
+}
+}
+for(var key in kontrolaData.welderData){
+if(key.indexOf('_'+deletedWeld.displayNum+'_')>-1){
+delete kontrolaData.welderData[key];
+}
+}
+for(var key in kontrolaData.dateData){
+if(key.indexOf('_'+deletedWeld.displayNum+'_')>-1){
+delete kontrolaData.dateData[key];
+}
+}
+saveKontrolaData();
+console.log('🗑️ Zvar',deletedWeld.displayNum,'zmazaný zo všetkých dát');
+
 up();
 dw();
 }
@@ -1838,6 +1858,26 @@ if(confirm('Zmazať?')){
 var deletedWeld = clickedWeld;
 ws=ws.filter(function(w){return w.id!==clickedWeld.id;});
 removeWeldFromWeldBook(deletedWeld.displayNum);
+
+// Odstráň aj z kontrolaData (všetky kľúče obsahujúce displayNum)
+for(var key in kontrolaData.completedWelds){
+if(key.indexOf('_'+deletedWeld.displayNum)>-1){
+delete kontrolaData.completedWelds[key];
+}
+}
+for(var key in kontrolaData.welderData){
+if(key.indexOf('_'+deletedWeld.displayNum+'_')>-1){
+delete kontrolaData.welderData[key];
+}
+}
+for(var key in kontrolaData.dateData){
+if(key.indexOf('_'+deletedWeld.displayNum+'_')>-1){
+delete kontrolaData.dateData[key];
+}
+}
+saveKontrolaData();
+console.log('🗑️ Zvar',deletedWeld.displayNum,'zmazaný zo všetkých dát');
+
 up();
 dw();
 }
@@ -2103,6 +2143,26 @@ if(detected.type==='weld'){
 if(confirm('🗑️ Zmazať zvar #'+detected.object.displayNum+'?')){
 ws.splice(detected.index,1);
 removeWeldFromWeldBook(detected.object.displayNum);
+
+// Odstráň aj z kontrolaData (všetky kľúče obsahujúce displayNum)
+for(var key in kontrolaData.completedWelds){
+if(key.indexOf('_'+detected.object.displayNum)>-1){
+delete kontrolaData.completedWelds[key];
+}
+}
+for(var key in kontrolaData.welderData){
+if(key.indexOf('_'+detected.object.displayNum+'_')>-1){
+delete kontrolaData.welderData[key];
+}
+}
+for(var key in kontrolaData.dateData){
+if(key.indexOf('_'+detected.object.displayNum+'_')>-1){
+delete kontrolaData.dateData[key];
+}
+}
+saveKontrolaData();
+console.log('🗑️ Zvar',detected.object.displayNum,'zmazaný zo všetkých dát');
+
 dw();
 up();
 showNotification('Zvar zmazaný: #'+detected.object.displayNum);
@@ -4255,8 +4315,6 @@ tbody.appendChild(trSpool);
 if(isSpoolExpanded){
 console.log('🔍 Zobrazujem zvary pre spool',spool.displayNum,': ',spoolWelds.length,'zvarov');
 spoolWelds.forEach(function(weld){
-console.log('🔍 DEBUG weld object:', JSON.stringify({id:weld.id, displayNum:weld.displayNum, type:typeof weld.displayNum}));
-
 var weldKey=spool.id+'_'+weld.displayNum;
 var isCompleted=kontrolaData.completedWelds[weldKey];
 
@@ -4271,7 +4329,6 @@ var checkColor=isCompleted?'#10b981':'#999';
 // OPRAVA: Používame spool.displayNum (napr. "SP1") namiesto spool.id (timestamp)
 var welderKey=spool.displayNum+'_'+weld.displayNum+'_welder';
 var dateKey=spool.displayNum+'_'+weld.displayNum+'_date';
-console.log('🔍 DEBUG welderKey:', welderKey, ', dateKey:', dateKey);
 var currentWelder=kontrolaData.welderData[welderKey]||'';
 var currentDate=kontrolaData.dateData[dateKey]||(new Date().toISOString().split('T')[0]);
 
@@ -4453,6 +4510,15 @@ kontrolaData.welderData[welderKey]=value;
 saveKontrolaData();
 console.log('👷 Zvarač nastavený:',welderKey,'=',value);
 
+// AUTOMATICKY nastav aj dnešný dátum ak ešte nie je nastavený
+var dateKey = welderKey.replace('_welder', '_date');
+if(!kontrolaData.dateData[dateKey]){
+var todayDate = new Date().toISOString().split('T')[0];
+kontrolaData.dateData[dateKey] = todayDate;
+console.log('📅 Automaticky nastavený dátum:', dateKey, '=', todayDate);
+saveKontrolaData();
+}
+
 // Aktualizuj WeldBook
 // welderKey má formát "SP1_1_welder" alebo "SP1_5A_welder"
 // Potrebujeme extrahovať číslo zvaru (1, 5A, atď)
@@ -4466,7 +4532,11 @@ var updated = false;
 for(var i=0; i<weldBookData.length; i++){
 if(String(weldBookData[i].weldId) === String(weldNum)){
 weldBookData[i].welderId = value;
-console.log('✅ WeldBook aktualizovaný: weldId='+weldNum+', welderId='+value);
+// Nastav aj dátum v WeldBook
+if(kontrolaData.dateData[dateKey]){
+weldBookData[i].dateWelding = kontrolaData.dateData[dateKey];
+}
+console.log('✅ WeldBook aktualizovaný: weldId='+weldNum+', welderId='+value+', dateWelding='+weldBookData[i].dateWelding);
 updated = true;
 // Refresh WeldBook grid ak je otvorený
 if(weldBookGrid && weldBookGrid.api){
@@ -4480,6 +4550,9 @@ if(!updated){
 console.log('⚠️ Zvar '+weldNum+' nenájdený v WeldBook');
 }
 }
+
+// Refresh UI v Kontrole spoolov aby sa zobrazil aj dátum
+buildSpoolListTable();
 }
 
 function setDateForWeld(dateKey,value){
