@@ -4381,7 +4381,9 @@ return;
 // Zvar sa musí nakresliť ručne v RED PEN
 
 // Pridaj do WeldBook s inteligentným radením
-var splitName=splitIsometricName(projectsData.currentPart||'Unknown');
+// OPRAVA: Používame originalFileName (názov PDF) namiesto projectsData.currentPart
+var splitName=splitIsometricName(originalFileName || 'Unknown');
+console.log('📝 addWeldToSpool - originalFileName:', originalFileName, '→ part:', splitName.part, ', iso:', splitName.isometric);
 addWeldToWeldBook({
 part: splitName.part,
 isometric: splitName.isometric,
@@ -4406,7 +4408,7 @@ buildSpoolListTable();
 var isoName=originalFileName||projectsData.currentPart||'Neznáma izometria';
 addNotification('Pridaný zvar #'+weldNum+' k izometrii: '+isoName+' - treba nakresliť v RED PEN!');
 
-console.log('➕ Zvar',weldNum,'pridaný do WeldBook (nie do výkresu)');
+console.log('✨ Zvar',weldNum,'pridaný do WeldBook (nie do výkresu)');
 }
 
 function removeWeldFromSpool(weldId,weldNum){
