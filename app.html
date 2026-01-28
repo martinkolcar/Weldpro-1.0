@@ -682,6 +682,12 @@ async function listProjectsFromFirebase() {
 <button onclick="activateDimension()" id="dimensionbtn" disabled>📏 Domerok</button>
 </div>
 <div class="ribbon-group">
+<button onclick="setTool('text')" id="prefab_textbtn" disabled>📝 Text</button>
+<button onclick="setTool('arrow')" id="prefab_arrowbtn" disabled>➡️ Šípka</button>
+<button onclick="setTool('doublearrow')" id="prefab_doublearrowbtn" disabled>⬌ Dvojšípka</button>
+<button onclick="setTool('curve')" id="prefab_curvebtn" disabled>☁️ Oblačik</button>
+</div>
+<div class="ribbon-group">
 <button onclick="ex()" id="ex" disabled>💾 Export CSV</button>
 </div>
 </div>
@@ -914,6 +920,7 @@ var spoolMode=false;
 var dimensions=[];
 var dimensionMode=false;
 var dimensionText='';
+var dimensionFontSize=16;
 var spoolData=[];
 var spoolNum=1;
 var crosses=[];
@@ -1161,6 +1168,18 @@ document.getElementById('f').onchange=function(e){
 var fi=e.target.files[0];
 if(!fi)return;
 originalFileName=fi.name.replace(/\.[^/.]+$/,'');
+
+// VYČISTI kontrolaData pre nový PDF
+console.log('🧹 Vyčisťujem kontrolaData pre nový PDF:', originalFileName);
+kontrolaData = {
+expandedRoutes: {},
+expandedSpools: {},
+completedWelds: {},
+welderData: {},
+dateData: {}
+};
+saveKontrolaData();
+
 weldLogMaterials=[];
 weldAssignments={};
 document.getElementById('materialsList').innerHTML='<div class="material-item" style="text-align:center;color:#999">Klikni na "📋 Načítať z izometrie"</div>';
@@ -1188,6 +1207,7 @@ document.getElementById('setstart').disabled=false;
 document.getElementById('selectbtn').disabled=false;
 document.getElementById('crossbtn').disabled=false;
 document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montazline').disabled=false;document.getElementById('montaztext').disabled=false;
+document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
 document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
@@ -1255,6 +1275,7 @@ document.getElementById('setstart').disabled=false;
 document.getElementById('selectbtn').disabled=false;
 document.getElementById('crossbtn').disabled=false;
 document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montazline').disabled=false;document.getElementById('montaztext').disabled=false;
+document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
 document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
@@ -1572,9 +1593,10 @@ id:'dim_'+Date.now()+'_'+Math.random(),
 text:dimensionText,
 x:x/ca.width,
 y:y/ca.height,
-rotation:0
+rotation:0,
+fontSize:dimensionFontSize
 });
-console.log('Added dimension:',dimensionText,'at',x,y);
+console.log('Added dimension:',dimensionText,'fontSize:',dimensionFontSize,'at',x,y);
 dw();
 return;
 }
@@ -2926,7 +2948,7 @@ var tx=document.createElementNS('http://www.w3.org/2000/svg','text');
 tx.setAttribute('x',dimX);
 tx.setAttribute('y',dimY);
 tx.setAttribute('fill','#FF0000');
-tx.setAttribute('font-size','28');
+tx.setAttribute('font-size', dim.fontSize || 28); // Použij vlastnú veľkosť alebo default 28
 tx.setAttribute('font-weight','bold');
 tx.setAttribute('text-anchor','middle');
 tx.setAttribute('dominant-baseline','middle');
@@ -7243,7 +7265,13 @@ console.log('✅ Preview rendered! Size:', previewCanvas.width, 'x', previewCanv
 function activateDimension(){
 var text=prompt('Zadaj text pre domerok (napr. +100, -50, EL+1500):','');
 if(text===null||text.trim()==='')return;
+
+var fontSize=prompt('Zadaj veľkosť písma (px, predvolené: 16):','16');
+if(fontSize===null)fontSize='16';
+fontSize=parseInt(fontSize)||16;
+
 dimensionText=text.trim();
+dimensionFontSize=fontSize;
 dimensionMode=true;
 currentTool='dimension';
 document.getElementById('dimensionbtn').style.opacity='1';
@@ -7252,7 +7280,7 @@ document.getElementById('crossbtn').style.opacity='0.7';
 document.getElementById('spoolbtn').style.opacity='0.7';
 ca.style.cursor='crosshair';
 document.getElementById('spoolPanel').classList.remove('active');
-console.log('Dimension mode activated:',dimensionText);
+console.log('Dimension mode activated:',dimensionText,'fontSize:',dimensionFontSize);
 }
 
 function calculateSpoools(){
@@ -8214,7 +8242,13 @@ function deleteSelectedWeldBookRows() {
   
   // Zmaž z gridu
   weldBookGrid.api.applyTransaction({ remove: selectedRows });
+  
+  // Ulož do localStorage
   saveWeldBookToStorage();
+  
+  // Ulož aj do Firebase projektu
+  saveCurrentPartWeldBook();
+  
   console.log('🗑️ Zmazaných', selectedRows.length, 'riadkov');
 }
 
@@ -8283,6 +8317,15 @@ function clearAllWeldBook() {
     console.log('✅ LocalStorage vyčistený!');
   } catch(err) {
     console.error('❌ Chyba pri mazaní LocalStorage:', err);
+  }
+  
+  // Vymaž aj z aktuálneho Firebase projektu
+  if (projectsData.currentProject && projectsData.currentPart) {
+    var currentProj = projectsData.projects[projectsData.currentProject];
+    var currentPart = currentProj.parts[projectsData.currentPart];
+    currentPart.weldBookData = [];
+    saveProjectsToStorage();
+    console.log('✅ WeldBook vymazaný aj z Firebase projektu!');
   }
   
   console.log('✅ WeldBook kompletne VYMAZANÝ!');
