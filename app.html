@@ -636,14 +636,14 @@ async function listProjectsFromFirebase() {
 </div>
 
 <div id="arrowOptions" class="ribbon-group" style="display:none">
-<select id="arrowColor" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
+<select id="arrowColor" onchange="updateArrowSettings()" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
 <option value="#FF0000" selected>🔴 Červená</option>
 <option value="#000000">⚫ Čierna</option>
 <option value="#0078D4">🔵 Modrá</option>
 <option value="#10b981">🟢 Zelená</option>
 <option value="#f97316">🟠 Oranžová</option>
 </select>
-<select id="arrowWidth" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
+<select id="arrowWidth" onchange="updateArrowSettings()" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
 <option value="0.3">0.3px</option>
 <option value="0.5">0.5px</option>
 <option value="1">1px</option>
@@ -1098,6 +1098,7 @@ function activateDrawTool(tool) {
     if (btn) btn.style.opacity = '1';
     currentTool = 'arrow';
     arrowType = 'single';
+    arrowPt = null; // Reset
     arrowColor = document.getElementById('arrowColor').value;
     arrowWidth = parseFloat(document.getElementById('arrowWidth').value);
   } else if (tool === 'doublearrow') {
@@ -1106,6 +1107,7 @@ function activateDrawTool(tool) {
     if (btn) btn.style.opacity = '1';
     currentTool = 'arrow';
     arrowType = 'double';
+    arrowPt = null; // Reset
     arrowColor = document.getElementById('arrowColor').value;
     arrowWidth = parseFloat(document.getElementById('arrowWidth').value);
   }
@@ -1118,6 +1120,12 @@ function updateLineSettings() {
   lineColor = document.getElementById('lineColor').value;
   lineWidth = parseFloat(document.getElementById('lineWidth').value);
   console.log('🎨 Palička nastavenia:', lineColor, lineWidth + 'px');
+}
+
+function updateArrowSettings() {
+  arrowColor = document.getElementById('arrowColor').value;
+  arrowWidth = parseFloat(document.getElementById('arrowWidth').value);
+  console.log('🎨 Šípka nastavenia:', arrowColor, arrowWidth + 'px');
 }
 
 // ============= SET TOOL =============
