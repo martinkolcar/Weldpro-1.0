@@ -668,6 +668,19 @@ async function listProjectsFromFirebase() {
 </select>
 </div>
 
+<div id="dimensionOptions" class="ribbon-group" style="display:none">
+<select id="dimensionFontSize" onchange="dimensionFontSize=parseInt(this.value);console.log('📏 Dimension size:',dimensionFontSize)" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
+<option value="12">12px</option>
+<option value="14">14px</option>
+<option value="16" selected>16px</option>
+<option value="18">18px</option>
+<option value="20">20px</option>
+<option value="24">24px</option>
+<option value="28">28px</option>
+<option value="32">32px</option>
+</select>
+</div>
+
 </div>
 
 <div id="ribbonPrefab" class="ribbon-content">
@@ -682,10 +695,10 @@ async function listProjectsFromFirebase() {
 <button onclick="activateDimension()" id="dimensionbtn" disabled>📏 Domerok</button>
 </div>
 <div class="ribbon-group">
-<button onclick="setTool('text')" id="prefab_textbtn" disabled>📝 Text</button>
-<button onclick="setTool('arrow')" id="prefab_arrowbtn" disabled>➡️ Šípka</button>
-<button onclick="setTool('doublearrow')" id="prefab_doublearrowbtn" disabled>⬌ Dvojšípka</button>
-<button onclick="setTool('curve')" id="prefab_curvebtn" disabled>☁️ Oblačik</button>
+<button onclick="activateDrawTool('text')" id="prefab_textbtn" disabled>📝 Text</button>
+<button onclick="activateDrawTool('arrow')" id="prefab_arrowbtn" disabled>➡️ Šípka</button>
+<button onclick="activateDrawTool('doublearrow')" id="prefab_doublearrowbtn" disabled>⬌ Dvojšípka</button>
+<button onclick="activateDrawTool('curve')" id="prefab_curvebtn" disabled>☁️ Oblačik</button>
 </div>
 <div class="ribbon-group">
 <button onclick="ex()" id="ex" disabled>💾 Export CSV</button>
@@ -1199,7 +1212,7 @@ document.getElementById('zi').disabled=false;
 document.getElementById('zo').disabled=false;
 document.getElementById('zr').disabled=false;
 document.getElementById('savepdf').disabled=false;
-document.getElementById('saveproj').disabled=false;
+document.getElementById('saveproj').disabled=false;document.getElementById('savetolibrary').disabled=false;
 document.getElementById('loadprojbtn').disabled=false;
 document.getElementById('editmode').disabled=false;
 document.getElementById('editcrossmode').disabled=false;
@@ -1267,7 +1280,7 @@ document.getElementById('zi').disabled=false;
 document.getElementById('zo').disabled=false;
 document.getElementById('zr').disabled=false;
 document.getElementById('savepdf').disabled=false;
-document.getElementById('saveproj').disabled=false;
+document.getElementById('saveproj').disabled=false;document.getElementById('savetolibrary').disabled=false;
 document.getElementById('loadprojbtn').disabled=false;
 document.getElementById('editmode').disabled=false;
 document.getElementById('editcrossmode').disabled=false;
@@ -1979,6 +1992,7 @@ width:curveWidth
 curvePts=[];
 dw();
 console.log('✅ Oblúčik uzavretý!');
+document.getElementById('undo').disabled=false;
 return;
 }
 
@@ -2012,6 +2026,7 @@ type:arrowType
 });
 arrowPt=null;
 console.log('✅ Šípka vytvorená');
+document.getElementById('undo').disabled=false;
 dw();
 }
 return;
@@ -6793,7 +6808,7 @@ document.getElementById('zi').disabled=false;
 document.getElementById('zo').disabled=false;
 document.getElementById('zr').disabled=false;
 document.getElementById('savepdf').disabled=false;
-document.getElementById('saveproj').disabled=false;
+document.getElementById('saveproj').disabled=false;document.getElementById('savetolibrary').disabled=false;
 document.getElementById('loadprojbtn').disabled=false;
 if(document.getElementById('savetolibrary'))document.getElementById('savetolibrary').disabled=false;
 document.getElementById('editmode').disabled=false;
@@ -7266,14 +7281,18 @@ function activateDimension(){
 var text=prompt('Zadaj text pre domerok (napr. +100, -50, EL+1500):','');
 if(text===null||text.trim()==='')return;
 
-var fontSize=prompt('Zadaj veľkosť písma (px, predvolené: 16):','16');
-if(fontSize===null)fontSize='16';
-fontSize=parseInt(fontSize)||16;
-
 dimensionText=text.trim();
-dimensionFontSize=fontSize;
+dimensionFontSize=parseInt(document.getElementById('dimensionFontSize').value) || 16;
 dimensionMode=true;
 currentTool='dimension';
+
+// Zobraz dimension toolbar
+document.getElementById('dimensionOptions').style.display='flex';
+document.getElementById('lineOptions').style.display='none';
+document.getElementById('textOptions').style.display='none';
+document.getElementById('curveOptions').style.display='none';
+document.getElementById('arrowOptions').style.display='none';
+
 document.getElementById('dimensionbtn').style.opacity='1';
 document.getElementById('selectbtn').style.opacity='0.7';
 document.getElementById('crossbtn').style.opacity='0.7';
@@ -10058,7 +10077,7 @@ async function loadFromLibraryFirebase(projectName) {
           document.getElementById('zo').disabled=false;
           document.getElementById('zr').disabled=false;
           document.getElementById('savepdf').disabled=false;
-          document.getElementById('saveproj').disabled=false;
+          document.getElementById('saveproj').disabled=false;document.getElementById('savetolibrary').disabled=false;
           if(document.getElementById('savetolibrary')) document.getElementById('savetolibrary').disabled=false;
           document.getElementById('loadprojbtn').disabled=false;
           document.getElementById('editmode').disabled=false;
