@@ -7453,16 +7453,66 @@ return {part:'',isometric:fullName.trim()};
 }
 }
 
+// Helper funkcia: parsuje weld ID na numerickú hodnotu pre sortovanie
+function parseWeldId(weldId) {
+  if (!weldId) return 0;
+  
+  // Príklady: "5" → 5.0, "5a" → 5.1, "5A" → 5.1, "5B" → 5.2, "10C" → 10.3
+  var str = String(weldId).trim();
+  
+  // Extrahuj číselnú časť (napr. "5a" → "5")
+  var numMatch = str.match(/^(\d+)/);
+  var baseNum = numMatch ? parseInt(numMatch[1]) : 0;
+  
+  // Extrahuj písmenovú časť (napr. "5a" → "a")
+  var letterMatch = str.match(/[A-Za-z]+$/);
+  var letterPart = 0;
+  
+  if (letterMatch) {
+    // a/A=0.1, b/B=0.2, c/C=0.3, atď.
+    var letter = letterMatch[0].toUpperCase();
+    letterPart = (letter.charCodeAt(0) - 64) / 10; // A=1→0.1, B=2→0.2
+  }
+  
+  return baseNum + letterPart;
+}
+
 function addWeldToWeldBook(weldData) {
   console.log('➕ Pridávam zvar do WeldBook:', weldData);
   
-  // Pridaj do dát
-  weldBookData.push(weldData);
+  // Parse weld number pre sorted insert
+  var newWeldNum = parseWeldId(weldData.weldId);
+  var newIso = weldData.isometric || '';
   
-  // Ak je grid otvorený, updatni ho
+  // Nájdi správne miesto v poli (sorted insert v rámci tej istej izometrie)
+  var insertIndex = weldBookData.length; // Default: na koniec
+  
+  for (var i = 0; i < weldBookData.length; i++) {
+    var existingIso = weldBookData[i].isometric || '';
+    
+    // Ak je to tá istá izometria, porovnaj čísla
+    if (existingIso === newIso) {
+      var existingNum = parseWeldId(weldBookData[i].weldId);
+      if (newWeldNum < existingNum) {
+        insertIndex = i;
+        break;
+      }
+    }
+    // Ak je existujúca izometria "väčšia" (abecedne), vlož pred ňu
+    else if (newIso < existingIso) {
+      insertIndex = i;
+      break;
+    }
+  }
+  
+  // Vlož na správne miesto
+  weldBookData.splice(insertIndex, 0, weldData);
+  console.log('✅ Zvar vložený na index:', insertIndex, '(iso:', newIso, ', weldId:', weldData.weldId, '→', newWeldNum + ')');
+  
+  // Ak je grid otvorený, RELOAD celý dataset (aby sa zobrazil v správnom poradí)
   if (weldBookGrid && weldBookGrid.api) {
-    weldBookGrid.api.applyTransaction({ add: [weldData] });
-    console.log('✅ Zvar pridaný do tabuľky');
+    weldBookGrid.api.setGridOption('rowData', weldBookData);
+    console.log('✅ WeldBook tabuľka aktualizovaná');
   }
   
   // Ulož do aktívnej časti projektu
