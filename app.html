@@ -175,6 +175,123 @@ border-bottom-left-radius: 4px;
 background: #f3f4f6 !important;
 border-color: #667eea !important;
 }
+
+/* PDF PREVIEW MODAL */
+#pdfPreviewModal {
+display: none;
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background: rgba(0,0,0,0.7);
+z-index: 99999;
+justify-content: center;
+align-items: center;
+}
+#pdfPreviewModal.active {
+display: flex;
+}
+.preview-container {
+background: white;
+border-radius: 8px;
+padding: 20px;
+max-width: 90%;
+max-height: 90%;
+display: flex;
+flex-direction: column;
+box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+.preview-header {
+display: flex;
+justify-content: space-between;
+align-items: center;
+margin-bottom: 15px;
+padding-bottom: 10px;
+border-bottom: 2px solid #e5e7eb;
+}
+.preview-header h2 {
+margin: 0;
+font-size: 18px;
+color: #1f2937;
+}
+.preview-canvas-wrapper {
+flex: 1;
+overflow: auto;
+border: 1px solid #d1d5db;
+border-radius: 4px;
+background: #f9fafb;
+display: flex;
+justify-content: center;
+align-items: center;
+min-height: 400px;
+max-height: 500px;
+}
+.preview-controls {
+display: flex;
+justify-content: center;
+align-items: center;
+gap: 15px;
+margin-top: 15px;
+padding-top: 15px;
+border-top: 2px solid #e5e7eb;
+}
+.preview-scale-control {
+display: flex;
+align-items: center;
+gap: 10px;
+padding: 8px 15px;
+background: #f3f4f6;
+border-radius: 6px;
+}
+.preview-scale-control button {
+padding: 8px 15px;
+font-size: 18px;
+background: white;
+border: 1px solid #d1d5db;
+border-radius: 4px;
+cursor: pointer;
+transition: all 0.2s;
+}
+.preview-scale-control button:hover {
+background: #667eea;
+color: white;
+border-color: #667eea;
+}
+.preview-scale-display {
+min-width: 60px;
+text-align: center;
+font-weight: bold;
+font-size: 16px;
+color: #1f2937;
+}
+.preview-actions {
+display: flex;
+gap: 10px;
+}
+.preview-btn {
+padding: 10px 25px;
+font-size: 14px;
+font-weight: 600;
+border: none;
+border-radius: 6px;
+cursor: pointer;
+transition: all 0.2s;
+}
+.preview-btn-export {
+background: #10b981;
+color: white;
+}
+.preview-btn-export:hover {
+background: #059669;
+}
+.preview-btn-cancel {
+background: #ef4444;
+color: white;
+}
+.preview-btn-cancel:hover {
+background: #dc2626;
+}
 </style>
 <!-- QR Scanner Library -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -461,6 +578,11 @@ async function listProjectsFromFirebase() {
 </div>
 <div class="ribbon-group">
 <button onclick="toggleEditMode()" id="editmode" disabled>✏️ Edit zvary</button>
+</div>
+<div class="ribbon-group" title="Veľkosť zvarov (krúžky + čísla)">
+<button onclick="adjustWeldScale(-0.1)" id="weldscaleminus" disabled style="font-size:16px;padding:2px 8px">➖</button>
+<span id="weldScaleDisplay" style="display:inline-block;min-width:50px;text-align:center;font-size:11px;font-weight:bold">100%</span>
+<button onclick="adjustWeldScale(0.1)" id="weldscaleplus" disabled style="font-size:16px;padding:2px 8px">➕</button>
 </div>
 <div class="ribbon-group">
 <button onclick="activateDrawTool('line')" id="linebtn" disabled>📏 Palička</button>
@@ -786,6 +908,7 @@ var projectsData={
 };
 var currentTool='select';
 var oneClickMode=false; // Defaultne vypnuté - používateľ musí kliknúť "1-klik" tlačidlo
+var weldScale=1.0; // Globálny scale faktor pre zvary (krúžky + text)
 var spools=[];
 var spoolMode=false;
 var dimensions=[];
@@ -1025,6 +1148,15 @@ console.log('⚙️ Weld mode:', oneClick?'ONE-CLICK':'TWO-CLICK', '| currentToo
 dw();
 }
 
+function adjustWeldScale(delta){
+weldScale += delta;
+if(weldScale < 0.3) weldScale = 0.3; // Min 30%
+if(weldScale > 2.0) weldScale = 2.0; // Max 200%
+document.getElementById('weldScaleDisplay').textContent = Math.round(weldScale * 100) + '%';
+console.log('📏 Weld scale changed:', Math.round(weldScale * 100) + '%');
+dw(); // Prekreslenie
+}
+
 document.getElementById('f').onchange=function(e){
 var fi=e.target.files[0];
 if(!fi)return;
@@ -1058,7 +1190,7 @@ document.getElementById('crossbtn').disabled=false;
 document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montazline').disabled=false;document.getElementById('montaztext').disabled=false;
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
-document.getElementById('twoclickbtn').disabled=false;
+document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
 document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
 pd.getPage(1).then(function(firstPage){
 var totalPages=pd.numPages;
@@ -1125,7 +1257,7 @@ document.getElementById('crossbtn').disabled=false;
 document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montazline').disabled=false;document.getElementById('montaztext').disabled=false;
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
-document.getElementById('twoclickbtn').disabled=false;
+document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
 document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
 dw();
 };
@@ -2127,12 +2259,12 @@ var dx=endX-startX;
 var dy=endY-startY;
 var len=Math.sqrt(dx*dx+dy*dy);
 var numLen=String(w.displayNum).length;
-// ✅ Škáluj radius podľa zoom (sc)
+// ✅ Škáluj radius podľa zoom (sc) A weldScale
 var baseRadius=22;
 if(numLen>=4)baseRadius=30;
 else if(numLen>=3)baseRadius=26;
 else if(numLen>=2)baseRadius=24;
-var radius=baseRadius*sc; // Škáluj s zoom!
+var radius=baseRadius*sc*weldScale; // Škáluj s zoom A weldScale!
 var ratio=(len-radius)/len;
 var lineEndX=startX+dx*ratio;
 var lineEndY=startY+dy*ratio;
@@ -2180,15 +2312,15 @@ cr.setAttribute('cy',endY);
 cr.setAttribute('r',radius);
 cr.setAttribute('fill','none');
 cr.setAttribute('stroke',weldColor);
-cr.setAttribute('stroke-width',1.5*sc); // Škáluj s zoom
+cr.setAttribute('stroke-width',1.5*sc*weldScale); // Škáluj s zoom A weldScale
 ov.appendChild(cr);
 
-// ✅ Škáluj fontSize podľa zoom (sc)
+// ✅ Škáluj fontSize podľa zoom (sc) A weldScale
 var baseFontSize=34;
 if(numLen>=4)baseFontSize=24;
 else if(numLen>=3)baseFontSize=28;
 else if(numLen>=2)baseFontSize=30;
-var fontSize=baseFontSize*sc; // Škáluj s zoom!
+var fontSize=baseFontSize*sc*weldScale; // Škáluj s zoom A weldScale!
 
 var tx=document.createElementNS('http://www.w3.org/2000/svg','text');
 tx.setAttribute('x',endX);
@@ -6342,6 +6474,7 @@ weldAssignments:weldAssignments,
 currentNumber:cn,
 startNumber:startNum,
 projectName:originalFileName||'zvary',
+weldScale:weldScale,
 scale:sc,
 canvasWidth:baseImageWidth || ca.width,
 canvasHeight:baseImageHeight || ca.height,
@@ -6389,6 +6522,7 @@ async function uploadData(){
   startNumber:startNum,
   projectName:originalFileName||'zvary',
   partName:projectsData.currentPart,
+  weldScale:weldScale,
   scale:sc,
   canvasWidth:baseImageWidth || ca.width,
   canvasHeight:baseImageHeight || ca.height,
@@ -6479,6 +6613,9 @@ weldAssignments=projectData.weldAssignments||{};
 cn=projectData.currentNumber||1;
 startNum=projectData.startNumber||1;
 originalFileName=projectData.projectName||'zvary';
+weldScale=projectData.weldScale||1.0;
+document.getElementById('weldScaleDisplay').textContent = Math.round(weldScale * 100) + '%';
+console.log('📏 Loaded weldScale:', weldScale);
 var fileNameSpan=document.getElementById('fileName');
 if(fileNameSpan)fileNameSpan.textContent=originalFileName+'.json';
 var startInput=document.getElementById('startNumInput');
@@ -6510,7 +6647,7 @@ document.getElementById('crossbtn').disabled=false;
 document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montazline').disabled=false;document.getElementById('montaztext').disabled=false;
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
-document.getElementById('twoclickbtn').disabled=false;
+document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
 document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
 dw();
 up();
@@ -6536,6 +6673,36 @@ this.value='';
 };
 
 async function savePDF(){
+// Otvor preview modal namiesto priameho exportu
+openPDFPreview();
+}
+
+async function openPDFPreview(){
+console.log('📋 Otváram PDF preview...');
+document.getElementById('pdfPreviewModal').classList.add('active');
+await renderPDFPreview();
+}
+
+function closePDFPreview(){
+document.getElementById('pdfPreviewModal').classList.remove('active');
+}
+
+function adjustPreviewScale(delta){
+weldScale += delta;
+if(weldScale < 0.3) weldScale = 0.3;
+if(weldScale > 2.0) weldScale = 2.0;
+document.getElementById('previewScaleDisplay').textContent = Math.round(weldScale * 100) + '%';
+document.getElementById('weldScaleDisplay').textContent = Math.round(weldScale * 100) + '%';
+console.log('📏 Preview scale:', Math.round(weldScale * 100) + '%');
+renderPDFPreview(); // Prekreslenie preview
+}
+
+async function confirmPDFExport(){
+closePDFPreview();
+await exportPDFActual(); // Skutočný export
+}
+
+async function exportPDFActual(){
 const progressContainer=document.getElementById('progressContainer');
 const progressBar=document.getElementById('progressBar');
 const progressText=document.getElementById('progressText');
@@ -6880,6 +7047,87 @@ progressContainer.style.display='none';
 progressBar.style.width='0%';
 saveBtn.disabled=false;
 }
+}
+
+async function renderPDFPreview(){
+console.log('🎨 Rendering PDF preview with weldScale:', weldScale);
+const previewCanvas = document.getElementById('pdfPreviewCanvas');
+const previewCtx = previewCanvas.getContext('2d');
+const tempCanvas = document.createElement('canvas');
+const tempCtx = tempCanvas.getContext('2d');
+const pdfWidth = 420;
+const pdfHeight = 297;
+const scale = 3;
+tempCanvas.width = pdfWidth * scale;
+tempCanvas.height = pdfHeight * scale;
+tempCtx.fillStyle = '#FFFFFF';
+tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+if(pd){
+await pd.getPage(1).then(async function(page){
+const viewport = page.getViewport({scale: scale * 1.4});
+await page.render({canvasContext: tempCtx, viewport: viewport}).promise;
+});
+}else if(loadedImage){
+tempCtx.drawImage(loadedImage, 0, 0, tempCanvas.width, tempCanvas.height);
+}
+tempCtx.save();
+tempCtx.scale(scale, scale);
+ws.forEach(function(w){
+const startX = w.start.x * tempCanvas.width / scale;
+const startY = w.start.y * tempCanvas.height / scale;
+const endX = w.end.x * tempCanvas.width / scale;
+const endY = w.end.y * tempCanvas.height / scale;
+const dx = endX - startX;
+const dy = endY - startY;
+const len = Math.sqrt(dx*dx + dy*dy);
+const numLen = String(w.displayNum).length;
+let baseRadius = 22;
+if(numLen >= 4) baseRadius = 30;
+else if(numLen >= 3) baseRadius = 26;
+else if(numLen >= 2) baseRadius = 24;
+const radius = baseRadius * weldScale;
+const ratio = (len - radius) / len;
+const lineEndX = startX + dx * ratio;
+const lineEndY = startY + dy * ratio;
+tempCtx.strokeStyle = '#FF0000';
+tempCtx.lineWidth = 2.5 * weldScale;
+tempCtx.beginPath();
+tempCtx.moveTo(startX, startY);
+tempCtx.lineTo(lineEndX, lineEndY);
+tempCtx.stroke();
+const crossSize = 1.6 * weldScale;
+tempCtx.lineWidth = 2 * weldScale;
+tempCtx.beginPath();
+tempCtx.moveTo(startX - crossSize, startY - crossSize);
+tempCtx.lineTo(startX + crossSize, startY + crossSize);
+tempCtx.stroke();
+tempCtx.beginPath();
+tempCtx.moveTo(startX + crossSize, startY - crossSize);
+tempCtx.lineTo(startX - crossSize, startY + crossSize);
+tempCtx.stroke();
+tempCtx.beginPath();
+tempCtx.arc(endX, endY, radius, 0, Math.PI * 2);
+tempCtx.strokeStyle = '#FF0000';
+tempCtx.lineWidth = 1.5 * weldScale;
+tempCtx.stroke();
+let baseFontSize = 34;
+if(numLen >= 4) baseFontSize = 24;
+else if(numLen >= 3) baseFontSize = 28;
+else if(numLen >= 2) baseFontSize = 30;
+const fontSize = baseFontSize * weldScale;
+tempCtx.fillStyle = '#FF0000';
+tempCtx.font = 'bold ' + fontSize + 'px Arial';
+tempCtx.textAlign = 'center';
+tempCtx.textBaseline = 'middle';
+tempCtx.fillText(w.displayNum, endX, endY);
+});
+tempCtx.restore();
+const previewWidth = 600;
+const previewHeight = (pdfHeight / pdfWidth) * previewWidth;
+previewCanvas.width = previewWidth;
+previewCanvas.height = previewHeight;
+previewCtx.drawImage(tempCanvas, 0, 0, previewWidth, previewHeight);
+console.log('✅ Preview rendered!');
 }
 
 function activateDimension(){
@@ -9624,7 +9872,7 @@ async function loadFromLibraryFirebase(projectName) {
           if(document.getElementById('montaztext')) document.getElementById('montaztext').disabled=false;
           if(document.getElementById('weldlogbtn')) document.getElementById('weldlogbtn').disabled=false;
           if(document.getElementById('oneclickbtn')) document.getElementById('oneclickbtn').disabled=false;
-          if(document.getElementById('twoclickbtn')) document.getElementById('twoclickbtn').disabled=false;
+          if(document.getElementById('twoclickbtn')) document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
           if(document.getElementById('mtobtn')) document.getElementById('mtobtn').disabled=false;
           if(document.getElementById('dimensionbtn')) document.getElementById('dimensionbtn').disabled=false;
           if(document.getElementById('linebtn')) document.getElementById('linebtn').disabled=false;
@@ -11498,6 +11746,29 @@ Voľné: <span id="availableSpace">~10 MB</span>
 </div>
 <div id="adminChatHistoryContent" style="flex:1;overflow-y:auto;padding:20px">
 <div style="text-align:center;color:#999;padding:40px">Načítavam...</div>
+</div>
+</div>
+</div>
+
+<!-- PDF PREVIEW MODAL -->
+<div id="pdfPreviewModal">
+<div class="preview-container">
+<div class="preview-header">
+<h2>📄 Náhľad PDF exportu</h2>
+<div class="preview-scale-control">
+<button onclick="adjustPreviewScale(-0.1)">➖</button>
+<span class="preview-scale-display" id="previewScaleDisplay">100%</span>
+<button onclick="adjustPreviewScale(0.1)">➕</button>
+</div>
+</div>
+<div class="preview-canvas-wrapper">
+<canvas id="pdfPreviewCanvas"></canvas>
+</div>
+<div class="preview-controls">
+<div class="preview-actions">
+<button class="preview-btn preview-btn-cancel" onclick="closePDFPreview()">❌ Zrušiť</button>
+<button class="preview-btn preview-btn-export" onclick="confirmPDFExport()">✅ Exportovať PDF</button>
+</div>
 </div>
 </div>
 </div>
