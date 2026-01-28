@@ -785,7 +785,7 @@ var projectsData={
   projects: {}
 };
 var currentTool='select';
-var oneClickMode=true;
+var oneClickMode=false; // Defaultne vypnuté - používateľ musí kliknúť "1-klik" tlačidlo
 var spools=[];
 var spoolMode=false;
 var dimensions=[];
@@ -2299,8 +2299,7 @@ ov.appendChild(tx);
 });
 }
 
-// Kreslenie palíčok - len v PREFABRIKÁCIA
-if(activeTab==='prefab'){
+// Kreslenie palíčok - VŠUDE (RED PEN aj PREFAB)
 lines.forEach(function(line){
 var startX=line.start.x*ca.width;
 var startY=line.start.y*ca.height;
@@ -2317,7 +2316,6 @@ ln.setAttribute('stroke-width',line.width);
 ln.setAttribute('data-line-id',line.id);
 ov.appendChild(ln);
 });
-} // End lines filter
 
 // Kreslenie šípok - VŠUDE (RED PEN aj PREFAB)
 arrows.forEach(function(arrow){
@@ -6794,7 +6792,21 @@ tempCtx.stroke();
 });
 
 }else{
-console.log('✏️ PDF export: RED PEN mode - zvary + text + šípky');
+console.log('✏️ PDF export: RED PEN mode - zvary + text + šípky + paličky');
+
+// RED PEN: Paličky
+lines.forEach(function(line){
+var x1=line.start.x*ca.width;
+var y1=line.start.y*ca.height;
+var x2=line.end.x*ca.width;
+var y2=line.end.y*ca.height;
+tempCtx.strokeStyle=line.color||'#FF0000';
+tempCtx.lineWidth=line.width||2;
+tempCtx.beginPath();
+tempCtx.moveTo(x1,y1);
+tempCtx.lineTo(x2,y2);
+tempCtx.stroke();
+});
 
 // RED PEN: Texty
 texts.forEach(function(txt){
