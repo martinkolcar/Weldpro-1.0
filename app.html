@@ -287,6 +287,13 @@ async function uploadProjectToFirebase(projectData) {
   const jsonString = JSON.stringify(projectData);
   console.log('🔥 JSON string size:', (jsonString.length / 1024).toFixed(1), 'KB');
   
+  // VERIFY: Počet zvarov po stringify
+  const parsed = JSON.parse(jsonString);
+  console.log('🔥 VERIFY po stringify: welds.length =', parsed.welds.length);
+  if(parsed.welds.length !== projectData.welds.length){
+    console.error('❌ CHYBA! Počet zvarov sa zmenil pri stringify!', projectData.welds.length, '→', parsed.welds.length);
+  }
+  
   const CHUNK_SIZE = 800 * 1024;
   const chunks = [];
   for (let i = 0; i < jsonString.length; i += CHUNK_SIZE) chunks.push(jsonString.slice(i, i + CHUNK_SIZE));
@@ -323,16 +330,36 @@ async function uploadProjectToFirebase(projectData) {
 }
 
 async function downloadProjectFromFirebase(projectName) {
+  console.log('📥 DOWNLOAD FROM FIREBASE - DEBUG:');
+  console.log('  projectName:', projectName);
+  
   if (!db) throw new Error('Firebase not ready');
   const doc = await db.collection('projects').doc(projectName).get();
   if (!doc.exists) throw new Error('Not found');
   const meta = doc.data();
+  
+  console.log('📥 Metadata:', meta);
+  console.log('📥 Očakávaný počet chunkov:', meta.chunks);
+  
   const chunks = [];
   for (let i = 0; i < meta.chunks; i++) {
     const c = await db.collection('projects').doc(projectName).collection('data').doc('c' + i).get();
-    if (c.exists) chunks.push(c.data().d);
+    if (c.exists) {
+      chunks.push(c.data().d);
+      console.log('📥 Chunk', i, 'načítaný, size:', c.data().d.length);
+    } else {
+      console.error('❌ Chunk', i, 'NEEXISTUJE!');
+    }
   }
-  return JSON.parse(chunks.join(''));
+  
+  console.log('📥 Spájam', chunks.length, 'chunkov...');
+  const jsonString = chunks.join('');
+  console.log('📥 Celková veľkosť JSON:', (jsonString.length / 1024).toFixed(1), 'KB');
+  
+  const parsed = JSON.parse(jsonString);
+  console.log('📥 PARSED: welds.length =', parsed.welds?.length || 0);
+  
+  return parsed;
 }
 
 async function listProjectsFromFirebase() {
