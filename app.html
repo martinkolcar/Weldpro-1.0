@@ -4255,6 +4255,8 @@ tbody.appendChild(trSpool);
 if(isSpoolExpanded){
 console.log('🔍 Zobrazujem zvary pre spool',spool.displayNum,': ',spoolWelds.length,'zvarov');
 spoolWelds.forEach(function(weld){
+console.log('🔍 DEBUG weld object:', JSON.stringify({id:weld.id, displayNum:weld.displayNum, type:typeof weld.displayNum}));
+
 var weldKey=spool.id+'_'+weld.displayNum;
 var isCompleted=kontrolaData.completedWelds[weldKey];
 
@@ -4266,8 +4268,10 @@ var checkIcon=isCompleted?'☑':'☐';
 var checkColor=isCompleted?'#10b981':'#999';
 
 // Získaj zvarača a dátum pre tento zvar
-var welderKey=spool.id+'_'+weld.displayNum+'_welder';
-var dateKey=spool.id+'_'+weld.displayNum+'_date';
+// OPRAVA: Používame spool.displayNum (napr. "SP1") namiesto spool.id (timestamp)
+var welderKey=spool.displayNum+'_'+weld.displayNum+'_welder';
+var dateKey=spool.displayNum+'_'+weld.displayNum+'_date';
+console.log('🔍 DEBUG welderKey:', welderKey, ', dateKey:', dateKey);
 var currentWelder=kontrolaData.welderData[welderKey]||'';
 var currentDate=kontrolaData.dateData[dateKey]||(new Date().toISOString().split('T')[0]);
 
