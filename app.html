@@ -196,8 +196,8 @@ display: flex;
 background: white;
 border-radius: 8px;
 padding: 20px;
-max-width: 90%;
-max-height: 90%;
+width: 90vw;
+height: 90vh;
 display: flex;
 flex-direction: column;
 box-shadow: 0 10px 40px rgba(0,0,0,0.3);
@@ -209,6 +209,7 @@ align-items: center;
 margin-bottom: 15px;
 padding-bottom: 10px;
 border-bottom: 2px solid #e5e7eb;
+flex-shrink: 0;
 }
 .preview-header h2 {
 margin: 0;
@@ -224,8 +225,7 @@ background: #f9fafb;
 display: flex;
 justify-content: center;
 align-items: center;
-min-height: 400px;
-max-height: 500px;
+min-height: 0;
 }
 .preview-controls {
 display: flex;
@@ -6764,14 +6764,14 @@ var baseRadius=22;
 if(numLen>=4)baseRadius=30;
 else if(numLen>=3)baseRadius=26;
 else if(numLen>=2)baseRadius=24;
-// Normalizuj radius na pôvodný canvas
-var radius = baseImageWidth > 0 ? baseRadius * (baseImageWidth / ca.width) : baseRadius;
+// Normalizuj radius na pôvodný canvas A aplikuj weldScale!
+var radius = baseImageWidth > 0 ? baseRadius * (baseImageWidth / ca.width) * weldScale : baseRadius * weldScale;
 var ratio=(len-radius)/len;
 var lineEndX=startX+dx*ratio;
 var lineEndY=startY+dy*ratio;
 
 tempCtx.strokeStyle='#FF0000';
-tempCtx.lineWidth=2.5;
+tempCtx.lineWidth=2.5*weldScale;
 tempCtx.beginPath();
 tempCtx.moveTo(startX,startY);
 tempCtx.lineTo(lineEndX,lineEndY);
@@ -6779,9 +6779,9 @@ tempCtx.stroke();
 
 var hasCross=crosses.some(function(c){return c.weldId===w.id;});
 if(hasCross){
-var crossSize=8;
+var crossSize=8*weldScale;
 tempCtx.strokeStyle='#FF0000';
-tempCtx.lineWidth=3;
+tempCtx.lineWidth=3*weldScale;
 tempCtx.beginPath();
 tempCtx.moveTo(startX-crossSize,startY-crossSize);
 tempCtx.lineTo(startX+crossSize,startY+crossSize);
@@ -6791,18 +6791,18 @@ tempCtx.stroke();
 }
 
 tempCtx.strokeStyle='#FF0000';
-tempCtx.lineWidth=2;
+tempCtx.lineWidth=2*weldScale;
 tempCtx.beginPath();
 tempCtx.arc(endX,endY,radius,0,Math.PI*2);
 tempCtx.stroke();
 
-// ✅ Font-size nezávislý na zoom
+// ✅ Font-size nezávislý na zoom A aplikuj weldScale!
 var baseFontSize=34;
 if(numLen>=4)baseFontSize=24;
 else if(numLen>=3)baseFontSize=28;
 else if(numLen>=2)baseFontSize=30;
-// Normalizuj font-size na pôvodný canvas
-var fontSize = baseImageWidth > 0 ? baseFontSize * (baseImageWidth / ca.width) : baseFontSize;
+// Normalizuj font-size na pôvodný canvas A aplikuj weldScale!
+var fontSize = baseImageWidth > 0 ? baseFontSize * (baseImageWidth / ca.width) * weldScale : baseFontSize * weldScale;
 
 tempCtx.fillStyle='#FF0000';
 tempCtx.font=fontSize+'px Arial';
@@ -7122,12 +7122,11 @@ tempCtx.textBaseline = 'middle';
 tempCtx.fillText(w.displayNum, endX, endY);
 });
 tempCtx.restore();
-const previewWidth = 600;
-const previewHeight = (pdfHeight / pdfWidth) * previewWidth;
-previewCanvas.width = previewWidth;
-previewCanvas.height = previewHeight;
-previewCtx.drawImage(tempCanvas, 0, 0, previewWidth, previewHeight);
-console.log('✅ Preview rendered!');
+// Použij PLNÚ veľkosť pre preview (nie zmenšený)
+previewCanvas.width = tempCanvas.width;
+previewCanvas.height = tempCanvas.height;
+previewCtx.drawImage(tempCanvas, 0, 0);
+console.log('✅ Preview rendered! Size:', previewCanvas.width, 'x', previewCanvas.height, '| weldScale:', weldScale);
 }
 
 function activateDimension(){
