@@ -591,7 +591,10 @@ async function listProjectsFromFirebase() {
 <button onclick="activateDrawTool('arrow')" id="arrowbtn" disabled>→ Šípka</button>
 <button onclick="activateDrawTool('doublearrow')" id="doublearrowbtn" disabled>↔ Dvojšípka</button>
 </div>
-<!-- DYNAMICKÉ MENU PRE NÁSTROJE -->
+
+</div>
+
+<!-- ZDIEĽANÉ TOOLBARY PRE RED PEN A PREFABRIKÁCIU -->
 <div id="lineOptions" class="ribbon-group" style="display:none">
 <select id="lineColor" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
 <option value="#FF0000" selected>🔴 Červená</option>
@@ -612,6 +615,7 @@ async function listProjectsFromFirebase() {
 <option value="5">5px</option>
 </select>
 </div>
+
 <div id="textOptions" class="ribbon-group" style="display:none">
 <select id="textColor" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
 <option value="#FF0000" selected>🔴 Červená</option>
@@ -630,6 +634,7 @@ async function listProjectsFromFirebase() {
 <option value="24">24px</option>
 </select>
 </div>
+
 <div id="curveOptions" class="ribbon-group" style="display:none">
 <select id="curveColor" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
 <option value="#FF0000" selected>🔴 Červená</option>
@@ -679,8 +684,6 @@ async function listProjectsFromFirebase() {
 <option value="28">28px</option>
 <option value="32">32px</option>
 </select>
-</div>
-
 </div>
 
 <div id="ribbonPrefab" class="ribbon-content">
