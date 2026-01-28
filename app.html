@@ -592,9 +592,7 @@ async function listProjectsFromFirebase() {
 <button onclick="activateDrawTool('doublearrow')" id="doublearrowbtn" disabled>↔ Dvojšípka</button>
 </div>
 
-</div>
-
-<!-- ZDIEĽANÉ TOOLBARY PRE RED PEN A PREFABRIKÁCIU -->
+<!-- TOOLBARY PRE RED PEN NÁSTROJE -->
 <div id="lineOptions" class="ribbon-group" style="display:none">
 <select id="lineColor" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
 <option value="#FF0000" selected>🔴 Červená</option>
@@ -635,42 +633,6 @@ async function listProjectsFromFirebase() {
 </select>
 </div>
 
-<div id="curveOptions" class="ribbon-group" style="display:none">
-<select id="curveColor" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
-<option value="#FF0000" selected>🔴 Červená</option>
-<option value="#000000">⚫ Čierna</option>
-<option value="#0078D4">🔵 Modrá</option>
-<option value="#10b981">🟢 Zelená</option>
-<option value="#f97316">🟠 Oranžová</option>
-</select>
-<select id="curveWidth" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
-<option value="1">1px</option>
-<option value="1.5">1.5px</option>
-<option value="2" selected>2px</option>
-<option value="2.5">2.5px</option>
-<option value="3">3px</option>
-<option value="4">4px</option>
-</select>
-</div>
-
-<div id="arrowOptions" class="ribbon-group" style="display:none">
-<select id="arrowColor" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
-<option value="#FF0000" selected>🔴 Červená</option>
-<option value="#000000">⚫ Čierna</option>
-<option value="#0078D4">🔵 Modrá</option>
-<option value="#10b981">🟢 Zelená</option>
-<option value="#f97316">🟠 Oranžová</option>
-</select>
-<select id="arrowWidth" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
-<option value="0.3">0.3px</option>
-<option value="0.5">0.5px</option>
-<option value="1">1px</option>
-<option value="1.5">1.5px</option>
-<option value="2" selected>2px</option>
-<option value="2.5">2.5px</option>
-<option value="3">3px</option>
-<option value="4">4px</option>
-</select>
 </div>
 
 <div id="dimensionOptions" class="ribbon-group" style="display:none">
@@ -698,10 +660,11 @@ async function listProjectsFromFirebase() {
 <button onclick="activateDimension()" id="dimensionbtn" disabled>📏 Domerok</button>
 </div>
 <div class="ribbon-group">
+<button onclick="activateDrawTool('line')" id="prefab_linebtn" disabled>📏 Palička</button>
 <button onclick="activateDrawTool('text')" id="prefab_textbtn" disabled>📝 Text</button>
+<button onclick="activateDrawTool('curve')" id="prefab_curvebtn" disabled>☁️ Oblačik</button>
 <button onclick="activateDrawTool('arrow')" id="prefab_arrowbtn" disabled>➡️ Šípka</button>
 <button onclick="activateDrawTool('doublearrow')" id="prefab_doublearrowbtn" disabled>⬌ Dvojšípka</button>
-<button onclick="activateDrawTool('curve')" id="prefab_curvebtn" disabled>☁️ Oblačik</button>
 </div>
 <div class="ribbon-group">
 <button onclick="ex()" id="ex" disabled>💾 Export CSV</button>
@@ -1223,11 +1186,11 @@ document.getElementById('setstart').disabled=false;
 document.getElementById('selectbtn').disabled=false;
 document.getElementById('crossbtn').disabled=false;
 document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montazline').disabled=false;document.getElementById('montaztext').disabled=false;
-document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;
+
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
 document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
-document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
+document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
 pd.getPage(1).then(function(firstPage){
 var totalPages=pd.numPages;
 console.log('PDF má',totalPages,'strán');
@@ -1291,11 +1254,11 @@ document.getElementById('setstart').disabled=false;
 document.getElementById('selectbtn').disabled=false;
 document.getElementById('crossbtn').disabled=false;
 document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montazline').disabled=false;document.getElementById('montaztext').disabled=false;
-document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;
+
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
 document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
-document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
+document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
 dw();
 };
 im.src=ev.target.result;
@@ -3722,7 +3685,7 @@ var xOffset=0;
 var yOffset=0;
 
 window.addEventListener('load',function(){
-document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
+document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
 });
 
 mtoHeader.addEventListener('mousedown',function(e){
@@ -6823,7 +6786,7 @@ document.getElementById('spoolbtn').disabled=false;document.getElementById('spoo
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
 document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
-document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
+document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
 dw();
 up();
 var weldLogPanel=document.getElementById('weldLogPanel');
@@ -10099,7 +10062,7 @@ async function loadFromLibraryFirebase(projectName) {
           if(document.getElementById('oneclickbtn')) document.getElementById('oneclickbtn').disabled=false;
           if(document.getElementById('twoclickbtn')) document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
           if(document.getElementById('mtobtn')) document.getElementById('mtobtn').disabled=false;
-          if(document.getElementById('dimensionbtn')) document.getElementById('dimensionbtn').disabled=false;
+          if(document.getElementById('dimensionbtn')) document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;
           if(document.getElementById('linebtn')) document.getElementById('linebtn').disabled=false;
           if(document.getElementById('textbtn')) document.getElementById('textbtn').disabled=false;
           if(document.getElementById('curvebtn')) document.getElementById('curvebtn').disabled=false;
