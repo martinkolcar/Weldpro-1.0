@@ -9176,18 +9176,6 @@ function saveCurrentPartWeldBook() {
   currentPart.lastModified = new Date().toISOString().slice(0,10);
   
   saveProjectsToStorage();
-  
-  // Ak sme OFFLINE, pridaj do pending changes
-  if(!isOnline || typeof isOnline === 'undefined'){
-    addPendingChange('weld_update',{
-      projectName: projectsData.currentProject,
-      partName: projectsData.currentPart,
-      weldBookData: JSON.parse(JSON.stringify(weldBookData)), // Deep copy
-      timestamp: new Date().toISOString()
-    });
-    console.log('📤 WeldBook zmeny pridané do offline fronty');
-  }
-  
   console.log('💾 WeldBook uložený pre:', projectsData.currentProject, '/', projectsData.currentPart);
 }
 
@@ -11854,14 +11842,9 @@ item.style.display=text.includes(searchText)?'block':'none';
 
 async function loadOfflineProject(projectId){
 try{
-// Nastav offline flag aby sa Firebase nevolal
-const wasOnline = isOnline;
-isOnline = false; // Dočasne vypni online režim
-
 const data=JSON.parse(localStorage.getItem('offline_project_'+projectId));
 if(!data){
 alert('❌ Projekt nebol nájdený v offline úložisku');
-isOnline = wasOnline;
 return;
 }
 
@@ -11878,16 +11861,19 @@ if(data.spoolData)spoolData=data.spoolData;
 if(data.weldBookData)weldBookData=data.weldBookData;
 if(data.kontrolaData)kontrolaData=data.kontrolaData;
 
-// Načítaj PDF ak je
+// Načítaj PDF/Image ak je
 if(data.pdfData){
-const pdfBytes=base64ToUint8Array(data.pdfData);
+// pdfData je PNG image (Data URL) z Firebase
+const img = new Image();
+img.onload = function(){
+ca.width = img.width;
+ca.height = img.height;
+ov.setAttribute('width', img.width);
+ov.setAttribute('height', img.height);
+ct.imageSmoothingEnabled = false;
+ct.drawImage(img, 0, 0);
 
-// Načítaj PDF cez pdfjsLib
-pdfjsLib.getDocument(pdfBytes).promise.then(function(p){
-pd=p;
-originalFileName=data.projectMeta?.name||projectId;
-
-// Aktualizuj UI elementy
+// Aktualizuj UI
 document.getElementById('up').style.display='none';
 document.getElementById('cw').style.display='block';
 document.getElementById('zoomInfo').style.display='block';
@@ -11932,38 +11918,30 @@ document.getElementById('arrowbtn').disabled=false;
 document.getElementById('doublearrowbtn').disabled=false;
 document.getElementById('undo').disabled=false;
 
-// Renderuj prvú stranu
-rp();
+originalFileName=data.projectMeta?.name||projectId;
 
-// Aktualizuj UI
+// Aktualizuj zobrazenie
 up();
 dw();
 closeOfflineModeModal();
-
-// Obnov online stav
-isOnline = wasOnline;
-
 alert('✅ Offline projekt načítaný: '+(data.projectMeta?.name||projectId));
 console.log('📱 Offline projekt načítaný:',projectId);
-}).catch(function(err){
-console.error('❌ Chyba pri načítaní PDF:',err);
-isOnline = wasOnline;
-alert('❌ Chyba pri načítaní PDF: '+err.message);
-});
+};
+img.onerror = function(){
+alert('❌ Chyba pri načítaní obrázku');
+closeOfflineModeModal();
+};
+img.src = data.pdfData; // Data URL
 }else{
-// Žiadne PDF - len data
+// Žiadny obrázok
 up();
 dw();
 closeOfflineModeModal();
-isOnline = wasOnline;
-alert('✅ Offline projekt načítaný (bez PDF): '+(data.projectMeta?.name||projectId));
-console.log('📱 Offline projekt načítaný (bez PDF):',projectId);
+alert('✅ Offline projekt načítaný (bez výkresu): '+(data.projectMeta?.name||projectId));
 }
 }catch(error){
 console.error('Chyba pri načítaní offline projektu:',error);
 alert('❌ Chyba pri načítaní: '+error.message);
-// Obnov online stav aj pri chybe
-if(typeof wasOnline !== 'undefined') isOnline = wasOnline;
 }
 }
 
