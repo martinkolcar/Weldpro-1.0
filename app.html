@@ -11640,13 +11640,16 @@ case 'project_update':
 // Prepíš celý projekt s novými dátami!
 console.log('📤 Nahrávam projekt update:', change.data.projectName);
 
-// Načítaj existujúci projekt z Firebase
-const projectId = change.data.projectName + ',' + change.data.partName;
+// ✅ Použiť firebaseProjectId ak existuje!
+const projectId = change.data.firebaseProjectId || (change.data.projectName + ',' + change.data.partName);
+console.log('📌 Firebase projectId:', projectId);
+
 const projectRef = db.collection('projects').doc(projectId);
 const projectDoc = await projectRef.get();
 
 if(!projectDoc.exists){
-throw new Error('Projekt neexistuje v Firebase');
+console.error('❌ Projekt',projectId,'neexistuje v Firebase!');
+throw new Error('Projekt neexistuje v Firebase: ' + projectId);
 }
 
 // Aktualizuj s novými dátami
