@@ -378,10 +378,25 @@ let auth = null;
 
 window.addEventListener('load', function() {
   if (typeof firebase !== 'undefined') {
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    auth = firebase.auth();
-    auth.signInAnonymously().then(() => console.log('✅ Firebase ready!')).catch(err => console.error(err));
+    try {
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore();
+      auth = firebase.auth();
+      
+      // Len ak sme online, skús pripojiť
+      if (navigator.onLine) {
+        auth.signInAnonymously()
+          .then(() => console.log('✅ Firebase ready!'))
+          .catch(err => {
+            console.warn('⚠️ Firebase auth failed (offline?):', err.message);
+            // Aj tak pokračuj - offline režim funguje
+          });
+      } else {
+        console.log('📱 Offline režim - Firebase neinicializovaný');
+      }
+    } catch(err) {
+      console.error('❌ Firebase init error:', err);
+    }
   }
 });
 
