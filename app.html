@@ -1837,33 +1837,8 @@ dw();
 console.log('❌ Zvar',w.displayNum,'odznačený - zvarač vymazaný');
 }
 }else{
-// OZNAČIŤ - zadaj zvarača
-var welderInput=prompt('Zadaj Welder ID pre zvar '+w.displayNum+':','');
-if(welderInput && welderInput.trim()!==''){
-var todayDate=new Date().toISOString().split('T')[0];
-var dateInput=prompt('Dátum zvarenia (YYYY-MM-DD):',todayDate);
-if(dateInput===null)dateInput=todayDate; // Ak Cancel, použij dnešný
-
-// Aktualizuj WeldBook
-if(weldBookEntry){
-weldBookEntry.welderId=welderInput.trim();
-weldBookEntry.dateWelding=dateInput;
-}else{
-// Vytvor nový záznam ak neexistuje
-var splitName=splitIsometricName(originalFileName||'Unknown');
-addWeldToWeldBook({
-part:splitName.part,
-isometric:splitName.isometric,
-sheets:1,
-weldId:String(w.displayNum),
-welderId:welderInput.trim(),
-dateWelding:dateInput
-});
-}
-saveCurrentPartWeldBook();
-dw();
-console.log('✅ Zvar',w.displayNum,'označený - zvarač:',welderInput.trim(),', dátum:',dateInput);
-}
+// OZNAČIŤ - otvor modal
+openMontazWelderModal(w, weldBookEntry);
 }
 return; // Exit po MONTÁŽ interakcii
 }
@@ -5647,6 +5622,58 @@ result.style.display='block';
 // ============= MONTÁŽ FUNKCIE =============
 var montazWeldMode=false;
 var montazWeldNumber='';
+var montazCurrentWeld=null; // Pre modal - ktorý zvar upravujeme
+
+function openMontazWelderModal(weld, weldBookEntry){
+montazCurrentWeld={weld:weld, weldBookEntry:weldBookEntry};
+document.getElementById('montazWelderWeldNum').textContent='#'+weld.displayNum;
+document.getElementById('montazWelderInput').value='';
+// Nastav dnešný dátum
+var today=new Date().toISOString().split('T')[0];
+document.getElementById('montazDateInput').value=today;
+document.getElementById('montazWelderModal').style.display='flex';
+// Focus na input
+setTimeout(function(){document.getElementById('montazWelderInput').focus();},100);
+}
+
+function closeMontazWelderModal(){
+document.getElementById('montazWelderModal').style.display='none';
+montazCurrentWeld=null;
+}
+
+function saveMontazWelder(){
+var welderInput=document.getElementById('montazWelderInput').value.trim();
+var dateInput=document.getElementById('montazDateInput').value;
+
+if(!welderInput){
+alert('⚠️ Zadaj Welder ID!');
+return;
+}
+
+var weld=montazCurrentWeld.weld;
+var weldBookEntry=montazCurrentWeld.weldBookEntry;
+
+// Aktualizuj WeldBook
+if(weldBookEntry){
+weldBookEntry.welderId=welderInput;
+weldBookEntry.dateWelding=dateInput;
+}else{
+// Vytvor nový záznam ak neexistuje
+var splitName=splitIsometricName(originalFileName||'Unknown');
+addWeldToWeldBook({
+part:splitName.part,
+isometric:splitName.isometric,
+sheets:1,
+weldId:String(weld.displayNum),
+welderId:welderInput,
+dateWelding:dateInput
+});
+}
+saveCurrentPartWeldBook();
+dw();
+closeMontazWelderModal();
+console.log('✅ Zvar',weld.displayNum,'označený - zvarač:',welderInput,', dátum:',dateInput);
+}
 
 function addMontazWeld(){
 var weldNum=prompt('Zadajte číslo nového zvaru (napr: 5a, 10b):','');
@@ -12097,6 +12124,25 @@ Voľné: <span id="availableSpace">~10 MB</span>
 <button class="preview-btn preview-btn-cancel" onclick="closePDFPreview()">❌ Zrušiť</button>
 <button class="preview-btn preview-btn-export" onclick="confirmPDFExport()">✅ Exportovať PDF</button>
 </div>
+</div>
+</div>
+</div>
+
+<!-- MODAL: Pridať zvarača v MONTÁŽ -->
+<div id="montazWelderModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;justify-content:center;align-items:center;">
+<div style="background:white;padding:30px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:400px;width:90%;">
+<h3 style="margin:0 0 20px 0;color:#333;">Označiť zvar <span id="montazWelderWeldNum"></span></h3>
+<div style="margin-bottom:15px;">
+<label style="display:block;margin-bottom:5px;font-weight:bold;color:#555;">Welder ID:</label>
+<input type="text" id="montazWelderInput" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px;" placeholder="Napr: SD5">
+</div>
+<div style="margin-bottom:20px;">
+<label style="display:block;margin-bottom:5px;font-weight:bold;color:#555;">Dátum zvarania:</label>
+<input type="date" id="montazDateInput" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+</div>
+<div style="display:flex;gap:10px;">
+<button onclick="saveMontazWelder()" style="flex:1;padding:10px;background:#10b981;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;">✅ Uložiť</button>
+<button onclick="closeMontazWelderModal()" style="flex:1;padding:10px;background:#e5e5e5;color:#333;border:none;border-radius:4px;cursor:pointer;font-size:14px;">❌ Zrušiť</button>
 </div>
 </div>
 </div>
