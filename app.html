@@ -302,10 +302,27 @@ background: #dc2626;
 var jsPDF = window.jspdf.jsPDF;
 </script>
 
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<!-- Firebase - načíta sa dynamicky len ak sme online -->
+<script>
+// ✅ Dynamické načítanie Firebase len v online režime
+if (navigator.onLine) {
+  console.log('📡 Online - načítavam Firebase...');
+  const scripts = [
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js'
+  ];
+  
+  scripts.forEach(src => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.onerror = () => console.warn('⚠️ Firebase script failed:', src);
+    document.head.appendChild(script);
+  });
+} else {
+  console.log('📱 Offline - Firebase NEBUDEME načítavať');
+}
+</script>
 
 <script>
 // 🔒 SESSION CHECK - Ochrana proti neautorizovanému prístupu
@@ -377,25 +394,32 @@ let db = null;
 let auth = null;
 
 window.addEventListener('load', function() {
+  // ✅ Check NAJPRV či sme online!
+  if (!navigator.onLine) {
+    console.log('📱 OFFLINE MODE - Firebase vypnutý');
+    db = null;
+    auth = null;
+    document.getElementById('connectionStatus').innerHTML='🔴 Offline';
+    document.getElementById('offlineIndicator').style.background='#ef4444';
+    return; // ← STOP! Žiadny Firebase!
+  }
+  
+  // Online - inicializuj Firebase
   if (typeof firebase !== 'undefined') {
     try {
       firebase.initializeApp(firebaseConfig);
       db = firebase.firestore();
       auth = firebase.auth();
       
-      // Len ak sme online, skús pripojiť
-      if (navigator.onLine) {
-        auth.signInAnonymously()
-          .then(() => console.log('✅ Firebase ready!'))
-          .catch(err => {
-            console.warn('⚠️ Firebase auth failed (offline?):', err.message);
-            // Aj tak pokračuj - offline režim funguje
-          });
-      } else {
-        console.log('📱 Offline režim - Firebase neinicializovaný');
-      }
+      auth.signInAnonymously()
+        .then(() => console.log('✅ Firebase ready!'))
+        .catch(err => {
+          console.warn('⚠️ Firebase auth failed:', err.message);
+        });
     } catch(err) {
       console.error('❌ Firebase init error:', err);
+      db = null;
+      auth = null;
     }
   }
 });
