@@ -1799,6 +1799,78 @@ return;
 
 var clickedWeld=null;
 var clickType='';
+
+// MONTÁŽ MODE - klik na kruh zvaru pre označenie/odznačenie
+if(displayFilter.enabled && !editMode && !montazWeldMode){
+for(var i=0;i<ws.length;i++){
+var w=ws[i];
+var wEndX=w.end.x*ca.width;
+var wEndY=w.end.y*ca.height;
+var distEnd=Math.sqrt(Math.pow(x-wEndX,2)+Math.pow(y-wEndY,2));
+
+// Klik na KRUH (nie na palička)
+if(distEnd<35){ // Väčší radius pre ľahšie klikanie
+clickedWeld=w;
+
+// Check či má vyplneného zvarača v WeldBook
+var hasWelder=false;
+var weldBookEntry=null;
+if(weldBookData){
+for(var wbi=0;wbi<weldBookData.length;wbi++){
+if(String(weldBookData[wbi].weldId)===String(w.displayNum)){
+weldBookEntry=weldBookData[wbi];
+if(weldBookEntry.welderId && weldBookEntry.welderId.trim()!==''){
+hasWelder=true;
+}
+break;
+}
+}
+}
+
+if(hasWelder){
+// ODZNAČ - vymaž zvarača
+if(confirm('Odznačiť zvar '+w.displayNum+'? (vymaže sa zvarač z WeldBook)')){
+weldBookEntry.welderId='';
+weldBookEntry.dateWelding='';
+saveCurrentPartWeldBook();
+dw();
+console.log('❌ Zvar',w.displayNum,'odznačený - zvarač vymazaný');
+}
+}else{
+// OZNAČIŤ - zadaj zvarača
+var welderInput=prompt('Zadaj Welder ID pre zvar '+w.displayNum+':','');
+if(welderInput && welderInput.trim()!==''){
+var todayDate=new Date().toISOString().split('T')[0];
+var dateInput=prompt('Dátum zvarenia (YYYY-MM-DD):',todayDate);
+if(dateInput===null)dateInput=todayDate; // Ak Cancel, použij dnešný
+
+// Aktualizuj WeldBook
+if(weldBookEntry){
+weldBookEntry.welderId=welderInput.trim();
+weldBookEntry.dateWelding=dateInput;
+}else{
+// Vytvor nový záznam ak neexistuje
+var splitName=splitIsometricName(originalFileName||'Unknown');
+addWeldToWeldBook({
+part:splitName.part,
+isometric:splitName.isometric,
+sheets:1,
+weldId:String(w.displayNum),
+welderId:welderInput.trim(),
+dateWelding:dateInput
+});
+}
+saveCurrentPartWeldBook();
+dw();
+console.log('✅ Zvar',w.displayNum,'označený - zvarač:',welderInput.trim(),', dátum:',dateInput);
+}
+}
+return; // Exit po MONTÁŽ interakcii
+}
+}
+}
+
+// NORMÁLNY klik handling (pre ostatné režimy)
 for(var i=0;i<ws.length;i++){
 var w=ws[i];
 var wEndX=w.end.x*ca.width;
