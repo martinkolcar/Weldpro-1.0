@@ -2352,13 +2352,8 @@ return totalCount>0?whiteCount/totalCount:0;
 function dw(){
 ov.innerHTML='';
 ws.forEach(function(w){
-// FILTER CHECK - ak je filter enabled v MONTÁŽ mode
-if(displayFilter.enabled){
-var source=w.source||'site';
-if(source==='prefab' && !displayFilter.showPrefab)return;
-if(source==='site' && !displayFilter.showSite)return;
-if(source==='new' && !displayFilter.showNew)return;
-}
+// MONTÁŽ MODE - Zobrazíme VŠETKY zvary, len menime farbu
+// Filter už neblokuje zobrazenie, len určuje farbu kruhu (zelený/červený)
 
 var startX=w.start.x*ca.width;
 var startY=w.start.y*ca.height;
@@ -2378,33 +2373,39 @@ var ratio=(len-radius)/len;
 var lineEndX=startX+dx*ratio;
 var lineEndY=startY+dy*ratio;
 
-// FARBA podľa source (ak je filter enabled)
-var weldColor='#FF0000';
-var fillColor='none'; // Default - nevyplnený
+// FARBA podľa WELDBOOK - ak má vyplneného zvarača
+var weldColor='#FF0000'; // Default červená (stroke)
+var fillColor='none'; // Default nevyplnený
 
-// Ak je filter enabled (MONTÁŽ mode), check či je hotový v KONTROLA
+// Ak je filter enabled (MONTÁŽ mode), check WeldBook
 if(displayFilter.enabled){
-// Nájdi spool ID pre tento zvar
-var spoolId = null;
-var weldNum = w.displayNum;
+// Check či má tento zvar vyplneného zvarača v WeldBook
+var hasWelder = false;
 
-// Prejdi všetky spooly a nájdi ten ktorý obsahuje tento zvar
-for(var si=0; si<spoolData.length; si++){
-var sp = spoolData[si];
-// Check či tento zvar patrí do tohto spoolu (musíme použiť weldId)
-var possibleKey = sp.id + '_' + weldNum;
-if(kontrolaData.completedWelds[possibleKey]){
-// HOTOVÝ ZVAR - vyplň zelenou!
-fillColor = '#10b981';
+// Prejdi WeldBook a nájdi tento zvar
+if(weldBookData && weldBookData.length > 0){
+for(var wbi=0; wbi<weldBookData.length; wbi++){
+var wbEntry = weldBookData[wbi];
+// Match podľa displayNum
+if(wbEntry.weldNumber === w.displayNum){
+// Check či má vyplneného zvarača
+if(wbEntry.welder && wbEntry.welder.trim() !== ''){
+hasWelder = true;
 break;
 }
 }
+}
+}
 
-// Farba stroke podľa source
-var source=w.source||'site';
-if(source==='prefab')weldColor='#10b981';  // Zelená
-else if(source==='new')weldColor='#fbbf24';  // Žltá
-else weldColor='#ffffff';  // Biela (site)
+// Ak má zvarača → vyplň zelenou
+if(hasWelder){
+fillColor = '#10b981'; // ZELENÁ vyplnená
+weldColor = '#10b981'; // Zelený stroke
+} else {
+// Nemá zvarača → červený prázdny (pozičný)
+fillColor = 'none';
+weldColor = '#FF0000';
+}
 }
 
 var ln=document.createElementNS('http://www.w3.org/2000/svg','line');
