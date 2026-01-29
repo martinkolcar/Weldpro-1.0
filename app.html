@@ -2470,16 +2470,34 @@ if(displayFilter.enabled){
 // Check či má tento zvar vyplneného zvarača v WeldBook
 var hasWelder = false;
 
-// Prejdi WeldBook a nájdi tento zvar
+// Prejdi WeldBook a nájdi tento zvar PRE TENTO PROJEKT!
 if(weldBookData && weldBookData.length > 0){
+// ✅ Zisti názov aktuálneho projektu
+var currentProjectName = projectsData.currentProject || originalFileName || 'unknown';
+
 for(var wbi=0; wbi<weldBookData.length; wbi++){
 var wbEntry = weldBookData[wbi];
-// Match podľa weldId (nie weldNumber!)
-if(String(wbEntry.weldId) === String(w.displayNum)){
+
+// ✅ KONTROLUJ aj projectName!
+var entryProjectName = wbEntry.projectName || wbEntry.project || '';
+
+// Ak WeldBook entry nemá projectName, skús použiť currentProjectName (spätná kompatibilita)
+var matchesProject = true;
+if(entryProjectName && entryProjectName !== ''){
+// Ak má projectName, musí sa zhodovať
+matchesProject = (entryProjectName === currentProjectName);
+}
+// Inak (starý formát bez projectName) - akceptuj, ale log warning
+else {
+console.warn('⚠️ WeldBook entry bez projectName - možný problém pri viacerých izometriách');
+}
+
+// Match podľa weldId A projectName!
+if(matchesProject && String(wbEntry.weldId) === String(w.displayNum)){
 // Check či má vyplneného zvarača (welderId nie welder!)
 if(wbEntry.welderId && wbEntry.welderId.trim() !== ''){
 hasWelder = true;
-console.log('✅ MONTÁŽ: Zvar',w.displayNum,'má zvarača:',wbEntry.welderId);
+console.log('✅ MONTÁŽ: Zvar',w.displayNum,'má zvarača:',wbEntry.welderId,'(projekt:',currentProjectName,')');
 break;
 }
 }
@@ -5698,12 +5716,17 @@ var weldBookEntry=montazCurrentWeld.weldBookEntry;
 if(weldBookEntry){
 weldBookEntry.welderId=welderInput;
 weldBookEntry.dateWelding=dateInput;
+// ✅ Aktualizuj projectName ak chýba
+if(!weldBookEntry.projectName){
+weldBookEntry.projectName = projectsData.currentProject || originalFileName || 'Unknown';
+}
 }else{
 // Vytvor nový záznam ak neexistuje
 var splitName=splitIsometricName(originalFileName||'Unknown');
 addWeldToWeldBook({
 part:splitName.part,
 isometric:splitName.isometric,
+projectName: projectsData.currentProject || originalFileName || 'Unknown', // ✅ PRIDANÉ!
 sheets:1,
 weldId:String(weld.displayNum),
 welderId:welderInput,
@@ -5713,7 +5736,7 @@ dateWelding:dateInput
 saveCurrentPartWeldBook();
 dw();
 closeMontazWelderModal();
-console.log('✅ Zvar',weld.displayNum,'označený - zvarač:',welderInput,', dátum:',dateInput);
+console.log('✅ Zvar',weld.displayNum,'označený - zvarač:',welderInput,', dátum:',dateInput,'(projekt:',projectsData.currentProject||originalFileName,')');
 }
 
 function addMontazWeld(){
@@ -11612,6 +11635,64 @@ case 'project':
 await db.collection('library').doc(change.data.id).set(change.data);
 break;
 
+case 'project_update':
+// Prepíš celý projekt s novými dátami!
+console.log('📤 Nahrávam projekt update:', change.data.projectName);
+
+// Načítaj existujúci projekt z Firebase
+const projectId = change.data.projectName + ',' + change.data.partName;
+const projectRef = db.collection('projects').doc(projectId);
+const projectDoc = await projectRef.get();
+
+if(!projectDoc.exists){
+throw new Error('Projekt neexistuje v Firebase');
+}
+
+// Aktualizuj s novými dátami
+const updateData = {
+welds: change.data.data.welds,
+lines: change.data.data.lines,
+texts: change.data.data.texts,
+arrows: change.data.data.arrows,
+curves: change.data.data.curves,
+crosses: change.data.data.crosses,
+spools: change.data.data.spools,
+dimensions: change.data.data.dimensions,
+spoolData: change.data.data.spoolData,
+lastModified: new Date().toISOString(),
+modifiedBy: window.currentUser?.username || 'unknown'
+};
+
+// Prepíš projekt v Firebase (merge aby sa zachovali ostatné polia)
+const existingData = projectDoc.data();
+const mergedData = {...existingData, ...updateData};
+
+// Rozdeľ na chunky a ulož
+const jsonString = JSON.stringify(mergedData);
+const chunkSize = 800000;
+const chunks = [];
+for(let i=0; i<jsonString.length; i+=chunkSize){
+chunks.push(jsonString.substring(i, i+chunkSize));
+}
+
+// Aktualizuj metadata
+await projectRef.set({
+chunks: chunks.length,
+size: jsonString.length,
+date: new Date().toISOString(),
+lastModified: new Date().toISOString(),
+name: change.data.projectName,
+part: change.data.partName
+}, {merge: true});
+
+// Ulož chunky
+for(let i=0; i<chunks.length; i++){
+await projectRef.collection('data').doc('c'+i).set({d: chunks[i]});
+}
+
+console.log('✅ Projekt prepísaný:', chunks.length, 'chunkov');
+break;
+
 case 'delivery':
 await db.collection('delivery_notes').doc(change.data.id).set(change.data);
 break;
@@ -12009,12 +12090,51 @@ if(data.curves)curves=data.curves;
 if(data.arrows)arrows=data.arrows;
 if(data.dimensions)dimensions=data.dimensions;
 if(data.spoolData)spoolData=data.spoolData;
-if(data.weldBookData)weldBookData=data.weldBookData;
+
+// ✅ WeldBook - načítaj len pre TENTO projekt!
+if(data.weldBookData && Array.isArray(data.weldBookData)){
+weldBookData=data.weldBookData;
+console.log('📖 WeldBook načítaný:', weldBookData.length, 'zvarov');
+} else {
+// Ak projekt nemá WeldBook, vyčisti ho
+weldBookData=[];
+console.log('📖 WeldBook prázdny pre tento projekt');
+}
+
 if(data.kontrolaData)kontrolaData=data.kontrolaData;
 if(data.materials)weldLogMaterials=data.materials;
 if(data.weldAssignments)weldAssignments=data.weldAssignments;
 if(data.currentNumber)cn=data.currentNumber;
 if(data.startNumber)startNum=data.startNumber;
+
+// ✅ NASTAV currentProject/currentPart aby sa zmeny ukladali správne!
+const projectName = data.projectName || projectId.split(',')[0];
+const partName = data.partName || projectId.split(',')[1] || 'default';
+
+// Vytvor projekt ak neexistuje
+if(!projectsData.projects[projectName]){
+projectsData.projects[projectName] = {
+parts: {},
+created: new Date().toISOString(),
+createdBy: window.currentUser?.username || 'offline'
+};
+}
+
+// Vytvor part ak neexistuje
+if(!projectsData.projects[projectName].parts[partName]){
+projectsData.projects[projectName].parts[partName] = {
+welds: ws,
+weldBookData: weldBookData,
+created: new Date().toISOString(),
+lastModified: new Date().toISOString()
+};
+}
+
+// NASTAV ako aktívny projekt!
+projectsData.currentProject = projectName;
+projectsData.currentPart = partName;
+
+console.log('✅ Aktívny projekt:', projectName, '/', partName);
 
 // Načítaj PDF/Image ak je
 if(data.pdfData){
