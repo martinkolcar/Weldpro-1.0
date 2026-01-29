@@ -955,7 +955,7 @@ async function listProjectsFromFirebase() {
 
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-var pd=null,sc=1.0,ca=document.getElementById('can'),ct=ca.getContext('2d'),ov=document.getElementById('ov'),ws=[],pt=null,cn=1,startNum=1,originalFileName='',editMode=false,moveMode=false,selectedWeldId=null,editCrossMode=false,activeTab='redpen';
+var pd=null,sc=1.0,ca=document.getElementById('can'),ct=ca.getContext('2d'),ov=document.getElementById('ov'),ws=[],pt=null,cn=1,startNum=1,originalFileName='',currentOfflineProjectId='',editMode=false,moveMode=false,selectedWeldId=null,editCrossMode=false,activeTab='redpen';
 var loadedImage=null,baseImageWidth=0,baseImageHeight=0; // Pre zoom PNG obrázkov
 var weldHistory=[];
 var projectsData={
@@ -11427,6 +11427,7 @@ saveProjectsToStorage();
 // Pridaj do pending changes ak sme offline
 if(!isOnline){
 addPendingChange('project_update',{
+firebaseProjectId: currentOfflineProjectId || (projectsData.currentProject + ',' + projectsData.currentPart), // ✅ CELÝ ID!
 projectName: projectsData.currentProject,
 partName: projectsData.currentPart,
 data: {
@@ -11444,7 +11445,7 @@ kontrolaData: kontrolaData
 },
 timestamp: new Date().toISOString()
 });
-console.log('📤 Zmeny pridané do offline fronty');
+console.log('📤 Zmeny pridané do offline fronty (projectId:', currentOfflineProjectId, ')');
 }
 
 showNotification('💾 Zmeny uložené!','success');
@@ -12110,6 +12111,10 @@ if(data.startNumber)startNum=data.startNumber;
 // ✅ NASTAV currentProject/currentPart aby sa zmeny ukladali správne!
 const projectName = data.projectName || projectId.split(',')[0];
 const partName = data.partName || projectId.split(',')[1] || 'default';
+
+// ✅ ULOŽ CELÝ projectId pre sync!
+currentOfflineProjectId = projectId;
+console.log('📌 Uložený offline projectId:', currentOfflineProjectId);
 
 // Vytvor projekt ak neexistuje
 if(!projectsData.projects[projectName]){
