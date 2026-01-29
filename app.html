@@ -12150,6 +12150,16 @@ const partName = data.partName || projectId.split(',')[1] || 'default';
 currentOfflineProjectId = projectId;
 console.log('📌 Uložený offline projectId:', currentOfflineProjectId);
 
+// ✅ NASTAV originalFileName aby sa zobrazil v UI!
+originalFileName = projectId;
+console.log('📁 Nastavený originalFileName:', originalFileName);
+
+// Aktualizuj UI - zobraz názov súboru
+const fileNameDisplay = document.querySelector('input[placeholder="Názov súboru"]');
+if(fileNameDisplay){
+  fileNameDisplay.value = projectId;
+}
+
 // Vytvor projekt ak neexistuje
 if(!projectsData.projects[projectName]){
 projectsData.projects[projectName] = {
