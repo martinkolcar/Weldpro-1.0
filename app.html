@@ -769,6 +769,7 @@ async function listProjectsFromFirebase() {
 <div class="ribbon-group">
 <button onclick="addMontazWeld()" id="addmontazweld" disabled>➕ Pridať zvar</button>
 <button onclick="showSpoolsPreview()" id="spoolspreview" disabled>📋 Náhľad spoolov</button>
+<button onclick="saveOfflineChanges()" id="saveoffline" style="background:#f59e0b;color:white;font-weight:bold">💾 Uložiť offline</button>
 </div>
 <div class="ribbon-group">
 <button onclick="activateDrawTool('line')" id="montaz_linebtn" disabled>📏 Palička</button>
@@ -11370,6 +11371,63 @@ showNotification('⚠️ Offline režim - zmeny sa uložia lokálne','warning');
 });
 
 // Ulož zmenu do pending queue
+// Ulož všetky zmeny offline (MONTÁŽ tlačidlo)
+function saveOfflineChanges(){
+if(!projectsData.currentProject || !projectsData.currentPart){
+alert('❌ Žiadny aktívny projekt!');
+return;
+}
+
+console.log('💾 Ukladám offline zmeny...');
+
+// Ulož do projectsData
+var currentProj = projectsData.projects[projectsData.currentProject];
+var currentPart = currentProj.parts[projectsData.currentPart];
+
+// Aktualizuj všetky dáta
+currentPart.welds = ws;
+currentPart.lines = lines;
+currentPart.texts = texts;
+currentPart.arrows = arrows;
+currentPart.curves = curves;
+currentPart.crosses = crosses;
+currentPart.spools = spools;
+currentPart.dimensions = dimensions;
+currentPart.spoolData = spoolData;
+currentPart.weldBookData = weldBookData;
+currentPart.kontrolaData = kontrolaData;
+currentPart.lastModified = new Date().toISOString();
+
+// Ulož do localStorage
+saveProjectsToStorage();
+
+// Pridaj do pending changes ak sme offline
+if(!isOnline){
+addPendingChange('project_update',{
+projectName: projectsData.currentProject,
+partName: projectsData.currentPart,
+data: {
+welds: ws,
+lines: lines,
+texts: texts,
+arrows: arrows,
+curves: curves,
+crosses: crosses,
+spools: spools,
+dimensions: dimensions,
+spoolData: spoolData,
+weldBookData: weldBookData,
+kontrolaData: kontrolaData
+},
+timestamp: new Date().toISOString()
+});
+console.log('📤 Zmeny pridané do offline fronty');
+}
+
+showNotification('💾 Zmeny uložené!','success');
+console.log('✅ Offline zmeny uložené');
+}
+
 function addPendingChange(type,data){
 const change={
 id:Date.now()+'_'+Math.random().toString(36).substr(2,9),
