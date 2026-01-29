@@ -11306,6 +11306,22 @@ document.getElementById('connectionStatus').innerHTML='🟢 Online';
 document.getElementById('offlineIndicator').style.background='#10b981';
 console.log('✅ Pripojený k internetu');
 
+// ✅ ZNOVU inicializuj Firebase
+if(typeof firebase !== 'undefined' && !db){
+  try {
+    if(!firebase.apps.length){
+      firebase.initializeApp(firebaseConfig);
+    }
+    db = firebase.firestore();
+    auth = firebase.auth();
+    auth.signInAnonymously()
+      .then(() => console.log('✅ Firebase znovu pripojený!'))
+      .catch(err => console.warn('Firebase reconnect error:', err));
+  } catch(e) {
+    console.error('Firebase init error:', e);
+  }
+}
+
 // Ukáž sync tlačidlo ak sú pending changes
 if(pendingChanges.length>0){
 document.getElementById('syncBtn').style.display='inline-block';
@@ -11319,6 +11335,22 @@ document.getElementById('connectionStatus').innerHTML='🔴 Offline';
 document.getElementById('offlineIndicator').style.background='#ef4444';
 document.getElementById('syncBtn').style.display='none';
 console.log('⚠️ Odpojený od internetu');
+
+// ✅ VYPNI Firebase aby nevolal API!
+if(db){
+  console.log('🔌 Odpájam Firebase...');
+  try {
+    // Terminate Firestore connection
+    db.terminate().then(() => {
+      console.log('✅ Firebase odpojený');
+    }).catch(err => {
+      console.warn('Firebase terminate error:', err);
+    });
+  } catch(e) {
+    console.warn('Firebase už odpojený');
+  }
+}
+
 showNotification('⚠️ Offline režim - zmeny sa uložia lokálne','warning');
 });
 
