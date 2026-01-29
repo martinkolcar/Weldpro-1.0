@@ -731,8 +731,11 @@ async function listProjectsFromFirebase() {
 <button onclick="showSpoolsPreview()" id="spoolspreview" disabled>📋 Náhľad spoolov</button>
 </div>
 <div class="ribbon-group">
-<button onclick="toggleDrawMode('line')" id="montazline" disabled>📏 Palička</button>
-<button onclick="toggleDrawMode('text')" id="montaztext" disabled>🔵 Text</button>
+<button onclick="activateDrawTool('line')" id="montaz_linebtn" disabled>📏 Palička</button>
+<button onclick="activateDrawTool('text')" id="montaz_textbtn" disabled>📝 Text</button>
+<button onclick="activateDrawTool('curve')" id="montaz_curvebtn" disabled>☁️ Oblačik</button>
+<button onclick="activateDrawTool('arrow')" id="montaz_arrowbtn" disabled>➡️ Šípka</button>
+<button onclick="activateDrawTool('doublearrow')" id="montaz_doublearrowbtn" disabled>⬌ Dvojšípka</button>
 </div>
 </div>
 
@@ -1226,7 +1229,7 @@ document.getElementById('editcrossmode').disabled=false;
 document.getElementById('setstart').disabled=false;
 document.getElementById('selectbtn').disabled=false;
 document.getElementById('crossbtn').disabled=false;
-document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montazline').disabled=false;document.getElementById('montaztext').disabled=false;
+document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montaz_linebtn').disabled=false;document.getElementById('montaz_textbtn').disabled=false;document.getElementById('montaz_curvebtn').disabled=false;document.getElementById('montaz_arrowbtn').disabled=false;document.getElementById('montaz_doublearrowbtn').disabled=false;
 
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
@@ -1294,7 +1297,7 @@ document.getElementById('editcrossmode').disabled=false;
 document.getElementById('setstart').disabled=false;
 document.getElementById('selectbtn').disabled=false;
 document.getElementById('crossbtn').disabled=false;
-document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montazline').disabled=false;document.getElementById('montaztext').disabled=false;
+document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montaz_linebtn').disabled=false;document.getElementById('montaz_textbtn').disabled=false;document.getElementById('montaz_curvebtn').disabled=false;document.getElementById('montaz_arrowbtn').disabled=false;document.getElementById('montaz_doublearrowbtn').disabled=false;
 
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
@@ -2377,7 +2380,27 @@ var lineEndY=startY+dy*ratio;
 
 // FARBA podľa source (ak je filter enabled)
 var weldColor='#FF0000';
+var fillColor='none'; // Default - nevyplnený
+
+// Ak je filter enabled (MONTÁŽ mode), check či je hotový v KONTROLA
 if(displayFilter.enabled){
+// Nájdi spool ID pre tento zvar
+var spoolId = null;
+var weldNum = w.displayNum;
+
+// Prejdi všetky spooly a nájdi ten ktorý obsahuje tento zvar
+for(var si=0; si<spoolData.length; si++){
+var sp = spoolData[si];
+// Check či tento zvar patrí do tohto spoolu (musíme použiť weldId)
+var possibleKey = sp.id + '_' + weldNum;
+if(kontrolaData.completedWelds[possibleKey]){
+// HOTOVÝ ZVAR - vyplň zelenou!
+fillColor = '#10b981';
+break;
+}
+}
+
+// Farba stroke podľa source
 var source=w.source||'site';
 if(source==='prefab')weldColor='#10b981';  // Zelená
 else if(source==='new')weldColor='#fbbf24';  // Žltá
@@ -2416,7 +2439,7 @@ var cr=document.createElementNS('http://www.w3.org/2000/svg','circle');
 cr.setAttribute('cx',endX);
 cr.setAttribute('cy',endY);
 cr.setAttribute('r',radius);
-cr.setAttribute('fill','none');
+cr.setAttribute('fill',fillColor); // VYPLŇ ak je hotový!
 cr.setAttribute('stroke',weldColor);
 cr.setAttribute('stroke-width',1.5*sc*weldScale); // Škáluj s zoom A weldScale
 ov.appendChild(cr);
@@ -6825,7 +6848,7 @@ document.getElementById('editcrossmode').disabled=false;
 document.getElementById('setstart').disabled=false;
 document.getElementById('selectbtn').disabled=false;
 document.getElementById('crossbtn').disabled=false;
-document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montazline').disabled=false;document.getElementById('montaztext').disabled=false;
+document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montaz_linebtn').disabled=false;document.getElementById('montaz_textbtn').disabled=false;document.getElementById('montaz_curvebtn').disabled=false;document.getElementById('montaz_arrowbtn').disabled=false;document.getElementById('montaz_doublearrowbtn').disabled=false;
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
 document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
