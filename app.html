@@ -2374,7 +2374,7 @@ var lineEndX=startX+dx*ratio;
 var lineEndY=startY+dy*ratio;
 
 // FARBA podľa WELDBOOK - ak má vyplneného zvarača
-var weldColor='#FF0000'; // Default červená (stroke)
+var weldColor='#FF0000'; // Stroke VŽDY červený!
 var fillColor='none'; // Default nevyplnený
 
 // Ak je filter enabled (MONTÁŽ mode), check WeldBook
@@ -2398,14 +2398,14 @@ break;
 }
 }
 
-// Ak má zvarača → vyplň zelenou
+// Ak má zvarača → vyplň jasnou zvýrazňovačovou zelenou
 if(hasWelder){
-fillColor = '#10b981'; // ZELENÁ vyplnená
-weldColor = '#10b981'; // Zelený stroke
+fillColor = '#00FF00'; // JASNÁ KRIKĽAVÁ ZELENÁ (zvýrazňovač)
+// weldColor zostáva červený!
 } else {
 // Nemá zvarača → červený prázdny (pozičný)
 fillColor = 'none';
-weldColor = '#FF0000';
+weldColor = '#FF0000'; // Červený
 }
 }
 
