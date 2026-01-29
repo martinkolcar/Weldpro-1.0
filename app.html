@@ -12084,16 +12084,32 @@ console.log('📱 Načítavam offline projekt:', projectId);
 console.log('   welds:', data.welds?.length || 0);
 console.log('   pdfData:', !!data.pdfData);
 
-// Načítaj projekt data (správne názvy polí!)
-if(data.welds)ws=data.welds; // ← welds nie ws!
-if(data.spools)spools=data.spools;
-if(data.crosses)crosses=data.crosses;
-if(data.lines)lines=data.lines;
-if(data.texts)texts=data.texts;
-if(data.curves)curves=data.curves;
-if(data.arrows)arrows=data.arrows;
-if(data.dimensions)dimensions=data.dimensions;
-if(data.spoolData)spoolData=data.spoolData;
+// ✅ NAJPRV VYČISTI VŠETKO!
+console.log('🧹 Čistím predošlé dáta...');
+ws = [];
+lines = [];
+texts = [];
+arrows = [];
+curves = [];
+crosses = [];
+spools = [];
+dimensions = [];
+spoolData = {};
+weldBookData = [];
+kontrolaData = {};
+weldLogMaterials = [];
+weldAssignments = {};
+
+// Teraz načítaj projekt data (správne názvy polí!)
+if(data.welds && data.welds.length > 0) ws = data.welds;
+if(data.spools && data.spools.length > 0) spools = data.spools;
+if(data.crosses && data.crosses.length > 0) crosses = data.crosses;
+if(data.lines && data.lines.length > 0) lines = data.lines;
+if(data.texts && data.texts.length > 0) texts = data.texts;
+if(data.curves && data.curves.length > 0) curves = data.curves;
+if(data.arrows && data.arrows.length > 0) arrows = data.arrows;
+if(data.dimensions && data.dimensions.length > 0) dimensions = data.dimensions;
+if(data.spoolData && Object.keys(data.spoolData).length > 0) spoolData = data.spoolData;
 
 // ✅ WeldBook - načítaj len pre TENTO projekt!
 if(data.weldBookData && Array.isArray(data.weldBookData)){
