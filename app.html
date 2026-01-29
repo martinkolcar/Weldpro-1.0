@@ -11928,14 +11928,21 @@ item.style.display=text.includes(searchText)?'block':'none';
 
 async function loadOfflineProject(projectId){
 try{
-const data=JSON.parse(localStorage.getItem('offline_project_'+projectId));
-if(!data){
+const stored=JSON.parse(localStorage.getItem('offline_project_'+projectId));
+if(!stored){
 alert('❌ Projekt nebol nájdený v offline úložisku');
 return;
 }
 
-// Načítaj projekt data
-if(data.ws)ws=data.ws;
+// ✅ Dáta sú vnorené v stored.data!
+const data = stored.data;
+
+console.log('📱 Načítavam offline projekt:', projectId);
+console.log('   welds:', data.welds?.length || 0);
+console.log('   pdfData:', !!data.pdfData);
+
+// Načítaj projekt data (správne názvy polí!)
+if(data.welds)ws=data.welds; // ← welds nie ws!
 if(data.spools)spools=data.spools;
 if(data.crosses)crosses=data.crosses;
 if(data.lines)lines=data.lines;
@@ -11946,12 +11953,18 @@ if(data.dimensions)dimensions=data.dimensions;
 if(data.spoolData)spoolData=data.spoolData;
 if(data.weldBookData)weldBookData=data.weldBookData;
 if(data.kontrolaData)kontrolaData=data.kontrolaData;
+if(data.materials)weldLogMaterials=data.materials;
+if(data.weldAssignments)weldAssignments=data.weldAssignments;
+if(data.currentNumber)cn=data.currentNumber;
+if(data.startNumber)startNum=data.startNumber;
 
 // Načítaj PDF/Image ak je
 if(data.pdfData){
+console.log('📄 Načítavam PNG image...');
 // pdfData je PNG image (Data URL) z Firebase
 const img = new Image();
 img.onload = function(){
+console.log('✅ PNG načítaný:', img.width, 'x', img.height);
 ca.width = img.width;
 ca.height = img.height;
 ov.setAttribute('width', img.width);
