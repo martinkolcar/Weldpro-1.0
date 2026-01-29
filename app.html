@@ -12154,10 +12154,13 @@ console.log('📌 Uložený offline projectId:', currentOfflineProjectId);
 originalFileName = projectId;
 console.log('📁 Nastavený originalFileName:', originalFileName);
 
-// Aktualizuj UI - zobraz názov súboru
-const fileNameDisplay = document.querySelector('input[placeholder="Názov súboru"]');
+// ✅ Aktualizuj UI - zobraz názov súboru (je to SPAN nie input!)
+const fileNameDisplay = document.getElementById('fileName');
 if(fileNameDisplay){
-  fileNameDisplay.value = projectId;
+  fileNameDisplay.textContent = projectId;
+  console.log('✅ UI aktualizované - fileName span nastavený');
+} else {
+  console.warn('⚠️ fileName element nebol nájdený!');
 }
 
 // Vytvor projekt ak neexistuje
