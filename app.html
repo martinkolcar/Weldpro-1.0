@@ -11854,9 +11854,14 @@ item.style.display=text.includes(searchText)?'block':'none';
 
 async function loadOfflineProject(projectId){
 try{
+// Nastav offline flag aby sa Firebase nevolal
+const wasOnline = isOnline;
+isOnline = false; // Dočasne vypni online režim
+
 const data=JSON.parse(localStorage.getItem('offline_project_'+projectId));
 if(!data){
 alert('❌ Projekt nebol nájdený v offline úložisku');
+isOnline = wasOnline;
 return;
 }
 
@@ -11886,11 +11891,17 @@ originalFileName=data.projectMeta?.name||projectId;
 up();
 dw();
 closeOfflineModeModal();
+
+// Obnov online stav
+isOnline = wasOnline;
+
 alert('✅ Offline projekt načítaný: '+(data.projectMeta?.name||projectId));
 console.log('📱 Offline projekt načítaný:',projectId);
 }catch(error){
 console.error('Chyba pri načítaní offline projektu:',error);
 alert('❌ Chyba pri načítaní: '+error.message);
+// Obnov online stav aj pri chybe
+if(typeof wasOnline !== 'undefined') isOnline = wasOnline;
 }
 }
 
