@@ -11663,12 +11663,27 @@ crosses: change.data.data.crosses,
 spools: change.data.data.spools,
 dimensions: change.data.data.dimensions,
 spoolData: change.data.data.spoolData,
+weldBookData: change.data.data.weldBookData, // ✅ PRIDANÉ!
+kontrolaData: change.data.data.kontrolaData, // ✅ PRIDANÉ!
 lastModified: new Date().toISOString(),
 modifiedBy: window.currentUser?.username || 'unknown'
 };
 
 // Prepíš projekt v Firebase (merge aby sa zachovali ostatné polia)
 const existingData = projectDoc.data();
+
+// ✅ ZACHOVAJ pdfData z existujúceho projektu!
+if(existingData.pdfData){
+updateData.pdfData = existingData.pdfData;
+console.log('✅ Zachováva sa pdfData z Firebase');
+} else {
+console.warn('⚠️ Existujúci projekt NEMÁ pdfData!');
+}
+
+// ✅ ZACHOVAJ aj materials, weldAssignments ak existujú
+if(existingData.materials) updateData.materials = existingData.materials;
+if(existingData.weldAssignments) updateData.weldAssignments = existingData.weldAssignments;
+
 const mergedData = {...existingData, ...updateData};
 
 // Rozdeľ na chunky a ulož
