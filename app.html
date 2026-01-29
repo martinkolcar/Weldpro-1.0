@@ -2386,11 +2386,12 @@ var hasWelder = false;
 if(weldBookData && weldBookData.length > 0){
 for(var wbi=0; wbi<weldBookData.length; wbi++){
 var wbEntry = weldBookData[wbi];
-// Match podľa displayNum
-if(wbEntry.weldNumber === w.displayNum){
-// Check či má vyplneného zvarača
-if(wbEntry.welder && wbEntry.welder.trim() !== ''){
+// Match podľa weldId (nie weldNumber!)
+if(String(wbEntry.weldId) === String(w.displayNum)){
+// Check či má vyplneného zvarača (welderId nie welder!)
+if(wbEntry.welderId && wbEntry.welderId.trim() !== ''){
 hasWelder = true;
+console.log('✅ MONTÁŽ: Zvar',w.displayNum,'má zvarača:',wbEntry.welderId);
 break;
 }
 }
