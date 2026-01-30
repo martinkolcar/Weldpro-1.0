@@ -11426,6 +11426,11 @@ saveProjectsToStorage();
 
 // Pridaj do pending changes ak sme offline
 if(!isOnline){
+console.log('🔍 DEBUG saveOfflineChanges:');
+console.log('  currentOfflineProjectId:', currentOfflineProjectId);
+console.log('  projectsData.currentProject:', projectsData.currentProject);
+console.log('  projectsData.currentPart:', projectsData.currentPart);
+
 addPendingChange('project_update',{
 firebaseProjectId: currentOfflineProjectId || (projectsData.currentProject + ',' + projectsData.currentPart), // ✅ CELÝ ID!
 projectName: projectsData.currentProject,
@@ -11445,7 +11450,8 @@ kontrolaData: kontrolaData
 },
 timestamp: new Date().toISOString()
 });
-console.log('📤 Zmeny pridané do offline fronty (projectId:', currentOfflineProjectId, ')');
+console.log('📤 Zmeny pridané do offline fronty');
+console.log('  firebaseProjectId:', currentOfflineProjectId || (projectsData.currentProject + ',' + projectsData.currentPart));
 }
 
 showNotification('💾 Zmeny uložené!','success');
@@ -11517,8 +11523,11 @@ html+=`
 ${change.data.projectName||change.data.id||''}
 </div>
 </div>
+<div style="display:flex;gap:8px;align-items:center">
 <div style="background:${statusColor};color:white;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap">
 ${statusIcon} ${statusText}
+</div>
+${change.status!=='uploading' && change.status!=='success'?`<button onclick="deletePendingChange('${change.id}')" style="background:#ef4444;color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">🗑️</button>`:''}
 </div>
 </div>
 <div style="font-size:11px;color:#999">
@@ -11531,6 +11540,25 @@ ${change.status==='uploading'?'<div style="margin-top:10px;height:4px;background
 });
 
 listEl.innerHTML=html;
+}
+
+// Vymaž jednu pending zmenu
+function deletePendingChange(changeId){
+if(!confirm('Naozaj zmazať túto zmenu?\\n\\nZmena sa stratí a nebude nahraná na server.')){
+return;
+}
+
+const index=pendingChanges.findIndex(c=>c.id===changeId);
+if(index===-1){
+console.error('Zmena nenájdená:',changeId);
+return;
+}
+
+pendingChanges.splice(index,1);
+savePendingChanges();
+buildPendingChangesList();
+showNotification('🗑️ Zmena zmazaná','success');
+console.log('🗑️ Pending change deleted:',changeId);
 }
 
 // Synchronizuj všetky pending changes
