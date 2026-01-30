@@ -12171,8 +12171,16 @@ if(data.currentNumber)cn=data.currentNumber;
 if(data.startNumber)startNum=data.startNumber;
 
 // ✅ NASTAV currentProject/currentPart aby sa zmeny ukladali správne!
-const projectName = data.projectName || projectId.split(',')[0];
-const partName = data.partName || projectId.split(',')[1] || 'default';
+// VŽDY split projectId - IGNORUJ data.projectName (môže byť zlý)!
+const projectIdToSplit = data.originalFirebaseId || projectId;
+const parts = projectIdToSplit.split(',');
+const projectName = parts.slice(0, -1).join(','); // Všetko okrem posledného
+const partName = parts[parts.length - 1]; // Posledný
+
+console.log('🔍 Split projectId:');
+console.log('   projectIdToSplit:', projectIdToSplit);
+console.log('   projectName:', projectName);
+console.log('   partName:', partName);
 
 // ✅ ULOŽ CELÝ projectId pre sync - použiť originalFirebaseId ak existuje!
 currentOfflineProjectId = data.originalFirebaseId || projectId;
