@@ -11706,6 +11706,19 @@ updateData.pdfData = existingData.pdfData;
 console.log('✅ Zachováva sa pdfData z Firebase');
 } else {
 console.warn('⚠️ Existujúci projekt NEMÁ pdfData!');
+// ✅ VYTVOR PNG z aktuálneho canvas!
+if(typeof ca !== 'undefined' && ca && ca.width > 0){
+try {
+const pngDataUrl = ca.toDataURL('image/png', 0.95);
+updateData.pdfData = pngDataUrl;
+console.log('✅ Vytvorený nový pdfData z canvas:', (pngDataUrl.length / 1024).toFixed(1), 'KB');
+} catch(e) {
+console.error('❌ Chyba pri vytváraní PNG z canvas:', e);
+// Pokračuj bez pdfData
+}
+} else {
+console.warn('⚠️ Canvas nie je dostupný - pokračujem bez pdfData');
+}
 }
 
 // ✅ ZACHOVAJ aj materials, weldAssignments ak existujú
