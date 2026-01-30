@@ -302,6 +302,9 @@ background: #dc2626;
 var jsPDF = window.jspdf.jsPDF;
 </script>
 
+<!-- Pako.js pre komprimáciu -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+
 <!-- Firebase - načíta sa dynamicky len ak sme online -->
 <script>
 // ✅ Dynamické načítanie Firebase len v online režime
@@ -604,7 +607,7 @@ async function listProjectsFromFirebase() {
 <span id="pendingSyncCount" style="display:none;background:rgba(255,255,255,0.3);padding:2px 8px;border-radius:4px;font-size:11px"></span>
 </div>
 <button onclick="showPendingChangesModal()" id="detailsBtn" style="display:none;background:#6366f1;color:white;margin-left:10px">📋 Detaily</button>
-<button onclick="syncOfflineData()" id="syncBtn" style="display:none;background:#f59e0b;color:white;margin-left:10px;animation:pulse 2s infinite">📤 Nahrať zmeny</button>
+<button onclick="exportOfflineChanges()" id="syncBtn" style="display:none;background:#f59e0b;color:white;margin-left:10px;animation:pulse 2s infinite">📥 Export zmien</button>
 <button onclick="logout()" style="background:#ef4444;color:white;margin-left:10px">🚪 Odhlásiť</button>
 </div>
 
@@ -11561,8 +11564,58 @@ showNotification('🗑️ Zmena zmazaná','success');
 console.log('🗑️ Pending change deleted:',changeId);
 }
 
-// Synchronizuj všetky pending changes
+// ✅ BEZPEČNÝ EXPORT offline zmien (namiesto sync)
+async function exportOfflineChanges(){
+if(pendingChanges.length===0){
+alert('✅ Žiadne zmeny na export!');
+return;
+}
+
+console.log('📤 Exportujem offline zmeny...');
+
+// Vytvor ZIP alebo jeden veľký JSON so všetkými zmenami
+const exportData = {
+exported: new Date().toISOString(),
+changesCount: pendingChanges.length,
+changes: pendingChanges.map(change => ({
+type: change.type,
+projectName: change.data.projectName,
+partName: change.data.partName,
+firebaseProjectId: change.data.firebaseProjectId,
+data: change.data.data,
+timestamp: change.timestamp,
+user: change.user
+}))
+};
+
+// Stiahni ako JSON súbor
+const jsonString = JSON.stringify(exportData, null, 2);
+const blob = new Blob([jsonString], {type: 'application/json'});
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = `offline_changes_${new Date().toISOString().slice(0,10)}.json`;
+a.click();
+URL.revokeObjectURL(url);
+
+showNotification('📥 Offline zmeny stiahnuté! Teraz nahraj cez "✨ Upload JSON"','success');
+console.log('✅ Export dokončený:', pendingChanges.length, 'zmien');
+
+// Opýtaj sa či vymazať pending changes
+if(confirm('Zmeny boli stiahnuté.\n\nVymazať ich z offline fronty?\n\n(Môžeš ich manuálne nahrať cez "✨ Upload JSON")')){
+pendingChanges = [];
+savePendingChanges();
+buildPendingChangesList();
+closePendingChangesModal();
+}
+}
+
+// STARÝ NEBEZPEČNÝ SYNC - VYPNUTÝ!
 async function syncOfflineData(){
+alert('⚠️ Automatický sync je vypnutý!\n\nPoužite "📤 Export zmien" → potom "✨ Upload JSON"');
+return;
+
+/* STARÝ KÓD - VYPNUTÝ
 if(!isOnline){
 alert('❌ Nemáš internet! Pripoj sa najprv.');
 return;
@@ -12127,10 +12180,34 @@ item.style.display=text.includes(searchText)?'block':'none';
 
 async function loadOfflineProject(projectId){
 try{
-const stored=JSON.parse(localStorage.getItem('offline_project_'+projectId));
-if(!stored){
+let rawData = localStorage.getItem('offline_project_'+projectId);
+if(!rawData){
 alert('❌ Projekt nebol nájdený v offline úložisku');
 return;
+}
+
+// ✅ DEKOMPRIMUJ ak je komprimované!
+let stored;
+if(rawData.startsWith('GZIP:')){
+console.log('🗜️ Dekomprimujem projekt...');
+try {
+const base64 = rawData.substring(5); // Odstráň "GZIP:" prefix
+const binaryString = atob(base64);
+const bytes = new Uint8Array(binaryString.length);
+for(let i=0; i<binaryString.length; i++){
+bytes[i] = binaryString.charCodeAt(i);
+}
+const decompressed = pako.ungzip(bytes, {to: 'string'});
+stored = JSON.parse(decompressed);
+console.log('✅ Dekomprimácia úspešná');
+} catch(e) {
+console.error('❌ Dekomprimácia zlyhala:', e);
+alert('❌ Chyba pri dekomprimácii projektu!');
+return;
+}
+} else {
+// Nekomprimovaný (starý formát)
+stored = JSON.parse(rawData);
 }
 
 // ✅ Dáta sú vnorené v stored.data!
@@ -12441,12 +12518,44 @@ const projectData=await downloadProjectFromFirebase(projectId);
 projectData.originalFirebaseId = projectId;
 console.log('✅ Ukladám originalFirebaseId:', projectId);
 
-const dataToStore=JSON.stringify({id:projectId,data:projectData,downloadedAt:new Date().toISOString()});
+const dataObject = {id:projectId, data:projectData, downloadedAt:new Date().toISOString()};
+const jsonString = JSON.stringify(dataObject);
+const originalSize = jsonString.length;
+
+// ✅ KOMPRIMUJ pomocou pako.js!
+let dataToStore;
+let compressed = false;
+if(typeof pako !== 'undefined'){
+try {
+const compressed_data = pako.gzip(jsonString);
+// Konvertuj na base64 pre localStorage
+const base64 = btoa(String.fromCharCode.apply(null, compressed_data));
+dataToStore = 'GZIP:' + base64; // Prefix aby sme vedeli že je to komprimované
+compressed = true;
+const compressedSize = dataToStore.length;
+console.log('🗜️ Komprimácia:', originalSize, '→', compressedSize, '(', ((1-compressedSize/originalSize)*100).toFixed(1), '% úspora)');
+} catch(e) {
+console.warn('⚠️ Komprimácia zlyhala, ukladám nekomprimované:', e);
+dataToStore = jsonString;
+}
+} else {
+console.warn('⚠️ Pako.js nedostupný, ukladám nekomprimované');
+dataToStore = jsonString;
+}
+
 try{
-localStorage.setItem('offline_project_'+projectId,dataToStore);
+localStorage.setItem('offline_project_'+projectId, dataToStore);
 downloaded++;
 const item=document.querySelector(`.offline-project-item[data-id="${projectId}"]`);
-if(item){item.style.background='#d1fae5';item.style.borderColor='#10b981';}
+if(item){
+item.style.background='#d1fae5';
+item.style.borderColor='#10b981';
+// Ukáž komprimovanú veľkosť
+if(compressed){
+const sizeEl = item.querySelector('div[style*="font-size:12px"]');
+if(sizeEl) sizeEl.innerHTML = (dataToStore.length/1024).toFixed(1) + ' KB <span style="color:#10b981">🗜️</span>';
+}
+}
 }catch(storageError){
 if(storageError.name==='QuotaExceededError'){
 console.error('❌ Kapacita naplnená!');
@@ -12534,7 +12643,7 @@ function logout() {
 
 <div style="padding:20px;background:#f5f5f5;border-top:2px solid #ddd;display:flex;gap:10px">
 <button onclick="closePendingChanges()" style="flex:1;background:#6b7280;color:white;border:none;padding:14px;border-radius:8px;cursor:pointer;font-weight:600">Zavrieť</button>
-<button onclick="closePendingChanges();syncOfflineData()" id="syncFromModal" style="flex:2;background:#f59e0b;color:white;border:none;padding:14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:15px">📤 Nahrať teraz</button>
+<button onclick="closePendingChanges();exportOfflineChanges()" id="syncFromModal" style="flex:2;background:#f59e0b;color:white;border:none;padding:14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:15px">📥 Export zmien</button>
 </div>
 </div>
 </div>
