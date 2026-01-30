@@ -302,6 +302,9 @@ background: #dc2626;
 var jsPDF = window.jspdf.jsPDF;
 </script>
 
+<!-- Pako.js pre komprimáciu -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -11796,51 +11799,98 @@ function loadOfflineModeProjects(){
 const listEl=document.getElementById('offlineModeProjectsList');
 listEl.innerHTML='<div style="text-align:center;color:#999;padding:20px">⏳ Načítavam...</div>';
 
-const offlineProjects=[];
-for(let i=0;i<localStorage.length;i++){
-const key=localStorage.key(i);
-if(key.startsWith('offline_project_')){
-const projectId=key.replace('offline_project_','');
-try{
-const data=JSON.parse(localStorage.getItem(key));
-offlineProjects.push({id:projectId,data:data});
-}catch(e){
-console.error('Chyba pri čítaní offline projektu:',projectId,e);
-}
-}
-}
+// ✅ Použi moju novú funkciu listOfflineProjects()
+const offlineProjects = listOfflineProjects();
 
 if(offlineProjects.length===0){
 listEl.innerHTML='<div style="text-align:center;color:#999;padding:40px">📭 Žiadne offline projekty<br><small style="color:#bbb">Najprv stiahni projekty cez "📦 Offline balík"</small></div>';
 return;
 }
 
-let html='';
+// Zobraz info o kapacite
+const storageInfo = getStorageInfo();
+let html = `<div style="background:#fef3c7;border-radius:8px;padding:12px;margin-bottom:15px;border-left:4px solid #f59e0b">
+<strong>💾 Kapacita:</strong> ${storageInfo.usedMB} MB / 10 MB (${storageInfo.usedPercent}% použité)
+<br><small style="color:#666">Voľné: ${storageInfo.freeMB} MB</small>
+</div>`;
+
 offlineProjects.forEach(proj=>{
-const meta=proj.data.projectMeta||{};
-const name=meta.name||proj.id;
-const date=meta.date?new Date(meta.date).toLocaleDateString('sk-SK'):'';
-const size=JSON.stringify(proj.data).length;
+const sizeKB = (proj.size / 1024).toFixed(1);
+const compressIcon = proj.compressed ? ' 🗜️' : '';
 html+=`<div class="offline-mode-project" style="background:#e0e7ff;border:2px solid #8b5cf6;border-radius:8px;padding:15px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
-<div style="flex:1;cursor:pointer" onclick="loadOfflineProject('${proj.id}')">
-<div style="font-weight:700;font-size:15px;color:#333">${name} <span style="background:#8b5cf6;color:white;padding:2px 8px;border-radius:4px;font-size:11px">📱 OFFLINE</span></div>
-<div style="font-size:12px;color:#666">${(size/1024).toFixed(1)} KB${date?' • '+date:''}</div>
+<div style="flex:1;cursor:pointer" onclick="openOfflineProjectFromList('${proj.id}')">
+<div style="font-weight:700;font-size:15px;color:#333">${proj.id} <span style="background:#8b5cf6;color:white;padding:2px 8px;border-radius:4px;font-size:11px">📱 OFFLINE</span></div>
+<div style="font-size:12px;color:#666">${sizeKB} KB${compressIcon}</div>
 </div>
-<button onclick="event.stopPropagation();deleteOfflineProject('${proj.id}','${name}')" style="background:#ef4444;color:white;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:bold">🗑️ Zmazať</button>
+<button onclick="event.stopPropagation();deleteOfflineProjectFromList('${proj.id}')" style="background:#ef4444;color:white;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:bold">🗑️ Zmazať</button>
 </div>`;
 });
 
 listEl.innerHTML=html;
 }
 
-function deleteOfflineProject(projectId,projectName){
-if(!confirm('Zmazať offline projekt "'+projectName+'"?\\n\\nUvoľní sa miesto v localStorage.')){
+function openOfflineProjectFromList(projectId){
+console.log('📱 Otváram offline projekt:', projectId);
+
+// ✅ Použiť moju novú funkciu loadOfflineProject()
+const result = loadOfflineProject(projectId);
+
+if(!result.success){
+alert('❌ Chyba: ' + result.error);
 return;
 }
-localStorage.removeItem('offline_project_'+projectId);
-console.log('🗑️ Offline projekt zmazaný:',projectId);
-loadOfflineModeProjects(); // Refresh zoznamu
-showNotification('🗑️ Projekt zmazaný z offline úložiska','success');
+
+const stored = result.data;
+const data = stored.data;
+
+console.log('✅ Projekt načítaný:', projectId);
+console.log('   welds:', data.welds?.length || 0);
+console.log('   pdfData:', !!data.pdfData);
+
+// Načítaj PDF data
+if(data.pdfData){
+pd = data.pdfData;
+loadImageFromData(pd);
+originalFileName = projectId;
+document.getElementById('fileName').textContent = projectId;
+}
+
+// Načítaj zvary a ostatné dáta
+if(data.welds) ws = data.welds;
+if(data.lines) lines = data.lines;
+if(data.texts) texts = data.texts;
+if(data.arrows) arrows = data.arrows;
+if(data.curves) curves = data.curves;
+if(data.crosses) crosses = data.crosses;
+if(data.spools) spools = data.spools;
+if(data.dimensions) dimensions = data.dimensions;
+if(data.spoolData) spoolData = data.spoolData;
+if(data.weldBookData) weldBookData = data.weldBookData;
+if(data.kontrolaData) kontrolaData = data.kontrolaData;
+if(data.currentNumber) cn = data.currentNumber;
+if(data.startNumber) startNum = data.startNumber;
+
+// Enable tlačidlá
+document.getElementById('savetolibrary').disabled=false;
+document.getElementById('saveproj').disabled=false;
+document.getElementById('savepdf').disabled=false;
+document.getElementById('cl').disabled=false;
+
+// Zavri modal
+closeOfflineModeModal();
+
+// Vykresli
+render();
+showNotification('✅ Offline projekt načítaný: ' + projectId, 'success');
+}
+
+function deleteOfflineProjectFromList(projectId){
+if(!confirm('Zmazať offline projekt "'+projectId+'"?\\n\\nUvoľní sa miesto v localStorage.')){
+return;
+}
+deleteOfflineProject(projectId); // Moja nová funkcia
+loadOfflineModeProjects(); // Refresh
+showNotification('🗑️ Projekt zmazaný', 'success');
 }
 
 function filterOfflineModeProjects(){
@@ -12075,37 +12125,58 @@ const btn=document.getElementById('downloadOfflineBtn');
 btn.disabled=true;
 let downloaded=0;
 let failed=0;
+let totalSavings=0;
+
 for(const projectId of selectedProjects){
 try{
 btn.textContent=`⏳ Sťahujem... (${downloaded+1}/${selectedProjects.size})`;
+
+// Stiahni z Firebase
 const projectData=await downloadProjectFromFirebase(projectId);
-const dataToStore=JSON.stringify({id:projectId,data:projectData,downloadedAt:new Date().toISOString()});
-try{
-localStorage.setItem('offline_project_'+projectId,dataToStore);
+
+// ✅ Ulož s komprimáciou!
+const result = saveOfflineProject(projectId, projectData);
+
+if(result.success){
 downloaded++;
+totalSavings += parseFloat(result.savings);
 const item=document.querySelector(`.offline-project-item[data-id="${projectId}"]`);
-if(item){item.style.background='#d1fae5';item.style.borderColor='#10b981';}
-}catch(storageError){
-if(storageError.name==='QuotaExceededError'){
-console.error('❌ Kapacita naplnená!');
-showNotification('⚠️ Kapacita naplnená! Stiahnuté: '+downloaded,'warning');
+if(item){
+item.style.background='#d1fae5';
+item.style.borderColor='#10b981';
+}
+} else {
+console.error('❌ Uloženie zlyhalo:', result.error);
+if(result.error.includes('localStorage je plný')){
+showNotification('⚠️ localStorage plný! Stiahnuté: '+downloaded,'warning');
 failed++;
 break;
 }
-throw storageError;
+failed++;
 }
+
 await new Promise(r=>setTimeout(r,300));
-}catch(error){console.error('❌ Chyba pri sťahovaní:',projectId,error);failed++;}
+}catch(error){
+console.error('❌ Chyba pri sťahovaní:',projectId,error);
+failed++;
 }
+}
+
 btn.disabled=false;
 btn.textContent=`⬇️ Stiahnuť (0)`;
 selectedProjects.clear();
 deselectAllProjects();
+
+// Zobraz výsledok
+const avgSavings = downloaded > 0 ? (totalSavings / downloaded).toFixed(1) : 0;
 if(failed>0){
 showNotification(`⚠️ Stiahnuté: ${downloaded}, Zlyhalo: ${failed}`,'warning');
 }else{
-showNotification(`✅ ${downloaded} projektov stiahnutých!`,'success');
+showNotification(`✅ ${downloaded} projektov stiahnutých! 🗜️ Priemer ${avgSavings}% úspora`,'success');
 }
+
+// Refresh zoznamu
+loadProjectsForOffline();
 }
 
 // 🚪 LOGOUT funkcia
@@ -12116,6 +12187,135 @@ function logout() {
     window.location.href = 'login.html';
   }
 }
+
+// ==========================================
+// 📦 OFFLINE STORAGE - Komprimované ukladanie
+// ==========================================
+
+// Uložiť projekt do localStorage (komprimovaný)
+function saveOfflineProject(projectId, projectData) {
+  try {
+    const dataObject = {
+      id: projectId,
+      data: projectData,
+      savedAt: new Date().toISOString()
+    };
+    
+    const jsonString = JSON.stringify(dataObject);
+    const originalSize = jsonString.length;
+    
+    // Komprimuj pomocou pako.js
+    if (typeof pako !== 'undefined') {
+      const compressed = pako.gzip(jsonString);
+      const base64 = btoa(String.fromCharCode.apply(null, compressed));
+      const dataToStore = 'GZIP:' + base64;
+      
+      localStorage.setItem('offline_project_' + projectId, dataToStore);
+      
+      const compressedSize = dataToStore.length;
+      const savings = ((1 - compressedSize/originalSize) * 100).toFixed(1);
+      console.log('🗜️ Projekt uložený:', originalSize, '→', compressedSize, 'bytes (', savings, '% úspora)');
+      
+      return {success: true, originalSize, compressedSize, savings};
+    } else {
+      // Fallback - nekomprimované
+      localStorage.setItem('offline_project_' + projectId, jsonString);
+      console.warn('⚠️ Pako.js nedostupný - ukladám nekomprimované');
+      return {success: true, originalSize, compressedSize: originalSize, savings: 0};
+    }
+  } catch (e) {
+    console.error('❌ Chyba pri ukladaní projektu:', e);
+    if (e.name === 'QuotaExceededError') {
+      alert('❌ localStorage je plný! (max 10 MB)\n\nZmažte staré offline projekty.');
+    }
+    return {success: false, error: e.message};
+  }
+}
+
+// Načítať projekt z localStorage (dekomprimovať)
+function loadOfflineProject(projectId) {
+  try {
+    const rawData = localStorage.getItem('offline_project_' + projectId);
+    if (!rawData) {
+      return {success: false, error: 'Projekt nenájdený'};
+    }
+    
+    // Dekomprimuj ak je komprimované
+    if (rawData.startsWith('GZIP:')) {
+      console.log('🗜️ Dekomprimujem projekt...');
+      const base64 = rawData.substring(5);
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const decompressed = pako.ungzip(bytes, {to: 'string'});
+      const data = JSON.parse(decompressed);
+      console.log('✅ Dekomprimácia úspešná');
+      return {success: true, data};
+    } else {
+      // Nekomprimované (starý formát)
+      const data = JSON.parse(rawData);
+      return {success: true, data};
+    }
+  } catch (e) {
+    console.error('❌ Chyba pri načítaní projektu:', e);
+    return {success: false, error: e.message};
+  }
+}
+
+// Zoznam všetkých offline projektov
+function listOfflineProjects() {
+  const projects = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('offline_project_')) {
+      const projectId = key.replace('offline_project_', '');
+      const size = localStorage.getItem(key).length;
+      projects.push({
+        id: projectId,
+        size: size,
+        compressed: localStorage.getItem(key).startsWith('GZIP:')
+      });
+    }
+  }
+  return projects;
+}
+
+// Vymazať offline projekt
+function deleteOfflineProject(projectId) {
+  localStorage.removeItem('offline_project_' + projectId);
+  console.log('🗑️ Offline projekt zmazaný:', projectId);
+}
+
+// Info o kapacite localStorage
+function getStorageInfo() {
+  let total = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key) {
+      total += localStorage.getItem(key).length;
+    }
+  }
+  
+  const maxSize = 10 * 1024 * 1024; // 10 MB
+  const used = total;
+  const free = maxSize - used;
+  const usedPercent = ((used / maxSize) * 100).toFixed(1);
+  
+  return {
+    total: maxSize,
+    used: used,
+    free: free,
+    usedPercent: usedPercent,
+    usedMB: (used / 1024 / 1024).toFixed(2),
+    freeMB: (free / 1024 / 1024).toFixed(2)
+  };
+}
+
+console.log('📦 Offline storage ready!');
+console.log('💾 Kapacita:', getStorageInfo().usedMB + ' MB / 10 MB použité');
+
 </script>
 
 
