@@ -12174,12 +12174,13 @@ if(data.startNumber)startNum=data.startNumber;
 const projectName = data.projectName || projectId.split(',')[0];
 const partName = data.partName || projectId.split(',')[1] || 'default';
 
-// ✅ ULOŽ CELÝ projectId pre sync!
-currentOfflineProjectId = projectId;
+// ✅ ULOŽ CELÝ projectId pre sync - použiť originalFirebaseId ak existuje!
+currentOfflineProjectId = data.originalFirebaseId || projectId;
 console.log('📌 Uložený offline projectId:', currentOfflineProjectId);
+console.log('   (originalFirebaseId z data:', data.originalFirebaseId, ')');
 
 // ✅ NASTAV originalFileName aby sa zobrazil v UI!
-originalFileName = projectId;
+originalFileName = currentOfflineProjectId;
 console.log('📁 Nastavený originalFileName:', originalFileName);
 
 // ✅ Aktualizuj UI - zobraz názov súboru (je to SPAN nie input!)
@@ -12414,6 +12415,11 @@ for(const projectId of selectedProjects){
 try{
 btn.textContent=`⏳ Sťahujem... (${downloaded+1}/${selectedProjects.size})`;
 const projectData=await downloadProjectFromFirebase(projectId);
+
+// ✅ Ulož originálne Firebase ID DO projectData!
+projectData.originalFirebaseId = projectId;
+console.log('✅ Ukladám originalFirebaseId:', projectId);
+
 const dataToStore=JSON.stringify({id:projectId,data:projectData,downloadedAt:new Date().toISOString()});
 try{
 localStorage.setItem('offline_project_'+projectId,dataToStore);
