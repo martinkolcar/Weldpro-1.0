@@ -302,30 +302,10 @@ background: #dc2626;
 var jsPDF = window.jspdf.jsPDF;
 </script>
 
-<!-- Pako.js pre komprimáciu -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
-
-<!-- Firebase - načíta sa dynamicky len ak sme online -->
-<script>
-// ✅ Dynamické načítanie Firebase len v online režime
-if (navigator.onLine) {
-  console.log('📡 Online - načítavam Firebase...');
-  const scripts = [
-    'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js',
-    'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js',
-    'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js'
-  ];
-  
-  scripts.forEach(src => {
-    const script = document.createElement('script');
-    script.src = src;
-    script.onerror = () => console.warn('⚠️ Firebase script failed:', src);
-    document.head.appendChild(script);
-  });
-} else {
-  console.log('📱 Offline - Firebase NEBUDEME načítavať');
-}
-</script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 
 <script>
 // 🔒 SESSION CHECK - Ochrana proti neautorizovanému prístupu
@@ -397,33 +377,11 @@ let db = null;
 let auth = null;
 
 window.addEventListener('load', function() {
-  // ✅ Check NAJPRV či sme online!
-  if (!navigator.onLine) {
-    console.log('📱 OFFLINE MODE - Firebase vypnutý');
-    db = null;
-    auth = null;
-    document.getElementById('connectionStatus').innerHTML='🔴 Offline';
-    document.getElementById('offlineIndicator').style.background='#ef4444';
-    return; // ← STOP! Žiadny Firebase!
-  }
-  
-  // Online - inicializuj Firebase
   if (typeof firebase !== 'undefined') {
-    try {
-      firebase.initializeApp(firebaseConfig);
-      db = firebase.firestore();
-      auth = firebase.auth();
-      
-      auth.signInAnonymously()
-        .then(() => console.log('✅ Firebase ready!'))
-        .catch(err => {
-          console.warn('⚠️ Firebase auth failed:', err.message);
-        });
-    } catch(err) {
-      console.error('❌ Firebase init error:', err);
-      db = null;
-      auth = null;
-    }
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+    auth.signInAnonymously().then(() => console.log('✅ Firebase ready!')).catch(err => console.error(err));
   }
 });
 
@@ -607,7 +565,7 @@ async function listProjectsFromFirebase() {
 <span id="pendingSyncCount" style="display:none;background:rgba(255,255,255,0.3);padding:2px 8px;border-radius:4px;font-size:11px"></span>
 </div>
 <button onclick="showPendingChangesModal()" id="detailsBtn" style="display:none;background:#6366f1;color:white;margin-left:10px">📋 Detaily</button>
-<button onclick="exportOfflineChanges()" id="syncBtn" style="display:none;background:#f59e0b;color:white;margin-left:10px;animation:pulse 2s infinite">📥 Export zmien</button>
+<button onclick="syncOfflineData()" id="syncBtn" style="display:none;background:#f59e0b;color:white;margin-left:10px;animation:pulse 2s infinite">📤 Nahrať zmeny</button>
 <button onclick="logout()" style="background:#ef4444;color:white;margin-left:10px">🚪 Odhlásiť</button>
 </div>
 
@@ -772,7 +730,6 @@ async function listProjectsFromFirebase() {
 <div class="ribbon-group">
 <button onclick="addMontazWeld()" id="addmontazweld" disabled>➕ Pridať zvar</button>
 <button onclick="showSpoolsPreview()" id="spoolspreview" disabled>📋 Náhľad spoolov</button>
-<button onclick="saveOfflineChanges()" id="saveoffline" style="background:#f59e0b;color:white;font-weight:bold">💾 Uložiť offline</button>
 </div>
 <div class="ribbon-group">
 <button onclick="activateDrawTool('line')" id="montaz_linebtn" disabled>📏 Palička</button>
@@ -958,7 +915,7 @@ async function listProjectsFromFirebase() {
 
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-var pd=null,sc=1.0,ca=document.getElementById('can'),ct=ca.getContext('2d'),ov=document.getElementById('ov'),ws=[],pt=null,cn=1,startNum=1,originalFileName='',currentOfflineProjectId='',editMode=false,moveMode=false,selectedWeldId=null,editCrossMode=false,activeTab='redpen';
+var pd=null,sc=1.0,ca=document.getElementById('can'),ct=ca.getContext('2d'),ov=document.getElementById('ov'),ws=[],pt=null,cn=1,startNum=1,originalFileName='',editMode=false,moveMode=false,selectedWeldId=null,editCrossMode=false,activeTab='redpen';
 var loadedImage=null,baseImageWidth=0,baseImageHeight=0; // Pre zoom PNG obrázkov
 var weldHistory=[];
 var projectsData={
@@ -2473,34 +2430,16 @@ if(displayFilter.enabled){
 // Check či má tento zvar vyplneného zvarača v WeldBook
 var hasWelder = false;
 
-// Prejdi WeldBook a nájdi tento zvar PRE TENTO PROJEKT!
+// Prejdi WeldBook a nájdi tento zvar
 if(weldBookData && weldBookData.length > 0){
-// ✅ Zisti názov aktuálneho projektu
-var currentProjectName = projectsData.currentProject || originalFileName || 'unknown';
-
 for(var wbi=0; wbi<weldBookData.length; wbi++){
 var wbEntry = weldBookData[wbi];
-
-// ✅ KONTROLUJ aj projectName!
-var entryProjectName = wbEntry.projectName || wbEntry.project || '';
-
-// Ak WeldBook entry nemá projectName, skús použiť currentProjectName (spätná kompatibilita)
-var matchesProject = true;
-if(entryProjectName && entryProjectName !== ''){
-// Ak má projectName, musí sa zhodovať
-matchesProject = (entryProjectName === currentProjectName);
-}
-// Inak (starý formát bez projectName) - akceptuj, ale log warning
-else {
-console.warn('⚠️ WeldBook entry bez projectName - možný problém pri viacerých izometriách');
-}
-
-// Match podľa weldId A projectName!
-if(matchesProject && String(wbEntry.weldId) === String(w.displayNum)){
+// Match podľa weldId (nie weldNumber!)
+if(String(wbEntry.weldId) === String(w.displayNum)){
 // Check či má vyplneného zvarača (welderId nie welder!)
 if(wbEntry.welderId && wbEntry.welderId.trim() !== ''){
 hasWelder = true;
-console.log('✅ MONTÁŽ: Zvar',w.displayNum,'má zvarača:',wbEntry.welderId,'(projekt:',currentProjectName,')');
+console.log('✅ MONTÁŽ: Zvar',w.displayNum,'má zvarača:',wbEntry.welderId);
 break;
 }
 }
@@ -5719,17 +5658,12 @@ var weldBookEntry=montazCurrentWeld.weldBookEntry;
 if(weldBookEntry){
 weldBookEntry.welderId=welderInput;
 weldBookEntry.dateWelding=dateInput;
-// ✅ Aktualizuj projectName ak chýba
-if(!weldBookEntry.projectName){
-weldBookEntry.projectName = projectsData.currentProject || originalFileName || 'Unknown';
-}
 }else{
 // Vytvor nový záznam ak neexistuje
 var splitName=splitIsometricName(originalFileName||'Unknown');
 addWeldToWeldBook({
 part:splitName.part,
 isometric:splitName.isometric,
-projectName: projectsData.currentProject || originalFileName || 'Unknown', // ✅ PRIDANÉ!
 sheets:1,
 weldId:String(weld.displayNum),
 welderId:welderInput,
@@ -5739,7 +5673,7 @@ dateWelding:dateInput
 saveCurrentPartWeldBook();
 dw();
 closeMontazWelderModal();
-console.log('✅ Zvar',weld.displayNum,'označený - zvarač:',welderInput,', dátum:',dateInput,'(projekt:',projectsData.currentProject||originalFileName,')');
+console.log('✅ Zvar',weld.displayNum,'označený - zvarač:',welderInput,', dátum:',dateInput);
 }
 
 function addMontazWeld(){
@@ -9242,6 +9176,18 @@ function saveCurrentPartWeldBook() {
   currentPart.lastModified = new Date().toISOString().slice(0,10);
   
   saveProjectsToStorage();
+  
+  // Ak sme OFFLINE, pridaj do pending changes
+  if(!isOnline || typeof isOnline === 'undefined'){
+    addPendingChange('weld_update',{
+      projectName: projectsData.currentProject,
+      partName: projectsData.currentPart,
+      weldBookData: JSON.parse(JSON.stringify(weldBookData)), // Deep copy
+      timestamp: new Date().toISOString()
+    });
+    console.log('📤 WeldBook zmeny pridané do offline fronty');
+  }
+  
   console.log('💾 WeldBook uložený pre:', projectsData.currentProject, '/', projectsData.currentPart);
 }
 
@@ -11333,28 +11279,6 @@ document.getElementById('connectionStatus').innerHTML='🟢 Online';
 document.getElementById('offlineIndicator').style.background='#10b981';
 console.log('✅ Pripojený k internetu');
 
-// ✅ REŠTARTUJ HEARTBEAT
-if(typeof startHeartbeat === 'function'){
-  startHeartbeat();
-  console.log('🔄 Heartbeat reštartovaný');
-}
-
-// ✅ ZNOVU inicializuj Firebase
-if(typeof firebase !== 'undefined' && !db){
-  try {
-    if(!firebase.apps.length){
-      firebase.initializeApp(firebaseConfig);
-    }
-    db = firebase.firestore();
-    auth = firebase.auth();
-    auth.signInAnonymously()
-      .then(() => console.log('✅ Firebase znovu pripojený!'))
-      .catch(err => console.warn('Firebase reconnect error:', err));
-  } catch(e) {
-    console.error('Firebase init error:', e);
-  }
-}
-
 // Ukáž sync tlačidlo ak sú pending changes
 if(pendingChanges.length>0){
 document.getElementById('syncBtn').style.display='inline-block';
@@ -11368,99 +11292,10 @@ document.getElementById('connectionStatus').innerHTML='🔴 Offline';
 document.getElementById('offlineIndicator').style.background='#ef4444';
 document.getElementById('syncBtn').style.display='none';
 console.log('⚠️ Odpojený od internetu');
-
-// ✅ ZASTAV HEARTBEAT!
-if(heartbeatInterval){
-  clearInterval(heartbeatInterval);
-  heartbeatInterval = null;
-  console.log('🛑 Heartbeat zastavený');
-}
-
-// ✅ VYPNI Firebase
-if(db){
-  console.log('🔌 Odpájam Firebase...');
-  try {
-    db.terminate().then(() => {
-      console.log('✅ Firebase odpojený');
-      db = null; // Nastav na null
-    }).catch(err => {
-      console.warn('Firebase terminate error:', err);
-      db = null;
-    });
-  } catch(e) {
-    console.warn('Firebase už odpojený');
-    db = null;
-  }
-}
-
 showNotification('⚠️ Offline režim - zmeny sa uložia lokálne','warning');
 });
 
 // Ulož zmenu do pending queue
-// Ulož všetky zmeny offline (MONTÁŽ tlačidlo)
-function saveOfflineChanges(){
-if(!projectsData.currentProject || !projectsData.currentPart){
-alert('❌ Žiadny aktívny projekt!');
-return;
-}
-
-console.log('💾 Ukladám offline zmeny...');
-
-// Ulož do projectsData
-var currentProj = projectsData.projects[projectsData.currentProject];
-var currentPart = currentProj.parts[projectsData.currentPart];
-
-// Aktualizuj všetky dáta
-currentPart.welds = ws;
-currentPart.lines = lines;
-currentPart.texts = texts;
-currentPart.arrows = arrows;
-currentPart.curves = curves;
-currentPart.crosses = crosses;
-currentPart.spools = spools;
-currentPart.dimensions = dimensions;
-currentPart.spoolData = spoolData;
-currentPart.weldBookData = weldBookData;
-currentPart.kontrolaData = kontrolaData;
-currentPart.lastModified = new Date().toISOString();
-
-// Ulož do localStorage
-saveProjectsToStorage();
-
-// Pridaj do pending changes ak sme offline
-if(!isOnline){
-console.log('🔍 DEBUG saveOfflineChanges:');
-console.log('  currentOfflineProjectId:', currentOfflineProjectId);
-console.log('  projectsData.currentProject:', projectsData.currentProject);
-console.log('  projectsData.currentPart:', projectsData.currentPart);
-
-addPendingChange('project_update',{
-firebaseProjectId: currentOfflineProjectId || (projectsData.currentProject + ',' + projectsData.currentPart), // ✅ CELÝ ID!
-projectName: projectsData.currentProject,
-partName: projectsData.currentPart,
-data: {
-welds: ws,
-lines: lines,
-texts: texts,
-arrows: arrows,
-curves: curves,
-crosses: crosses,
-spools: spools,
-dimensions: dimensions,
-spoolData: spoolData,
-weldBookData: weldBookData,
-kontrolaData: kontrolaData
-},
-timestamp: new Date().toISOString()
-});
-console.log('📤 Zmeny pridané do offline fronty');
-console.log('  firebaseProjectId:', currentOfflineProjectId || (projectsData.currentProject + ',' + projectsData.currentPart));
-}
-
-showNotification('💾 Zmeny uložené!','success');
-console.log('✅ Offline zmeny uložené');
-}
-
 function addPendingChange(type,data){
 const change={
 id:Date.now()+'_'+Math.random().toString(36).substr(2,9),
@@ -11526,11 +11361,8 @@ html+=`
 ${change.data.projectName||change.data.id||''}
 </div>
 </div>
-<div style="display:flex;gap:8px;align-items:center">
 <div style="background:${statusColor};color:white;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap">
 ${statusIcon} ${statusText}
-</div>
-${change.status!=='uploading' && change.status!=='success'?`<button onclick="deletePendingChange('${change.id}')" style="background:#ef4444;color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">🗑️</button>`:''}
 </div>
 </div>
 <div style="font-size:11px;color:#999">
@@ -11545,77 +11377,8 @@ ${change.status==='uploading'?'<div style="margin-top:10px;height:4px;background
 listEl.innerHTML=html;
 }
 
-// Vymaž jednu pending zmenu
-function deletePendingChange(changeId){
-if(!confirm('Naozaj zmazať túto zmenu?\\n\\nZmena sa stratí a nebude nahraná na server.')){
-return;
-}
-
-const index=pendingChanges.findIndex(c=>c.id===changeId);
-if(index===-1){
-console.error('Zmena nenájdená:',changeId);
-return;
-}
-
-pendingChanges.splice(index,1);
-savePendingChanges();
-buildPendingChangesList();
-showNotification('🗑️ Zmena zmazaná','success');
-console.log('🗑️ Pending change deleted:',changeId);
-}
-
-// ✅ BEZPEČNÝ EXPORT offline zmien (namiesto sync)
-async function exportOfflineChanges(){
-if(pendingChanges.length===0){
-alert('✅ Žiadne zmeny na export!');
-return;
-}
-
-console.log('📤 Exportujem offline zmeny...');
-
-// Vytvor ZIP alebo jeden veľký JSON so všetkými zmenami
-const exportData = {
-exported: new Date().toISOString(),
-changesCount: pendingChanges.length,
-changes: pendingChanges.map(change => ({
-type: change.type,
-projectName: change.data.projectName,
-partName: change.data.partName,
-firebaseProjectId: change.data.firebaseProjectId,
-data: change.data.data,
-timestamp: change.timestamp,
-user: change.user
-}))
-};
-
-// Stiahni ako JSON súbor
-const jsonString = JSON.stringify(exportData, null, 2);
-const blob = new Blob([jsonString], {type: 'application/json'});
-const url = URL.createObjectURL(blob);
-const a = document.createElement('a');
-a.href = url;
-a.download = `offline_changes_${new Date().toISOString().slice(0,10)}.json`;
-a.click();
-URL.revokeObjectURL(url);
-
-showNotification('📥 Offline zmeny stiahnuté! Teraz nahraj cez "✨ Upload JSON"','success');
-console.log('✅ Export dokončený:', pendingChanges.length, 'zmien');
-
-// Opýtaj sa či vymazať pending changes
-if(confirm('Zmeny boli stiahnuté.\n\nVymazať ich z offline fronty?\n\n(Môžeš ich manuálne nahrať cez "✨ Upload JSON")')){
-pendingChanges = [];
-savePendingChanges();
-buildPendingChangesList();
-closePendingChangesModal();
-}
-}
-
-// STARÝ NEBEZPEČNÝ SYNC - VYPNUTÝ!
+// Synchronizuj všetky pending changes
 async function syncOfflineData(){
-alert('⚠️ Automatický sync je vypnutý!\n\nPoužite "📤 Export zmien" → potom "✨ Upload JSON"');
-return;
-
-/* STARÝ KÓD - VYPNUTÝ
 if(!isOnline){
 alert('❌ Nemáš internet! Pripoj sa najprv.');
 return;
@@ -11715,95 +11478,6 @@ throw new Error('Firebase nedostupný');
 switch(change.type){
 case 'project':
 await db.collection('library').doc(change.data.id).set(change.data);
-break;
-
-case 'project_update':
-// Prepíš celý projekt s novými dátami!
-console.log('📤 Nahrávam projekt update:', change.data.projectName);
-
-// ✅ Použiť firebaseProjectId ak existuje!
-const projectId = change.data.firebaseProjectId || (change.data.projectName + ',' + change.data.partName);
-console.log('📌 Firebase projectId:', projectId);
-
-const projectRef = db.collection('projects').doc(projectId);
-const projectDoc = await projectRef.get();
-
-if(!projectDoc.exists){
-console.error('❌ Projekt',projectId,'neexistuje v Firebase!');
-throw new Error('Projekt neexistuje v Firebase: ' + projectId);
-}
-
-// Aktualizuj s novými dátami
-const updateData = {
-welds: change.data.data.welds,
-lines: change.data.data.lines,
-texts: change.data.data.texts,
-arrows: change.data.data.arrows,
-curves: change.data.data.curves,
-crosses: change.data.data.crosses,
-spools: change.data.data.spools,
-dimensions: change.data.data.dimensions,
-spoolData: change.data.data.spoolData,
-weldBookData: change.data.data.weldBookData, // ✅ PRIDANÉ!
-kontrolaData: change.data.data.kontrolaData, // ✅ PRIDANÉ!
-lastModified: new Date().toISOString(),
-modifiedBy: window.currentUser?.username || 'unknown'
-};
-
-// Prepíš projekt v Firebase (merge aby sa zachovali ostatné polia)
-const existingData = projectDoc.data();
-
-// ✅ ZACHOVAJ pdfData z existujúceho projektu!
-if(existingData.pdfData){
-updateData.pdfData = existingData.pdfData;
-console.log('✅ Zachováva sa pdfData z Firebase');
-} else {
-console.warn('⚠️ Existujúci projekt NEMÁ pdfData!');
-// ✅ VYTVOR PNG z aktuálneho canvas!
-if(typeof ca !== 'undefined' && ca && ca.width > 0){
-try {
-const pngDataUrl = ca.toDataURL('image/png', 0.95);
-updateData.pdfData = pngDataUrl;
-console.log('✅ Vytvorený nový pdfData z canvas:', (pngDataUrl.length / 1024).toFixed(1), 'KB');
-} catch(e) {
-console.error('❌ Chyba pri vytváraní PNG z canvas:', e);
-// Pokračuj bez pdfData
-}
-} else {
-console.warn('⚠️ Canvas nie je dostupný - pokračujem bez pdfData');
-}
-}
-
-// ✅ ZACHOVAJ aj materials, weldAssignments ak existujú
-if(existingData.materials) updateData.materials = existingData.materials;
-if(existingData.weldAssignments) updateData.weldAssignments = existingData.weldAssignments;
-
-const mergedData = {...existingData, ...updateData};
-
-// Rozdeľ na chunky a ulož
-const jsonString = JSON.stringify(mergedData);
-const chunkSize = 800000;
-const chunks = [];
-for(let i=0; i<jsonString.length; i+=chunkSize){
-chunks.push(jsonString.substring(i, i+chunkSize));
-}
-
-// Aktualizuj metadata
-await projectRef.set({
-chunks: chunks.length,
-size: jsonString.length,
-date: new Date().toISOString(),
-lastModified: new Date().toISOString(),
-name: change.data.projectName,
-part: change.data.partName
-}, {merge: true});
-
-// Ulož chunky
-for(let i=0; i<chunks.length; i++){
-await projectRef.collection('data').doc('c'+i).set({d: chunks[i]});
-}
-
-console.log('✅ Projekt prepísaný:', chunks.length, 'chunkov');
 break;
 
 case 'delivery':
@@ -12180,156 +11854,40 @@ item.style.display=text.includes(searchText)?'block':'none';
 
 async function loadOfflineProject(projectId){
 try{
-let rawData = localStorage.getItem('offline_project_'+projectId);
-if(!rawData){
+// Nastav offline flag aby sa Firebase nevolal
+const wasOnline = isOnline;
+isOnline = false; // Dočasne vypni online režim
+
+const data=JSON.parse(localStorage.getItem('offline_project_'+projectId));
+if(!data){
 alert('❌ Projekt nebol nájdený v offline úložisku');
+isOnline = wasOnline;
 return;
 }
 
-// ✅ DEKOMPRIMUJ ak je komprimované!
-let stored;
-if(rawData.startsWith('GZIP:')){
-console.log('🗜️ Dekomprimujem projekt...');
-try {
-const base64 = rawData.substring(5); // Odstráň "GZIP:" prefix
-const binaryString = atob(base64);
-const bytes = new Uint8Array(binaryString.length);
-for(let i=0; i<binaryString.length; i++){
-bytes[i] = binaryString.charCodeAt(i);
-}
-const decompressed = pako.ungzip(bytes, {to: 'string'});
-stored = JSON.parse(decompressed);
-console.log('✅ Dekomprimácia úspešná');
-} catch(e) {
-console.error('❌ Dekomprimácia zlyhala:', e);
-alert('❌ Chyba pri dekomprimácii projektu!');
-return;
-}
-} else {
-// Nekomprimovaný (starý formát)
-stored = JSON.parse(rawData);
-}
-
-// ✅ Dáta sú vnorené v stored.data!
-const data = stored.data;
-
-console.log('📱 Načítavam offline projekt:', projectId);
-console.log('   welds:', data.welds?.length || 0);
-console.log('   pdfData:', !!data.pdfData);
-
-// ✅ NAJPRV VYČISTI VŠETKO!
-console.log('🧹 Čistím predošlé dáta...');
-ws = [];
-lines = [];
-texts = [];
-arrows = [];
-curves = [];
-crosses = [];
-spools = [];
-dimensions = [];
-spoolData = {};
-weldBookData = [];
-kontrolaData = {};
-weldLogMaterials = [];
-weldAssignments = {};
-
-// Teraz načítaj projekt data (správne názvy polí!)
-if(data.welds && data.welds.length > 0) ws = data.welds;
-if(data.spools && data.spools.length > 0) spools = data.spools;
-if(data.crosses && data.crosses.length > 0) crosses = data.crosses;
-if(data.lines && data.lines.length > 0) lines = data.lines;
-if(data.texts && data.texts.length > 0) texts = data.texts;
-if(data.curves && data.curves.length > 0) curves = data.curves;
-if(data.arrows && data.arrows.length > 0) arrows = data.arrows;
-if(data.dimensions && data.dimensions.length > 0) dimensions = data.dimensions;
-if(data.spoolData && Object.keys(data.spoolData).length > 0) spoolData = data.spoolData;
-
-// ✅ WeldBook - načítaj len pre TENTO projekt!
-if(data.weldBookData && Array.isArray(data.weldBookData)){
-weldBookData=data.weldBookData;
-console.log('📖 WeldBook načítaný:', weldBookData.length, 'zvarov');
-} else {
-// Ak projekt nemá WeldBook, vyčisti ho
-weldBookData=[];
-console.log('📖 WeldBook prázdny pre tento projekt');
-}
-
+// Načítaj projekt data
+if(data.ws)ws=data.ws;
+if(data.spools)spools=data.spools;
+if(data.crosses)crosses=data.crosses;
+if(data.lines)lines=data.lines;
+if(data.texts)texts=data.texts;
+if(data.curves)curves=data.curves;
+if(data.arrows)arrows=data.arrows;
+if(data.dimensions)dimensions=data.dimensions;
+if(data.spoolData)spoolData=data.spoolData;
+if(data.weldBookData)weldBookData=data.weldBookData;
 if(data.kontrolaData)kontrolaData=data.kontrolaData;
-if(data.materials)weldLogMaterials=data.materials;
-if(data.weldAssignments)weldAssignments=data.weldAssignments;
-if(data.currentNumber)cn=data.currentNumber;
-if(data.startNumber)startNum=data.startNumber;
 
-// ✅ NASTAV currentProject/currentPart aby sa zmeny ukladali správne!
-// VŽDY split projectId - IGNORUJ data.projectName (môže byť zlý)!
-const projectIdToSplit = data.originalFirebaseId || projectId;
-const parts = projectIdToSplit.split(',');
-const projectName = parts.slice(0, -1).join(','); // Všetko okrem posledného
-const partName = parts[parts.length - 1]; // Posledný
-
-console.log('🔍 Split projectId:');
-console.log('   projectIdToSplit:', projectIdToSplit);
-console.log('   projectName:', projectName);
-console.log('   partName:', partName);
-
-// ✅ ULOŽ CELÝ projectId pre sync - použiť originalFirebaseId ak existuje!
-currentOfflineProjectId = data.originalFirebaseId || projectId;
-console.log('📌 Uložený offline projectId:', currentOfflineProjectId);
-console.log('   (originalFirebaseId z data:', data.originalFirebaseId, ')');
-
-// ✅ NASTAV originalFileName aby sa zobrazil v UI!
-originalFileName = currentOfflineProjectId;
-console.log('📁 Nastavený originalFileName:', originalFileName);
-
-// ✅ Aktualizuj UI - zobraz názov súboru (je to SPAN nie input!)
-const fileNameDisplay = document.getElementById('fileName');
-if(fileNameDisplay){
-  fileNameDisplay.textContent = projectId;
-  console.log('✅ UI aktualizované - fileName span nastavený');
-} else {
-  console.warn('⚠️ fileName element nebol nájdený!');
-}
-
-// Vytvor projekt ak neexistuje
-if(!projectsData.projects[projectName]){
-projectsData.projects[projectName] = {
-parts: {},
-created: new Date().toISOString(),
-createdBy: window.currentUser?.username || 'offline'
-};
-}
-
-// Vytvor part ak neexistuje
-if(!projectsData.projects[projectName].parts[partName]){
-projectsData.projects[projectName].parts[partName] = {
-welds: ws,
-weldBookData: weldBookData,
-created: new Date().toISOString(),
-lastModified: new Date().toISOString()
-};
-}
-
-// NASTAV ako aktívny projekt!
-projectsData.currentProject = projectName;
-projectsData.currentPart = partName;
-
-console.log('✅ Aktívny projekt:', projectName, '/', partName);
-
-// Načítaj PDF/Image ak je
+// Načítaj PDF ak je
 if(data.pdfData){
-console.log('📄 Načítavam PNG image...');
-// pdfData je PNG image (Data URL) z Firebase
-const img = new Image();
-img.onload = function(){
-console.log('✅ PNG načítaný:', img.width, 'x', img.height);
-ca.width = img.width;
-ca.height = img.height;
-ov.setAttribute('width', img.width);
-ov.setAttribute('height', img.height);
-ct.imageSmoothingEnabled = false;
-ct.drawImage(img, 0, 0);
+const pdfBytes=base64ToUint8Array(data.pdfData);
 
-// Aktualizuj UI
+// Načítaj PDF cez pdfjsLib
+pdfjsLib.getDocument(pdfBytes).promise.then(function(p){
+pd=p;
+originalFileName=data.projectMeta?.name||projectId;
+
+// Aktualizuj UI elementy
 document.getElementById('up').style.display='none';
 document.getElementById('cw').style.display='block';
 document.getElementById('zoomInfo').style.display='block';
@@ -12374,30 +11932,38 @@ document.getElementById('arrowbtn').disabled=false;
 document.getElementById('doublearrowbtn').disabled=false;
 document.getElementById('undo').disabled=false;
 
-originalFileName=data.projectMeta?.name||projectId;
+// Renderuj prvú stranu
+rp();
 
-// Aktualizuj zobrazenie
+// Aktualizuj UI
 up();
 dw();
 closeOfflineModeModal();
+
+// Obnov online stav
+isOnline = wasOnline;
+
 alert('✅ Offline projekt načítaný: '+(data.projectMeta?.name||projectId));
 console.log('📱 Offline projekt načítaný:',projectId);
-};
-img.onerror = function(){
-alert('❌ Chyba pri načítaní obrázku');
-closeOfflineModeModal();
-};
-img.src = data.pdfData; // Data URL
+}).catch(function(err){
+console.error('❌ Chyba pri načítaní PDF:',err);
+isOnline = wasOnline;
+alert('❌ Chyba pri načítaní PDF: '+err.message);
+});
 }else{
-// Žiadny obrázok
+// Žiadne PDF - len data
 up();
 dw();
 closeOfflineModeModal();
-alert('✅ Offline projekt načítaný (bez výkresu): '+(data.projectMeta?.name||projectId));
+isOnline = wasOnline;
+alert('✅ Offline projekt načítaný (bez PDF): '+(data.projectMeta?.name||projectId));
+console.log('📱 Offline projekt načítaný (bez PDF):',projectId);
 }
 }catch(error){
 console.error('Chyba pri načítaní offline projektu:',error);
 alert('❌ Chyba pri načítaní: '+error.message);
+// Obnov online stav aj pri chybe
+if(typeof wasOnline !== 'undefined') isOnline = wasOnline;
 }
 }
 
@@ -12513,49 +12079,12 @@ for(const projectId of selectedProjects){
 try{
 btn.textContent=`⏳ Sťahujem... (${downloaded+1}/${selectedProjects.size})`;
 const projectData=await downloadProjectFromFirebase(projectId);
-
-// ✅ Ulož originálne Firebase ID DO projectData!
-projectData.originalFirebaseId = projectId;
-console.log('✅ Ukladám originalFirebaseId:', projectId);
-
-const dataObject = {id:projectId, data:projectData, downloadedAt:new Date().toISOString()};
-const jsonString = JSON.stringify(dataObject);
-const originalSize = jsonString.length;
-
-// ✅ KOMPRIMUJ pomocou pako.js!
-let dataToStore;
-let compressed = false;
-if(typeof pako !== 'undefined'){
-try {
-const compressed_data = pako.gzip(jsonString);
-// Konvertuj na base64 pre localStorage
-const base64 = btoa(String.fromCharCode.apply(null, compressed_data));
-dataToStore = 'GZIP:' + base64; // Prefix aby sme vedeli že je to komprimované
-compressed = true;
-const compressedSize = dataToStore.length;
-console.log('🗜️ Komprimácia:', originalSize, '→', compressedSize, '(', ((1-compressedSize/originalSize)*100).toFixed(1), '% úspora)');
-} catch(e) {
-console.warn('⚠️ Komprimácia zlyhala, ukladám nekomprimované:', e);
-dataToStore = jsonString;
-}
-} else {
-console.warn('⚠️ Pako.js nedostupný, ukladám nekomprimované');
-dataToStore = jsonString;
-}
-
+const dataToStore=JSON.stringify({id:projectId,data:projectData,downloadedAt:new Date().toISOString()});
 try{
-localStorage.setItem('offline_project_'+projectId, dataToStore);
+localStorage.setItem('offline_project_'+projectId,dataToStore);
 downloaded++;
 const item=document.querySelector(`.offline-project-item[data-id="${projectId}"]`);
-if(item){
-item.style.background='#d1fae5';
-item.style.borderColor='#10b981';
-// Ukáž komprimovanú veľkosť
-if(compressed){
-const sizeEl = item.querySelector('div[style*="font-size:12px"]');
-if(sizeEl) sizeEl.innerHTML = (dataToStore.length/1024).toFixed(1) + ' KB <span style="color:#10b981">🗜️</span>';
-}
-}
+if(item){item.style.background='#d1fae5';item.style.borderColor='#10b981';}
 }catch(storageError){
 if(storageError.name==='QuotaExceededError'){
 console.error('❌ Kapacita naplnená!');
@@ -12643,7 +12172,7 @@ function logout() {
 
 <div style="padding:20px;background:#f5f5f5;border-top:2px solid #ddd;display:flex;gap:10px">
 <button onclick="closePendingChanges()" style="flex:1;background:#6b7280;color:white;border:none;padding:14px;border-radius:8px;cursor:pointer;font-weight:600">Zavrieť</button>
-<button onclick="closePendingChanges();exportOfflineChanges()" id="syncFromModal" style="flex:2;background:#f59e0b;color:white;border:none;padding:14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:15px">📥 Export zmien</button>
+<button onclick="closePendingChanges();syncOfflineData()" id="syncFromModal" style="flex:2;background:#f59e0b;color:white;border:none;padding:14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:15px">📤 Nahrať teraz</button>
 </div>
 </div>
 </div>
