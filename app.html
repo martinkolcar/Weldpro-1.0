@@ -388,6 +388,30 @@ window.addEventListener('load', function() {
   }
 });
 
+// ==========================================
+// 🔧 STUB FUNKCIE - Definované skôr než sa použijú
+// ==========================================
+
+// Library Manager (definícia neskôr)
+function openLibraryManager() {
+  if (window.libraryManagerReady) {
+    window.openLibraryManagerReal();
+  } else {
+    console.log('⏳ Library Manager načítava...');
+    setTimeout(openLibraryManager, 100);
+  }
+}
+
+// WeldBook Sync (definícia neskôr)
+function syncWeldBookPending() {
+  if (window.libraryManagerReady) {
+    window.syncWeldBookPendingReal();
+  } else {
+    console.log('⏳ WeldBook Sync načítava...');
+    setTimeout(syncWeldBookPending, 100);
+  }
+}
+
 async function uploadProjectToFirebase(projectData) {
   if (!db) throw new Error('Firebase not ready');
   
@@ -11806,8 +11830,11 @@ let selectedProjects = new Set();
 let selectedOfflineProjects = new Set();
 let currentLibraryTab = 'online';
 
-// Otvor Library Manager
-function openLibraryManager() {
+// Nastav flag že funkcie sú ready
+window.libraryManagerReady = true;
+
+// Otvor Library Manager (REAL implementácia)
+window.openLibraryManagerReal = function() {
   document.getElementById('libraryManagerModal').style.display = 'block';
   switchLibraryTab('online');
 }
@@ -12354,8 +12381,9 @@ async function syncAllPendingWeldBook() {
 }
 
 // Sync tlačidlo v ribbonu
-function syncWeldBookPending() {
-  openLibraryManager();
+// Sync tlačidlo v ribbonu (REAL implementácia)
+window.syncWeldBookPendingReal = function() {
+  window.openLibraryManagerReal();
   switchLibraryTab('weldbook');
 }
 
