@@ -544,7 +544,6 @@ async function listProjectsFromFirebase() {
 <!-- HLAVNÁ LIŠTA - všetko v jednom riadku -->
 <div class="toolbar-main">
 <button onclick="document.getElementById('f').click()">📁 Nahrať PDF</button>
-<button onclick="openLibrary()" style="background:#10b981;color:white">📚 Online Knižnica</button>
 <button onclick="setTool('select')" id="selectbtn" disabled>👆 Kurzor</button>
 <button onclick="zi()" id="zi" disabled>🔍+</button>
 <button onclick="zo()" id="zo" disabled>🔍-</button>
@@ -12416,23 +12415,6 @@ setTimeout(() => {
   updateOfflineBadge();
   updateWeldBookBadge();
 }, 1000);
-
-
-
-// ✅ Použi moju novú funkciu listOfflineProjects()
-const offlineProjects = listOfflineProjects();
-
-if(offlineProjects.length===0){
-listEl.innerHTML='<div style="text-align:center;color:#999;padding:40px">📭 Žiadne offline projekty<br><small style="color:#bbb">Najprv stiahni projekty cez "📦 Offline balík"</small></div>';
-return;
-}
-
-// Zobraz info o kapacite
-const storageInfo = getStorageInfo();
-let html = `<div style="background:#fef3c7;border-radius:8px;padding:12px;margin-bottom:15px;border-left:4px solid #f59e0b">
-<strong>💾 Kapacita:</strong> ${storageInfo.usedMB} MB / 10 MB (${storageInfo.usedPercent}% použité)
-<br><small style="color:#666">Voľné: ${storageInfo.freeMB} MB</small>
-</div>`;
 
 offlineProjects.forEach(proj=>{
 const sizeKB = (proj.size / 1024).toFixed(1);
