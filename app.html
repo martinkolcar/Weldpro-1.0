@@ -12167,6 +12167,25 @@ function openOfflineProjectFromList2(projectId) {
       document.getElementById('cw').style.display = 'block';
       document.getElementById('zoomInfo').style.display = 'block';
       
+      // ✅ NAČÍTAJ ZVARY A OSTATNÉ DÁTA - PRESUNTÉ SEM!
+      ws = data.welds || [];
+      lines = data.lines || [];
+      texts = data.texts || [];
+      arrows = data.arrows || [];
+      curves = data.curves || [];
+      crosses = data.crosses || [];
+      spools = data.spools || [];
+      dimensions = data.dimensions || [];
+      spoolData = data.spoolData || {};
+      weldBookData = data.weldBookData || [];
+      kontrolaData = data.kontrolaData || {};
+      cn = data.currentNumber || 1;
+      startNum = data.startNumber || 1;
+      
+      console.log('✅ Načítané zvary:', ws.length);
+      console.log('✅ Načítané lines:', lines.length);
+      console.log('✅ Načítané texts:', texts.length);
+      
       // Enable tlačidlá
       document.getElementById('zi').disabled = false;
       document.getElementById('zo').disabled = false;
@@ -12186,21 +12205,6 @@ function openOfflineProjectFromList2(projectId) {
     
     document.getElementById('fileName').textContent = projectId;
   }
-  
-  // Načítaj zvary a ostatné dáta
-  ws = data.welds || [];
-  lines = data.lines || [];
-  texts = data.texts || [];
-  arrows = data.arrows || [];
-  curves = data.curves || [];
-  crosses = data.crosses || [];
-  spools = data.spools || [];
-  dimensions = data.dimensions || [];
-  spoolData = data.spoolData || {};
-  weldBookData = data.weldBookData || [];
-  kontrolaData = data.kontrolaData || {};
-  cn = data.currentNumber || 1;
-  startNum = data.startNumber || 1;
   
   // Zavri modal
   closeLibraryManager();
