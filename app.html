@@ -302,9 +302,6 @@ background: #dc2626;
 var jsPDF = window.jspdf.jsPDF;
 </script>
 
-<!-- Pako.js pre komprimáciu -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
-
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -387,30 +384,6 @@ window.addEventListener('load', function() {
     auth.signInAnonymously().then(() => console.log('✅ Firebase ready!')).catch(err => console.error(err));
   }
 });
-
-// ==========================================
-// 🔧 STUB FUNKCIE - Definované skôr než sa použijú
-// ==========================================
-
-// Library Manager (definícia neskôr)
-function openLibraryManager() {
-  if (window.libraryManagerReady) {
-    window.openLibraryManagerReal();
-  } else {
-    console.log('⏳ Library Manager načítava...');
-    setTimeout(openLibraryManager, 100);
-  }
-}
-
-// WeldBook Sync (definícia neskôr)
-function syncWeldBookPending() {
-  if (window.libraryManagerReady) {
-    window.syncWeldBookPendingReal();
-  } else {
-    console.log('⏳ WeldBook Sync načítava...');
-    setTimeout(syncWeldBookPending, 100);
-  }
-}
 
 async function uploadProjectToFirebase(projectData) {
   if (!db) throw new Error('Firebase not ready');
@@ -544,6 +517,7 @@ async function listProjectsFromFirebase() {
 <!-- HLAVNÁ LIŠTA - všetko v jednom riadku -->
 <div class="toolbar-main">
 <button onclick="document.getElementById('f').click()">📁 Nahrať PDF</button>
+<button onclick="openLibrary()" style="background:#10b981;color:white">📚 Online Knižnica</button>
 <button onclick="setTool('select')" id="selectbtn" disabled>👆 Kurzor</button>
 <button onclick="zi()" id="zi" disabled>🔍+</button>
 <button onclick="zo()" id="zo" disabled>🔍-</button>
@@ -575,11 +549,8 @@ async function listProjectsFromFirebase() {
 <button onclick="openMTO()" id="mtobtn" disabled>📊 MTO</button>
 <button onclick="saveProject()" id="saveproj" disabled>💾 Projekt</button>
 <button onclick="saveToLibrary()" id="savetolibrary" disabled style="background:#10b981;color:white">☁️ Do knižnice</button>
-<button onclick="openLibraryManager()" style="background:#6366f1;color:white;position:relative;margin-left:5px">
-📚 Knižnica
-<span id="offlineBadge" style="display:none;position:absolute;top:-5px;right:-5px;background:#ef4444;color:white;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:700;line-height:20px"></span>
-</button>
-<button onclick="syncWeldBookPending()" id="weldBookSyncBtn" style="display:none;background:#f59e0b;color:white;margin-left:5px">📤 Sync WeldBook (0)</button>
+<button onclick="openOfflinePackageModal()" style="background:#f59e0b;color:white">📦 Offline balík</button>
+<button onclick="openOfflineModeModal()" style="background:#8b5cf6;color:white">📱 Offline režim</button>
 <button onclick="document.getElementById('loadproj').click()" id="loadprojbtn" disabled>📂 Načítať</button>
 <button onclick="savePDF()" id="savepdf" disabled>📄 PDF</button>
 <button onclick="cl()" id="cl" disabled>🗑️ Zmazať</button>
@@ -593,6 +564,8 @@ async function listProjectsFromFirebase() {
 <span id="connectionStatus">🟢 Online</span>
 <span id="pendingSyncCount" style="display:none;background:rgba(255,255,255,0.3);padding:2px 8px;border-radius:4px;font-size:11px"></span>
 </div>
+<button onclick="showPendingChangesModal()" id="detailsBtn" style="display:none;background:#6366f1;color:white;margin-left:10px">📋 Detaily</button>
+<button onclick="syncOfflineData()" id="syncBtn" style="display:none;background:#f59e0b;color:white;margin-left:10px;animation:pulse 2s infinite">📤 Nahrať zmeny</button>
 <button onclick="logout()" style="background:#ef4444;color:white;margin-left:10px">🚪 Odhlásiť</button>
 </div>
 
@@ -2026,7 +1999,7 @@ width:lineWidth
 linePt=null;
 dw();
 console.log('✅ Palička vytvorená');
-autoSaveCurrentProject(); // ✅ AUTO-SAVE
+if(typeof autoSaveCurrentProject==='function')try{autoSaveCurrentProject()}catch(e){}
 }
 return;
 }
@@ -2046,7 +2019,6 @@ rotation:0
 });
 dw();
 console.log('✅ Text vytvorený:',userText);
-autoSaveCurrentProject(); // ✅ AUTO-SAVE
 document.getElementById('undo').disabled=false;
 }
 return;
@@ -2116,7 +2088,6 @@ type:arrowType
 arrowPt=null;
 console.log('✅ Šípka vytvorená');
 document.getElementById('undo').disabled=false;
-autoSaveCurrentProject(); // ✅ AUTO-SAVE
 dw();
 }
 return;
@@ -5702,18 +5673,26 @@ dateWelding:dateInput
 }
 saveCurrentPartWeldBook();
 
-// ✅ PRIDANÉ - Pridaj do PENDING WeldBook (pre sync)
+// ✅ OFFLINE: Pridaj do pending (len ak je offline projekt)
+if(typeof currentOfflineProjectId !== 'undefined' && currentOfflineProjectId){
+try{
+if(typeof addPendingWeldBookChange === 'function'){
 addPendingWeldBookChange({
 weldId: String(weld.displayNum),
 welderId: welderInput,
 dateWelding: dateInput,
-project: originalFileName || 'Unknown',
+project: originalFileName || currentOfflineProjectId,
 action: 'add',
 timestamp: new Date().toISOString()
 });
-
-// ✅ PRIDANÉ - AUTO-SAVE projektu do offline knižnice
+}
+if(typeof autoSaveCurrentProject === 'function'){
 autoSaveCurrentProject();
+}
+}catch(e){
+console.warn('⚠️ Offline auto-save skipped:', e.message);
+}
+}
 
 dw();
 closeMontazWelderModal();
@@ -9936,16 +9915,9 @@ window.tempMTOItems=items;
 </div>
 
 <script>
-// Knižnica - STARÁ VERZIA (NEPOUŽÍVAŤ!)
-function openLibraryOLD_DEPRECATED() {
-  console.log('⚠️ DEPRECATED: openLibrary called - use openLibraryManager instead!');
-  // Redirect na novú funkciu
-  if (window.openLibraryManagerReal) {
-    window.openLibraryManagerReal();
-  }
-  return;
-  
-  // STARÝ KÓD (disabled):
+// Knižnica - localStorage
+function openLibrary() {
+  console.log('🔵 openLibrary called');
   const modal = document.getElementById('libraryModal');
   console.log('🔵 Modal element:', modal);
   if (modal) {
@@ -9955,11 +9927,6 @@ function openLibraryOLD_DEPRECATED() {
     console.error('❌ Modal not found!');
   }
   loadLibrary();
-}
-
-// Alias pre spätnú kompatibilitu
-function openLibrary() {
-  openLibraryOLD_DEPRECATED();
 }
 
 function closeLibrary() {
@@ -11311,12 +11278,6 @@ const badge=document.getElementById('pendingSyncCount');
 const syncBtn=document.getElementById('syncBtn');
 const detailsBtn=document.getElementById('detailsBtn');
 
-// ✅ Null check - staré tlačidlá už neexistujú
-if(!badge || !syncBtn || !detailsBtn){
-  console.log('⚠️ Staré offline tlačidlá neexistujú - skipujem updateSyncBadge');
-  return;
-}
-
 if(pendingChanges.length>0){
 badge.textContent=pendingChanges.length+' zmien';
 badge.style.display='inline-block';
@@ -11837,777 +11798,72 @@ setInterval(updateTotalUnreadBadge,60000);
 updateTotalUnreadBadge();
 }
 
-// ==========================================
-// 📚 LIBRARY MANAGER - 3 záložky systém
-// ==========================================
-
-let selectedProjects = new Set();
-let selectedOfflineProjects = new Set();
-let currentLibraryTab = 'online';
-
-// Nastav flag že funkcie sú ready
-window.libraryManagerReady = true;
-
-// Otvor Library Manager (REAL implementácia)
-window.openLibraryManagerReal = function() {
-  document.getElementById('libraryManagerModal').style.display = 'block';
-  switchLibraryTab('online');
+// 📦 OFFLINE PACKAGE SYSTÉM
+let selectedProjects=new Set();
+function openOfflinePackageModal(){
+document.getElementById('offlinePackageModal').style.display='block';
+loadProjectsForOffline();
 }
 
-// Zavri Library Manager
-function closeLibraryManager() {
-  document.getElementById('libraryManagerModal').style.display = 'none';
+// ============= OFFLINE REŽIM - Načítanie stiahnutých projektov =============
+function openOfflineModeModal(){
+document.getElementById('offlineModeModal').style.display='block';
+loadOfflineModeProjects();
 }
 
-// Prepni záložku
-function switchLibraryTab(tab) {
-  currentLibraryTab = tab;
-  
-  // Skry všetky záložky
-  document.getElementById('onlineTab').style.display = 'none';
-  document.getElementById('offlineTab').style.display = 'none';
-  document.getElementById('weldbookTab').style.display = 'none';
-  
-  // Resetuj štýly tlačidiel
-  document.getElementById('tabOnline').style.background = '#f3f4f6';
-  document.getElementById('tabOnline').style.borderBottom = '3px solid transparent';
-  document.getElementById('tabOnline').style.color = '#6b7280';
-  
-  document.getElementById('tabOffline').style.background = '#f3f4f6';
-  document.getElementById('tabOffline').style.borderBottom = '3px solid transparent';
-  document.getElementById('tabOffline').style.color = '#6b7280';
-  
-  document.getElementById('tabWeldbook').style.background = '#f3f4f6';
-  document.getElementById('tabWeldbook').style.borderBottom = '3px solid transparent';
-  document.getElementById('tabWeldbook').style.color = '#6b7280';
-  
-  // Zobraz aktívnu záložku
-  if (tab === 'online') {
-    document.getElementById('onlineTab').style.display = 'flex';
-    document.getElementById('tabOnline').style.background = 'white';
-    document.getElementById('tabOnline').style.borderBottom = '3px solid #6366f1';
-    document.getElementById('tabOnline').style.color = '#6366f1';
-    loadOnlineProjects();
-  } else if (tab === 'offline') {
-    document.getElementById('offlineTab').style.display = 'flex';
-    document.getElementById('tabOffline').style.background = 'white';
-    document.getElementById('tabOffline').style.borderBottom = '3px solid #8b5cf6';
-    document.getElementById('tabOffline').style.color = '#8b5cf6';
-    loadOfflineProjectsTab();
-  } else if (tab === 'weldbook') {
-    document.getElementById('weldbookTab').style.display = 'flex';
-    document.getElementById('tabWeldbook').style.background = 'white';
-    document.getElementById('tabWeldbook').style.borderBottom = '3px solid #f59e0b';
-    document.getElementById('tabWeldbook').style.color = '#f59e0b';
-    loadWeldBookPending();
-  }
+function closeOfflineModeModal(){
+document.getElementById('offlineModeModal').style.display='none';
 }
 
-// ============= ONLINE TAB =============
+function loadOfflineModeProjects(){
+const listEl=document.getElementById('offlineModeProjectsList');
+listEl.innerHTML='<div style="text-align:center;color:#999;padding:20px">⏳ Načítavam...</div>';
 
-async function loadOnlineProjects() {
-  const listEl = document.getElementById('onlineProjectsList');
-  listEl.innerHTML = '<div style="text-align:center;color:#999;padding:40px">⏳ Načítavam...</div>';
-  
-  try {
-    if (!db) {
-      listEl.innerHTML = '<div style="text-align:center;color:#ef4444;padding:40px">❌ Firebase nedostupný</div>';
-      return;
-    }
-    
-    const snapshot = await db.collection('projects').orderBy('date', 'desc').limit(50).get();
-    
-    if (snapshot.empty) {
-      listEl.innerHTML = '<div style="text-align:center;color:#999;padding:40px">📭 Žiadne projekty</div>';
-      return;
-    }
-    
-    let html = '';
-    for (const doc of snapshot.docs) {
-      const meta = doc.data();
-      const size = meta.size || 0;
-      const isDownloaded = localStorage.getItem('offline_project_' + doc.id) !== null;
-      
-      html += `<div class="online-project-item" data-id="${doc.id}" data-size="${size}" style="background:${isDownloaded ? '#d1fae5' : 'white'};border:2px solid ${isDownloaded ? '#10b981' : '#e5e7eb'};border-radius:8px;padding:15px;margin-bottom:12px;cursor:pointer" onclick="toggleOnlineProjectSelection('${doc.id}')">
-        <div style="display:flex;align-items:center;gap:15px">
-          <input type="checkbox" class="online-checkbox" data-id="${doc.id}" onclick="event.stopPropagation();toggleOnlineProjectSelection('${doc.id}')" style="width:20px;height:20px;cursor:pointer">
-          <div style="flex:1">
-            <div style="font-weight:700;font-size:15px;color:#333">
-              ${meta.name || doc.id}
-              ${isDownloaded ? ' <span style="background:#10b981;color:white;padding:2px 8px;border-radius:4px;font-size:11px">✅ Stiahnutý</span>' : ''}
-            </div>
-            <div style="font-size:12px;color:#666">${(size / 1024).toFixed(1)} KB • ${meta.date ? new Date(meta.date).toLocaleDateString('sk-SK') : ''}</div>
-          </div>
-        </div>
-      </div>`;
-    }
-    
-    listEl.innerHTML = html;
-    updateOnlineStats();
-  } catch (error) {
-    console.error(error);
-    listEl.innerHTML = '<div style="text-align:center;color:#ef4444;padding:40px">❌ ' + error.message + '</div>';
-  }
+const offlineProjects=[];
+for(let i=0;i<localStorage.length;i++){
+const key=localStorage.key(i);
+if(key.startsWith('offline_project_')){
+const projectId=key.replace('offline_project_','');
+try{
+const data=JSON.parse(localStorage.getItem(key));
+offlineProjects.push({id:projectId,data:data});
+}catch(e){
+console.error('Chyba pri čítaní offline projektu:',projectId,e);
+}
+}
 }
 
-function toggleOnlineProjectSelection(projectId) {
-  const checkbox = document.querySelector(`.online-checkbox[data-id="${projectId}"]`);
-  const item = document.querySelector(`.online-project-item[data-id="${projectId}"]`);
-  
-  if (selectedProjects.has(projectId)) {
-    selectedProjects.delete(projectId);
-    checkbox.checked = false;
-    if (!localStorage.getItem('offline_project_' + projectId)) {
-      item.style.background = 'white';
-      item.style.borderColor = '#e5e7eb';
-    }
-  } else {
-    selectedProjects.add(projectId);
-    checkbox.checked = true;
-    item.style.background = '#fef3c7';
-    item.style.borderColor = '#f59e0b';
-  }
-  
-  updateOnlineStats();
-}
-
-function selectAllOnline() {
-  document.querySelectorAll('.online-checkbox').forEach(checkbox => {
-    selectedProjects.add(checkbox.dataset.id);
-    checkbox.checked = true;
-    const item = document.querySelector(`.online-project-item[data-id="${checkbox.dataset.id}"]`);
-    item.style.background = '#fef3c7';
-    item.style.borderColor = '#f59e0b';
-  });
-  updateOnlineStats();
-}
-
-function deselectAllOnline() {
-  document.querySelectorAll('.online-checkbox').forEach(checkbox => {
-    selectedProjects.delete(checkbox.dataset.id);
-    checkbox.checked = false;
-    const item = document.querySelector(`.online-project-item[data-id="${checkbox.dataset.id}"]`);
-    if (!localStorage.getItem('offline_project_' + checkbox.dataset.id)) {
-      item.style.background = 'white';
-      item.style.borderColor = '#e5e7eb';
-    } else {
-      item.style.background = '#d1fae5';
-      item.style.borderColor = '#10b981';
-    }
-  });
-  updateOnlineStats();
-}
-
-function updateOnlineStats() {
-  const count = selectedProjects.size;
-  const storageInfo = getStorageInfo();
-  
-  document.getElementById('onlineSelectedCount').textContent = count;
-  document.getElementById('availableSpace').textContent = storageInfo.freeMB + ' MB';
-  
-  const btn = document.getElementById('downloadBtn');
-  if (count > 0) {
-    btn.disabled = false;
-    btn.textContent = `⬇️ Stiahnuť (${count})`;
-  } else {
-    btn.disabled = true;
-    btn.textContent = '⬇️ Stiahnuť (0)';
-  }
-}
-
-function filterOnlineProjects() {
-  const searchText = document.getElementById('onlineSearch').value.toLowerCase();
-  const items = document.querySelectorAll('.online-project-item');
-  items.forEach(item => {
-    const text = item.textContent.toLowerCase();
-    item.style.display = text.includes(searchText) ? 'block' : 'none';
-  });
-}
-
-async function downloadSelectedToOffline() {
-  if (selectedProjects.size === 0) return;
-  
-  const btn = document.getElementById('downloadBtn');
-  btn.disabled = true;
-  
-  let downloaded = 0;
-  let failed = 0;
-  let totalSavings = 0;
-  
-  for (const projectId of selectedProjects) {
-    try {
-      btn.textContent = `⏳ Sťahujem... (${downloaded + 1}/${selectedProjects.size})`;
-      
-      // Stiahni z Firebase
-      const projectData = await downloadProjectFromFirebase(projectId);
-      
-      // Ulož s komprimáciou
-      const result = saveOfflineProject(projectId, projectData);
-      
-      if (result.success) {
-        downloaded++;
-        totalSavings += parseFloat(result.savings);
-        
-        const item = document.querySelector(`.online-project-item[data-id="${projectId}"]`);
-        if (item) {
-          item.style.background = '#d1fae5';
-          item.style.borderColor = '#10b981';
-          item.innerHTML = item.innerHTML.replace('</div>', ' <span style="background:#10b981;color:white;padding:2px 8px;border-radius:4px;font-size:11px">✅ Stiahnutý</span></div>');
-        }
-      } else {
-        failed++;
-        if (result.error.includes('localStorage je plný')) {
-          showNotification('⚠️ localStorage plný! Stiahnuté: ' + downloaded, 'warning');
-          break;
-        }
-      }
-      
-      await new Promise(r => setTimeout(r, 300));
-    } catch (error) {
-      console.error('❌ Chyba pri sťahovaní:', projectId, error);
-      failed++;
-    }
-  }
-  
-  btn.disabled = false;
-  btn.textContent = '⬇️ Stiahnuť (0)';
-  selectedProjects.clear();
-  deselectAllOnline();
-  
-  const avgSavings = downloaded > 0 ? (totalSavings / downloaded).toFixed(1) : 0;
-  if (failed > 0) {
-    showNotification(`⚠️ Stiahnuté: ${downloaded}, Zlyhalo: ${failed}`, 'warning');
-  } else {
-    showNotification(`✅ ${downloaded} projektov stiahnutých! 🗜️ ${avgSavings}% úspora`, 'success');
-  }
-  
-  updateOfflineBadge();
-  loadOnlineProjects(); // Refresh
-}
-
-// ============= OFFLINE TAB =============
-
-function loadOfflineProjectsTab() {
-  const listEl = document.getElementById('offlineProjectsList2');
-  const projects = listOfflineProjects();
-  
-  if (projects.length === 0) {
-    listEl.innerHTML = '<div style="text-align:center;color:#999;padding:40px">📭 Žiadne offline projekty<br><small style="color:#bbb">Najprv stiahni z Online knižnice</small></div>';
-    return;
-  }
-  
-  // Info o kapacite
-  const storageInfo = getStorageInfo();
-  let html = `<div style="background:#fef3c7;border-radius:8px;padding:12px;margin-bottom:15px;border-left:4px solid #f59e0b">
-    <strong>💾 Kapacita:</strong> ${storageInfo.usedMB} MB / 10 MB (${storageInfo.usedPercent}% použité)
-    <br><small style="color:#666">Voľné: ${storageInfo.freeMB} MB</small>
-  </div>`;
-  
-  projects.forEach(proj => {
-    const sizeKB = (proj.size / 1024).toFixed(1);
-    const compressIcon = proj.compressed ? ' 🗜️' : '';
-    
-    html += `<div class="offline-project-card" style="background:#e0e7ff;border:2px solid #8b5cf6;border-radius:8px;padding:15px;margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">
-        <div style="flex:1">
-          <div style="font-weight:700;font-size:15px;color:#333;margin-bottom:5px">
-            ${proj.id}
-            <span style="background:#8b5cf6;color:white;padding:2px 8px;border-radius:4px;font-size:11px">📱 OFFLINE</span>
-          </div>
-          <div style="font-size:12px;color:#666">${sizeKB} KB${compressIcon}</div>
-        </div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button onclick="openOfflineProjectFromList2('${proj.id}')" style="flex:1;background:#6366f1;color:white;border:none;padding:10px;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">
-          🔧 Otvoriť
-        </button>
-        <button onclick="uploadOfflineProjectToOnline('${proj.id}')" style="flex:1;background:#10b981;color:white;border:none;padding:10px;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">
-          📤 Upload
-        </button>
-        <button onclick="exportOfflineProjectAsJSON('${proj.id}')" style="flex:1;background:#f59e0b;color:white;border:none;padding:10px;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">
-          💾 JSON
-        </button>
-        <button onclick="deleteOfflineProjectFromList2('${proj.id}')" style="background:#ef4444;color:white;border:none;padding:10px 15px;border-radius:6px;cursor:pointer;font-weight:600">
-          🗑️
-        </button>
-      </div>
-    </div>`;
-  });
-  
-  listEl.innerHTML = html;
-}
-
-function openOfflineProjectFromList2(projectId) {
-  console.log('📱 Otváram offline projekt:', projectId);
-  
-  const result = loadOfflineProject(projectId);
-  
-  if (!result.success) {
-    alert('❌ Chyba: ' + result.error);
-    return;
-  }
-  
-  const stored = result.data;
-  const data = stored.data;
-  
-  // Nastav globálne premenné
-  currentOfflineProjectId = projectId;
-  originalFileName = projectId;
-  
-  // Načítaj PDF data
-  if (data.pdfData) {
-    pd = data.pdfData;
-    
-    // Vytvor Image objekt a načítaj PDF
-    const img = new Image();
-    img.onload = function() {
-      ca.width = img.width;
-      ca.height = img.height;
-      ov.setAttribute('width', img.width);
-      ov.setAttribute('height', img.height);
-      ct.imageSmoothingEnabled = false;
-      ct.drawImage(img, 0, 0);
-      
-      // Skry upload, zobraz canvas
-      document.getElementById('up').style.display = 'none';
-      document.getElementById('cw').style.display = 'block';
-      document.getElementById('zoomInfo').style.display = 'block';
-      
-      // ✅ NAČÍTAJ ZVARY A OSTATNÉ DÁTA - PRESUNTÉ SEM!
-      ws = data.welds || [];
-      lines = data.lines || [];
-      texts = data.texts || [];
-      arrows = data.arrows || [];
-      curves = data.curves || [];
-      crosses = data.crosses || [];
-      spools = data.spools || [];
-      dimensions = data.dimensions || [];
-      spoolData = data.spoolData || {};
-      weldBookData = data.weldBookData || [];
-      kontrolaData = data.kontrolaData || {};
-      cn = data.currentNumber || 1;
-      startNum = data.startNumber || 1;
-      
-      console.log('✅ Načítané zvary:', ws.length);
-      console.log('✅ Načítané lines:', lines.length);
-      console.log('✅ Načítané texts:', texts.length);
-      
-      // Enable tlačidlá
-      document.getElementById('zi').disabled = false;
-      document.getElementById('zo').disabled = false;
-      document.getElementById('zr').disabled = false;
-      document.getElementById('savepdf').disabled = false;
-      document.getElementById('savetolibrary').disabled = false;
-      document.getElementById('saveproj').disabled = false;
-      document.getElementById('cl').disabled = false;
-      document.getElementById('selectbtn').disabled = false;
-      document.getElementById('undo').disabled = false;
-      
-      // Vykresli zvary a ostatné
-      dw();
-      showNotification('✅ Offline projekt načítaný: ' + projectId, 'success');
-    };
-    img.src = pd;
-    
-    document.getElementById('fileName').textContent = projectId;
-  }
-  
-  // Zavri modal
-  closeLibraryManager();
-}
-
-function deleteOfflineProjectFromList2(projectId) {
-  if (!confirm('Zmazať offline projekt?\\n\\n' + projectId)) {
-    return;
-  }
-  
-  deleteOfflineProject(projectId);
-  loadOfflineProjectsTab();
-  updateOfflineBadge();
-  showNotification('🗑️ Projekt zmazaný', 'success');
-}
-
-function filterOfflineProjects2() {
-  const searchText = document.getElementById('offlineSearch').value.toLowerCase();
-  const items = document.querySelectorAll('.offline-project-card');
-  items.forEach(item => {
-    const text = item.textContent.toLowerCase();
-    item.style.display = text.includes(searchText) ? 'block' : 'none';
-  });
-}
-
-// Upload do online (MOŽNOSŤ A)
-async function uploadOfflineProjectToOnline(projectId) {
-  if (!confirm('Nahrať projekt do online knižnice?\\n\\n' + projectId + '\\n\\nPrepíše existujúcu verziu v Firebase!')) {
-    return;
-  }
-  
-  try {
-    showNotification('⏳ Nahrávam do Firebase...', 'info');
-    
-    // Načítaj z offline
-    const result = loadOfflineProject(projectId);
-    if (!result.success) {
-      alert('❌ Chyba: ' + result.error);
-      return;
-    }
-    
-    const projectData = result.data.data;
-    
-    // Nahrá do Firebase (chunked upload)
-    const jsonString = JSON.stringify(projectData);
-    const chunkSize = 800000;
-    const chunks = [];
-    for (let i = 0; i < jsonString.length; i += chunkSize) {
-      chunks.push(jsonString.substring(i, i + chunkSize));
-    }
-    
-    const projectRef = db.collection('projects').doc(projectId);
-    
-    // Metadata
-    await projectRef.set({
-      chunks: chunks.length,
-      size: jsonString.length,
-      date: new Date().toISOString(),
-      lastModified: new Date().toISOString(),
-      name: projectId
-    }, { merge: true });
-    
-    // Chunky
-    for (let i = 0; i < chunks.length; i++) {
-      await projectRef.collection('data').doc('c' + i).set({ d: chunks[i] });
-    }
-    
-    showNotification('✅ Projekt uploadovaný do online knižnice!', 'success');
-    console.log('✅ Upload done:', chunks.length, 'chunkov');
-    
-  } catch (error) {
-    console.error('❌ Upload failed:', error);
-    showNotification('❌ Chyba: ' + error.message, 'error');
-  }
-}
-
-// Export ako JSON (MOŽNOSŤ B)
-function exportOfflineProjectAsJSON(projectId) {
-  const result = loadOfflineProject(projectId);
-  
-  if (!result.success) {
-    alert('❌ Chyba: ' + result.error);
-    return;
-  }
-  
-  const projectData = result.data.data;
-  const jsonString = JSON.stringify(projectData, null, 2);
-  const blob = new Blob([jsonString], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = projectId + '_offline.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  
-  showNotification('📥 JSON stiahnutý! Nahraj ho cez "✨ Upload JSON"', 'success');
-}
-
-// ============= WELDBOOK TAB =============
-
-function loadWeldBookPending() {
-  const listEl = document.getElementById('weldbookPendingList');
-  const btn = document.getElementById('syncWeldBookBtn');
-  
-  if (pendingWeldBookChanges.length === 0) {
-    listEl.innerHTML = '<div style="text-align:center;color:#999;padding:40px">✅ Žiadne pending zmeny</div>';
-    btn.disabled = true;
-    btn.textContent = '📤 Sync všetky (0)';
-    return;
-  }
-  
-  btn.disabled = false;
-  btn.textContent = `📤 Sync všetky (${pendingWeldBookChanges.length})`;
-  
-  let html = '';
-  pendingWeldBookChanges.forEach((change, index) => {
-    html += `<div style="background:white;border:2px solid #fcd34d;border-radius:8px;padding:15px;margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:start">
-        <div style="flex:1">
-          <div style="font-weight:700;font-size:14px;color:#333;margin-bottom:5px">
-            ${change.project} - Zvar #${change.weldId}
-          </div>
-          <div style="font-size:12px;color:#666">
-            👷 ${change.welderId} • 📅 ${change.dateWelding}
-          </div>
-          <div style="font-size:11px;color:#999;margin-top:5px">
-            ${new Date(change.timestamp).toLocaleString('sk-SK')}
-          </div>
-        </div>
-        <button onclick="deletePendingWeldBookChange(${index})" style="background:#ef4444;color:white;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:12px">
-          🗑️
-        </button>
-      </div>
-    </div>`;
-  });
-  
-  listEl.innerHTML = html;
-}
-
-function deletePendingWeldBookChange(index) {
-  if (!confirm('Zmazať túto WeldBook zmenu?')) {
-    return;
-  }
-  
-  pendingWeldBookChanges.splice(index, 1);
-  savePendingWeldBookChanges();
-  loadWeldBookPending();
-  updateWeldBookBadge();
-}
-
-function clearAllPendingWeldBook() {
-  if (!confirm(`Zmazať všetky pending WeldBook zmeny? (${pendingWeldBookChanges.length})`)) {
-    return;
-  }
-  
-  pendingWeldBookChanges = [];
-  savePendingWeldBookChanges();
-  loadWeldBookPending();
-  updateWeldBookBadge();
-  showNotification('🗑️ Všetky pending zmeny zmazané', 'success');
-}
-
-async function syncAllPendingWeldBook() {
-  if (pendingWeldBookChanges.length === 0) return;
-  
-  if (!confirm(`Synchronizovať ${pendingWeldBookChanges.length} WeldBook zmien do Firebase?`)) {
-    return;
-  }
-  
-  const btn = document.getElementById('syncWeldBookBtn');
-  if(btn) {
-    btn.disabled = true;
-    btn.textContent = '⏳ Synchronizujem...';
-  }
-  
-  let synced = 0;
-  let failed = 0;
-  
-  // ✅ Zoskup zmeny podľa projektu
-  const changesByProject = {};
-  pendingWeldBookChanges.forEach(change => {
-    if (!changesByProject[change.project]) {
-      changesByProject[change.project] = [];
-    }
-    changesByProject[change.project].push(change);
-  });
-  
-  // ✅ Spracuj každý projekt samostatne
-  for (const projectId of Object.keys(changesByProject)) {
-    try {
-      console.log('🔄 Synchronizujem projekt:', projectId);
-      
-      // Načítaj projekt z Firebase
-      const projectRef = db.collection('projects').doc(projectId);
-      const projectDoc = await projectRef.get();
-      
-      if (!projectDoc.exists) {
-        console.error('❌ Projekt neexistuje:', projectId);
-        failed += changesByProject[projectId].length;
-        continue;
-      }
-      
-      // Stiahni projekt dáta (cez chunky)
-      const meta = projectDoc.data();
-      const chunks = meta.chunks || 0;
-      let jsonString = '';
-      
-      for (let i = 0; i < chunks; i++) {
-        const chunkDoc = await projectRef.collection('data').doc('c' + i).get();
-        if (chunkDoc.exists) {
-          jsonString += chunkDoc.data().d;
-        }
-      }
-      
-      const projectData = JSON.parse(jsonString);
-      
-      // ✅ Aktualizuj WeldBook dáta
-      if (!projectData.weldBookData) {
-        projectData.weldBookData = [];
-      }
-      
-      changesByProject[projectId].forEach(change => {
-        // Nájdi existujúci zvar
-        const existingIndex = projectData.weldBookData.findIndex(
-          w => String(w.weldId) === String(change.weldId)
-        );
-        
-        if (existingIndex >= 0) {
-          // Update existujúceho
-          projectData.weldBookData[existingIndex].welderId = change.welderId;
-          projectData.weldBookData[existingIndex].dateWelding = change.dateWelding;
-          console.log('✅ Updated zvar:', change.weldId);
-        } else {
-          // Pridaj nový
-          const splitName = splitIsometricName(projectId);
-          projectData.weldBookData.push({
-            part: splitName.part,
-            isometric: splitName.isometric,
-            sheets: 1,
-            weldId: String(change.weldId),
-            welderId: change.welderId,
-            dateWelding: change.dateWelding
-          });
-          console.log('✅ Added zvar:', change.weldId);
-        }
-        
-        synced++;
-      });
-      
-      // ✅ Ulož projekt naspäť do Firebase (chunked)
-      const updatedJsonString = JSON.stringify(projectData);
-      const chunkSize = 800000;
-      const newChunks = [];
-      
-      for (let i = 0; i < updatedJsonString.length; i += chunkSize) {
-        newChunks.push(updatedJsonString.substring(i, i + chunkSize));
-      }
-      
-      // Ulož metadata
-      await projectRef.set({
-        chunks: newChunks.length,
-        size: updatedJsonString.length,
-        lastModified: new Date().toISOString(),
-        modifiedBy: window.currentUser?.username || 'unknown'
-      }, { merge: true });
-      
-      // Ulož chunky
-      for (let i = 0; i < newChunks.length; i++) {
-        await projectRef.collection('data').doc('c' + i).set({ d: newChunks[i] });
-      }
-      
-      console.log('✅ Projekt uložený:', projectId);
-      
-    } catch (error) {
-      console.error('❌ Sync failed for project:', projectId, error);
-      failed += changesByProject[projectId].length;
-    }
-  }
-  
-  // Vymaž synchronized changes
-  pendingWeldBookChanges = [];
-  savePendingWeldBookChanges();
-  
-  if (failed > 0) {
-    showNotification(`⚠️ Synchronizovaných: ${synced}, Zlyhalo: ${failed}`, 'warning');
-  } else {
-    showNotification(`✅ ${synced} WeldBook zmien synchronizovaných!`, 'success');
-  }
-  
-  loadWeldBookPending();
-  updateWeldBookBadge();
-  
-  if(btn) {
-    btn.disabled = false;
-    btn.textContent = `📤 Sync všetky (0)`;
-  }
-}
-
-// Sync tlačidlo v ribbonu
-// Sync tlačidlo v ribbonu (REAL implementácia)
-window.syncWeldBookPendingReal = function() {
-  window.openLibraryManagerReal();
-  switchLibraryTab('weldbook');
-}
-
-// Aktualizuj badges na záložkách
-function updateLibraryTabBadges() {
-  const offlineCount = listOfflineProjects().length;
-  const weldbookCount = pendingWeldBookChanges.length;
-  
-  const offlineTabBadge = document.getElementById('offlineTabBadge');
-  const weldbookTabBadge = document.getElementById('weldbookTabBadge');
-  
-  if (offlineCount > 0 && offlineTabBadge) {
-    offlineTabBadge.textContent = offlineCount;
-    offlineTabBadge.style.display = 'inline';
-  } else if (offlineTabBadge) {
-    offlineTabBadge.style.display = 'none';
-  }
-  
-  if (weldbookCount > 0 && weldbookTabBadge) {
-    weldbookTabBadge.textContent = weldbookCount;
-    weldbookTabBadge.style.display = 'inline';
-  } else if (weldbookTabBadge) {
-    weldbookTabBadge.style.display = 'none';
-  }
-}
-
-// Inicializuj badges
-setTimeout(() => {
-  updateLibraryTabBadges();
-  updateOfflineBadge();
-  updateWeldBookBadge();
-}, 1000);
-
-function openOfflineProjectFromList(projectId){
-console.log('📱 Otváram offline projekt:', projectId);
-
-// ✅ Použiť moju novú funkciu loadOfflineProject()
-const result = loadOfflineProject(projectId);
-
-if(!result.success){
-alert('❌ Chyba: ' + result.error);
+if(offlineProjects.length===0){
+listEl.innerHTML='<div style="text-align:center;color:#999;padding:40px">📭 Žiadne offline projekty<br><small style="color:#bbb">Najprv stiahni projekty cez "📦 Offline balík"</small></div>';
 return;
 }
 
-const stored = result.data;
-const data = stored.data;
+let html='';
+offlineProjects.forEach(proj=>{
+const meta=proj.data.projectMeta||{};
+const name=meta.name||proj.id;
+const date=meta.date?new Date(meta.date).toLocaleDateString('sk-SK'):'';
+const size=JSON.stringify(proj.data).length;
+html+=`<div class="offline-mode-project" style="background:#e0e7ff;border:2px solid #8b5cf6;border-radius:8px;padding:15px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+<div style="flex:1;cursor:pointer" onclick="loadOfflineProject('${proj.id}')">
+<div style="font-weight:700;font-size:15px;color:#333">${name} <span style="background:#8b5cf6;color:white;padding:2px 8px;border-radius:4px;font-size:11px">📱 OFFLINE</span></div>
+<div style="font-size:12px;color:#666">${(size/1024).toFixed(1)} KB${date?' • '+date:''}</div>
+</div>
+<button onclick="event.stopPropagation();deleteOfflineProject('${proj.id}','${name}')" style="background:#ef4444;color:white;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:bold">🗑️ Zmazať</button>
+</div>`;
+});
 
-console.log('✅ Projekt načítaný:', projectId);
-console.log('   welds:', data.welds?.length || 0);
-console.log('   pdfData:', !!data.pdfData);
-
-// Načítaj PDF data
-if(data.pdfData){
-pd = data.pdfData;
-loadImageFromData(pd);
-originalFileName = projectId;
-document.getElementById('fileName').textContent = projectId;
+listEl.innerHTML=html;
 }
 
-// Načítaj zvary a ostatné dáta
-if(data.welds) ws = data.welds;
-if(data.lines) lines = data.lines;
-if(data.texts) texts = data.texts;
-if(data.arrows) arrows = data.arrows;
-if(data.curves) curves = data.curves;
-if(data.crosses) crosses = data.crosses;
-if(data.spools) spools = data.spools;
-if(data.dimensions) dimensions = data.dimensions;
-if(data.spoolData) spoolData = data.spoolData;
-if(data.weldBookData) weldBookData = data.weldBookData;
-if(data.kontrolaData) kontrolaData = data.kontrolaData;
-if(data.currentNumber) cn = data.currentNumber;
-if(data.startNumber) startNum = data.startNumber;
-
-// Enable tlačidlá
-document.getElementById('savetolibrary').disabled=false;
-document.getElementById('saveproj').disabled=false;
-document.getElementById('savepdf').disabled=false;
-document.getElementById('cl').disabled=false;
-
-// Zavri modal
-closeOfflineModeModal();
-
-// Vykresli
-dw();
-showNotification('✅ Offline projekt načítaný: ' + projectId, 'success');
-}
-
-function deleteOfflineProjectFromList(projectId){
-if(!confirm('Zmazať offline projekt "'+projectId+'"?\\n\\nUvoľní sa miesto v localStorage.')){
+function deleteOfflineProject(projectId,projectName){
+if(!confirm('Zmazať offline projekt "'+projectName+'"?\\n\\nUvoľní sa miesto v localStorage.')){
 return;
 }
-deleteOfflineProject(projectId); // Moja nová funkcia
-loadOfflineModeProjects(); // Refresh
-showNotification('🗑️ Projekt zmazaný', 'success');
+localStorage.removeItem('offline_project_'+projectId);
+console.log('🗑️ Offline projekt zmazaný:',projectId);
+loadOfflineModeProjects(); // Refresh zoznamu
+showNotification('🗑️ Projekt zmazaný z offline úložiska','success');
 }
 
 function filterOfflineModeProjects(){
@@ -12842,58 +12098,37 @@ const btn=document.getElementById('downloadOfflineBtn');
 btn.disabled=true;
 let downloaded=0;
 let failed=0;
-let totalSavings=0;
-
 for(const projectId of selectedProjects){
 try{
 btn.textContent=`⏳ Sťahujem... (${downloaded+1}/${selectedProjects.size})`;
-
-// Stiahni z Firebase
 const projectData=await downloadProjectFromFirebase(projectId);
-
-// ✅ Ulož s komprimáciou!
-const result = saveOfflineProject(projectId, projectData);
-
-if(result.success){
+const dataToStore=JSON.stringify({id:projectId,data:projectData,downloadedAt:new Date().toISOString()});
+try{
+localStorage.setItem('offline_project_'+projectId,dataToStore);
 downloaded++;
-totalSavings += parseFloat(result.savings);
 const item=document.querySelector(`.offline-project-item[data-id="${projectId}"]`);
-if(item){
-item.style.background='#d1fae5';
-item.style.borderColor='#10b981';
-}
-} else {
-console.error('❌ Uloženie zlyhalo:', result.error);
-if(result.error.includes('localStorage je plný')){
-showNotification('⚠️ localStorage plný! Stiahnuté: '+downloaded,'warning');
+if(item){item.style.background='#d1fae5';item.style.borderColor='#10b981';}
+}catch(storageError){
+if(storageError.name==='QuotaExceededError'){
+console.error('❌ Kapacita naplnená!');
+showNotification('⚠️ Kapacita naplnená! Stiahnuté: '+downloaded,'warning');
 failed++;
 break;
 }
-failed++;
+throw storageError;
 }
-
 await new Promise(r=>setTimeout(r,300));
-}catch(error){
-console.error('❌ Chyba pri sťahovaní:',projectId,error);
-failed++;
+}catch(error){console.error('❌ Chyba pri sťahovaní:',projectId,error);failed++;}
 }
-}
-
 btn.disabled=false;
 btn.textContent=`⬇️ Stiahnuť (0)`;
 selectedProjects.clear();
 deselectAllProjects();
-
-// Zobraz výsledok
-const avgSavings = downloaded > 0 ? (totalSavings / downloaded).toFixed(1) : 0;
 if(failed>0){
 showNotification(`⚠️ Stiahnuté: ${downloaded}, Zlyhalo: ${failed}`,'warning');
 }else{
-showNotification(`✅ ${downloaded} projektov stiahnutých! 🗜️ Priemer ${avgSavings}% úspora`,'success');
+showNotification(`✅ ${downloaded} projektov stiahnutých!`,'success');
 }
-
-// Refresh zoznamu
-loadProjectsForOffline();
 }
 
 // 🚪 LOGOUT funkcia
@@ -12906,155 +12141,20 @@ function logout() {
 }
 
 // ==========================================
-// 📦 OFFLINE STORAGE - Komprimované ukladanie
+// 📦 OFFLINE SYSTÉM - PRIDANÉ BEZ ZMENY ORIGINÁLNEJ LOGIKY
 // ==========================================
 
-// Uložiť projekt do localStorage (komprimovaný)
-function saveOfflineProject(projectId, projectData) {
-  try {
-    const dataObject = {
-      id: projectId,
-      data: projectData,
-      savedAt: new Date().toISOString()
-    };
-    
-    const jsonString = JSON.stringify(dataObject);
-    const originalSize = jsonString.length;
-    
-    // Komprimuj pomocou pako.js
-    if (typeof pako !== 'undefined') {
-      const compressed = pako.gzip(jsonString);
-      const base64 = btoa(String.fromCharCode.apply(null, compressed));
-      const dataToStore = 'GZIP:' + base64;
-      
-      localStorage.setItem('offline_project_' + projectId, dataToStore);
-      
-      const compressedSize = dataToStore.length;
-      const savings = ((1 - compressedSize/originalSize) * 100).toFixed(1);
-      console.log('🗜️ Projekt uložený:', originalSize, '→', compressedSize, 'bytes (', savings, '% úspora)');
-      
-      return {success: true, originalSize, compressedSize, savings};
-    } else {
-      // Fallback - nekomprimované
-      localStorage.setItem('offline_project_' + projectId, jsonString);
-      console.warn('⚠️ Pako.js nedostupný - ukladám nekomprimované');
-      return {success: true, originalSize, compressedSize: originalSize, savings: 0};
-    }
-  } catch (e) {
-    console.error('❌ Chyba pri ukladaní projektu:', e);
-    if (e.name === 'QuotaExceededError') {
-      alert('❌ localStorage je plný! (max 10 MB)\n\nZmažte staré offline projekty.');
-    }
-    return {success: false, error: e.message};
-  }
-}
-
-// Načítať projekt z localStorage (dekomprimovať)
-function loadOfflineProject(projectId) {
-  try {
-    const rawData = localStorage.getItem('offline_project_' + projectId);
-    if (!rawData) {
-      return {success: false, error: 'Projekt nenájdený'};
-    }
-    
-    // Dekomprimuj ak je komprimované
-    if (rawData.startsWith('GZIP:')) {
-      console.log('🗜️ Dekomprimujem projekt...');
-      const base64 = rawData.substring(5);
-      const binaryString = atob(base64);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      const decompressed = pako.ungzip(bytes, {to: 'string'});
-      const data = JSON.parse(decompressed);
-      console.log('✅ Dekomprimácia úspešná');
-      return {success: true, data};
-    } else {
-      // Nekomprimované (starý formát)
-      const data = JSON.parse(rawData);
-      return {success: true, data};
-    }
-  } catch (e) {
-    console.error('❌ Chyba pri načítaní projektu:', e);
-    return {success: false, error: e.message};
-  }
-}
-
-// Zoznam všetkých offline projektov
-function listOfflineProjects() {
-  const projects = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith('offline_project_')) {
-      const projectId = key.replace('offline_project_', '');
-      const size = localStorage.getItem(key).length;
-      projects.push({
-        id: projectId,
-        size: size,
-        compressed: localStorage.getItem(key).startsWith('GZIP:')
-      });
-    }
-  }
-  return projects;
-}
-
-// Vymazať offline projekt
-function deleteOfflineProject(projectId) {
-  localStorage.removeItem('offline_project_' + projectId);
-  console.log('🗑️ Offline projekt zmazaný:', projectId);
-}
-
-// Info o kapacite localStorage
-function getStorageInfo() {
-  let total = 0;
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key) {
-      total += localStorage.getItem(key).length;
-    }
-  }
-  
-  const maxSize = 10 * 1024 * 1024; // 10 MB
-  const used = total;
-  const free = maxSize - used;
-  const usedPercent = ((used / maxSize) * 100).toFixed(1);
-  
-  return {
-    total: maxSize,
-    used: used,
-    free: free,
-    usedPercent: usedPercent,
-    usedMB: (used / 1024 / 1024).toFixed(2),
-    freeMB: (free / 1024 / 1024).toFixed(2)
-  };
-}
-
-console.log('📦 Offline storage ready!');
-console.log('💾 Kapacita:', getStorageInfo().usedMB + ' MB / 10 MB použité');
-
-// ==========================================
-// 🔄 AUTO-SAVE & PENDING CHANGES
-// ==========================================
-
-let autoSaveTimeout = null;
 let currentOfflineProjectId = null;
+let autoSaveTimeout = null;
+let pendingWeldBookChanges = [];
 
-// Auto-save aktuálneho projektu (s debounce)
+// Auto-save (volá sa z rôznych miest)
 function autoSaveCurrentProject() {
-  // Zruš predošlý timeout
-  if (autoSaveTimeout) {
-    clearTimeout(autoSaveTimeout);
-  }
+  if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
   
-  // Čakaj 500ms pred uložením (debounce)
   autoSaveTimeout = setTimeout(() => {
-    if (!currentOfflineProjectId) {
-      console.log('⚠️ Žiadny offline projekt otvorený - neukládám');
-      return;
-    }
+    if (!currentOfflineProjectId) return;
     
-    // Zbali aktuálny stav
     const projectData = {
       welds: ws || [],
       lines: lines || [],
@@ -13072,100 +12172,118 @@ function autoSaveCurrentProject() {
       pdfData: pd
     };
     
-    // Ulož do offline knižnice
     const result = saveOfflineProject(currentOfflineProjectId, projectData);
-    
     if (result.success) {
-      console.log('💾 Auto-save:', currentOfflineProjectId, '-', result.savings, '% úspora');
-      updateOfflineBadge(); // Aktualizuj badge
-    } else {
-      console.error('❌ Auto-save zlyhal:', result.error);
+      console.log('💾 Auto-save:', currentOfflineProjectId);
     }
-  }, 500); // Debounce 500ms
+  }, 500);
 }
 
-// Pending WeldBook changes
-let pendingWeldBookChanges = [];
-
-// Načítaj pending changes z localStorage
-function loadPendingWeldBookChanges() {
-  const stored = localStorage.getItem('pending_weldbook');
-  if (stored) {
-    try {
-      pendingWeldBookChanges = JSON.parse(stored);
-      console.log('📊 Pending WeldBook changes:', pendingWeldBookChanges.length);
-      updateWeldBookBadge();
-    } catch (e) {
-      console.error('❌ Chyba pri načítaní pending WeldBook:', e);
-      pendingWeldBookChanges = [];
-    }
-  }
-}
-
-// Ulož pending changes do localStorage
-function savePendingWeldBookChanges() {
-  localStorage.setItem('pending_weldbook', JSON.stringify(pendingWeldBookChanges));
-}
-
-// Pridaj zmenu do pending WeldBook
+// Pridaj WeldBook zmenu do pending
 function addPendingWeldBookChange(change) {
-  // Skontroluj či už neexistuje (update namiesto duplicate)
+  loadPendingWeldBookChanges();
+  
   const existingIndex = pendingWeldBookChanges.findIndex(
     c => c.project === change.project && c.weldId === change.weldId
   );
   
   if (existingIndex >= 0) {
-    // Update existujúceho
     pendingWeldBookChanges[existingIndex] = change;
-    console.log('📝 WeldBook change updated:', change.weldId);
   } else {
-    // Pridaj nový
     pendingWeldBookChanges.push(change);
-    console.log('➕ WeldBook change added:', change.weldId);
   }
   
   savePendingWeldBookChanges();
-  updateWeldBookBadge();
+  console.log('📊 WeldBook change added:', change.weldId);
 }
 
-// Aktualizuj badge pre pending WeldBook
-function updateWeldBookBadge() {
-  const count = pendingWeldBookChanges.length;
-  const badge = document.getElementById('weldBookSyncBadge');
-  const btn = document.getElementById('weldBookSyncBtn');
-  
-  if (count > 0) {
-    if (badge) {
-      badge.textContent = count;
-      badge.style.display = 'inline';
+function loadPendingWeldBookChanges() {
+  const stored = localStorage.getItem('pending_weldbook');
+  if (stored) {
+    try {
+      pendingWeldBookChanges = JSON.parse(stored);
+    } catch (e) {
+      pendingWeldBookChanges = [];
     }
-    if (btn) {
-      btn.style.display = 'inline-block';
-      btn.textContent = `📤 Sync WeldBook (${count})`;
-    }
-  } else {
-    if (badge) badge.style.display = 'none';
-    if (btn) btn.style.display = 'none';
   }
 }
 
-// Aktualizuj badge pre offline projekty
-function updateOfflineBadge() {
-  const projects = listOfflineProjects();
-  const badge = document.getElementById('offlineBadge');
-  
-  if (projects.length > 0 && badge) {
-    badge.textContent = projects.length;
-    badge.style.display = 'inline';
-  } else if (badge) {
-    badge.style.display = 'none';
+function savePendingWeldBookChanges() {
+  localStorage.setItem('pending_weldbook', JSON.stringify(pendingWeldBookChanges));
+}
+
+// Kompresia/dekompresia
+function saveOfflineProject(projectId, projectData) {
+  try {
+    const dataObject = {
+      id: projectId,
+      data: projectData,
+      savedAt: new Date().toISOString()
+    };
+    
+    const jsonString = JSON.stringify(dataObject);
+    const originalSize = jsonString.length;
+    
+    if (typeof pako !== 'undefined') {
+      const compressed = pako.gzip(jsonString);
+      const base64 = btoa(String.fromCharCode.apply(null, compressed));
+      const dataToStore = 'GZIP:' + base64;
+      
+      localStorage.setItem('offline_project_' + projectId, dataToStore);
+      
+      const compressedSize = dataToStore.length;
+      const savings = ((1 - compressedSize/originalSize) * 100).toFixed(1);
+      
+      return {success: true, originalSize, compressedSize, savings};
+    } else {
+      localStorage.setItem('offline_project_' + projectId, jsonString);
+      return {success: true, originalSize, compressedSize: originalSize, savings: 0};
+    }
+  } catch (e) {
+    console.error('❌ Save failed:', e);
+    return {success: false, error: e.message};
   }
 }
 
-// Inicializuj pri načítaní
+function loadOfflineProject(projectId) {
+  try {
+    const rawData = localStorage.getItem('offline_project_' + projectId);
+    if (!rawData) {
+      return {success: false, error: 'Not found'};
+    }
+    
+    if (rawData.startsWith('GZIP:')) {
+      const base64 = rawData.substring(5);
+      const compressedData = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+      const decompressed = pako.ungzip(compressedData, { to: 'string' });
+      return {success: true, data: JSON.parse(decompressed)};
+    } else {
+      return {success: true, data: JSON.parse(rawData)};
+    }
+  } catch (e) {
+    return {success: false, error: e.message};
+  }
+}
+
+function listOfflineProjects() {
+  const projects = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith('offline_project_')) {
+      const id = key.replace('offline_project_', '');
+      const data = localStorage.getItem(key);
+      projects.push({
+        id: id,
+        size: data.length,
+        compressed: data.startsWith('GZIP:')
+      });
+    }
+  }
+  return projects;
+}
+
+console.log('📦 Offline systém pripravený');
 loadPendingWeldBookChanges();
-updateOfflineBadge();
-
 </script>
 
 
@@ -13286,97 +12404,49 @@ updateOfflineBadge();
 </div>
 
 <!-- OFFLINE PACKAGE MODAL -->
-<div id="libraryManagerModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000" onclick="if(event.target.id==='libraryManagerModal')closeLibraryManager()">
-<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.4);width:90%;max-width:900px;max-height:90%;display:flex;flex-direction:column" onclick="event.stopPropagation()">
-
-<!-- Header -->
-<div style="padding:25px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center">
+<div id="offlinePackageModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000" onclick="if(event.target.id==='offlinePackageModal')closeOfflinePackage()">
+<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.4);width:90%;max-width:700px;max-height:85%;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+<div style="padding:25px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center">
 <div>
-<h2 style="margin:0;color:white;font-size:24px">📚 Manažér knižníc</h2>
-<p style="margin:5px 0 0 0;color:rgba(255,255,255,0.9);font-size:13px">Spravuj online a offline projekty</p>
+<h2 style="margin:0;color:white;font-size:24px">📦 Pripraviť projekty pre offline</h2>
+<p style="margin:5px 0 0 0;color:rgba(255,255,255,0.9);font-size:13px">Stiahni projekty do prehliadača pre prácu bez internetu</p>
 </div>
-<button onclick="closeLibraryManager()" style="background:transparent;border:none;font-size:32px;cursor:pointer;color:white;padding:5px 10px">✕</button>
-</div>
-
-<!-- Tabs -->
-<div style="display:flex;background:#f3f4f6;border-bottom:2px solid #e5e7eb">
-<button onclick="switchLibraryTab('online')" id="tabOnline" style="flex:1;padding:15px;background:white;border:none;border-bottom:3px solid #6366f1;cursor:pointer;font-weight:700;font-size:14px;color:#6366f1">
-📚 Online knižnica
-</button>
-<button onclick="switchLibraryTab('offline')" id="tabOffline" style="flex:1;padding:15px;background:#f3f4f6;border:none;border-bottom:3px solid transparent;cursor:pointer;font-weight:600;font-size:14px;color:#6b7280">
-📦 Offline knižnica
-<span id="offlineTabBadge" style="display:none;background:#ef4444;color:white;padding:2px 6px;border-radius:4px;font-size:11px;margin-left:5px"></span>
-</button>
-<button onclick="switchLibraryTab('weldbook')" id="tabWeldbook" style="flex:1;padding:15px;background:#f3f4f6;border:none;border-bottom:3px solid transparent;cursor:pointer;font-weight:600;font-size:14px;color:#6b7280">
-📊 WeldBook Pending
-<span id="weldbookTabBadge" style="display:none;background:#ef4444;color:white;padding:2px 6px;border-radius:4px;font-size:11px;margin-left:5px"></span>
-</button>
+<button onclick="closeOfflinePackage()" style="background:transparent;border:none;font-size:32px;cursor:pointer;color:white;padding:5px 10px">✕</button>
 </div>
 
-<!-- Tab Content -->
-<div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
-
-<!-- ONLINE TAB -->
-<div id="onlineTab" style="flex:1;display:flex;flex-direction:column">
-<div style="padding:20px;background:#dbeafe;border-bottom:1px solid #bfdbfe">
-<div style="font-size:13px;color:#1e40af">
-<strong>☁️ Firebase knižnica:</strong> Originálne projekty. Stiahni ich pre offline prácu.
-</div>
-</div>
-<div style="padding:15px 20px;background:#f5f5f5;border-bottom:1px solid #e5e7eb">
-<input type="text" id="onlineSearch" placeholder="🔍 Hľadať projekt..." style="width:100%;padding:12px;border:2px solid #e5e7eb;border-radius:8px;font-size:14px" oninput="filterOnlineProjects()">
-</div>
-<div id="onlineProjectsList" style="flex:1;overflow-y:auto;padding:20px">
-<div style="text-align:center;color:#999;padding:40px">⏳ Načítavam...</div>
-</div>
-<div style="padding:15px 20px;background:#f9fafb;border-top:2px solid #e5e7eb">
-<div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:13px;color:#666">
-<div><strong id="onlineSelectedCount">0</strong> vybraných</div>
-<div>Voľné: <strong id="availableSpace">10 MB</strong></div>
-</div>
-<div style="display:flex;gap:10px">
-<button onclick="selectAllOnline()" style="flex:1;background:#6b7280;color:white;border:none;padding:10px;border-radius:6px;cursor:pointer">☑️ Všetky</button>
-<button onclick="deselectAllOnline()" style="flex:1;background:#6b7280;color:white;border:none;padding:10px;border-radius:6px;cursor:pointer">☐ Zrušiť</button>
-<button onclick="downloadSelectedToOffline()" id="downloadBtn" style="flex:2;background:#6366f1;color:white;border:none;padding:12px;border-radius:6px;cursor:pointer;font-weight:700" disabled>⬇️ Stiahnuť (0)</button>
-</div>
-</div>
-</div>
-
-<!-- OFFLINE TAB -->
-<div id="offlineTab" style="flex:1;display:none;flex-direction:column">
 <div style="padding:20px;background:#fef3c7;border-bottom:1px solid #fcd34d">
 <div style="font-size:13px;color:#78350f">
-<strong>📦 Pracovná knižnica:</strong> Tvoje zmeny sa ukladajú sem. Upload do online kedy chceš TY.
+<strong>💡 Tip:</strong> Vyber projekty ktoré budeš potrebovať na stavbe. Budú uložené v prehliadači a dostupné aj bez internetu.
 </div>
 </div>
+
 <div style="padding:15px 20px;background:#f5f5f5;border-bottom:1px solid #e5e7eb">
-<input type="text" id="offlineSearch" placeholder="🔍 Hľadať projekt..." style="width:100%;padding:12px;border:2px solid #e5e7eb;border-radius:8px;font-size:14px" oninput="filterOfflineProjects2()">
-</div>
-<div id="offlineProjectsList2" style="flex:1;overflow-y:auto;padding:20px">
-<div style="text-align:center;color:#999;padding:40px">📭 Žiadne offline projekty</div>
-</div>
+<input type="text" id="offlinePackageSearch" placeholder="🔍 Hľadať projekt..." style="width:100%;padding:12px;border:2px solid #e5e7eb;border-radius:8px;font-size:14px" oninput="filterOfflineProjects()">
 </div>
 
-<!-- WELDBOOK TAB -->
-<div id="weldbookTab" style="flex:1;display:none;flex-direction:column">
-<div style="padding:20px;background:#fee2e2;border-bottom:1px solid #fecaca">
-<div style="font-size:13px;color:#991b1b">
-<strong>📊 Pending zmeny:</strong> Tieto WeldBook zmeny čakajú na synchronizáciu.
+<div id="offlineProjectsList" style="flex:1;overflow-y:auto;padding:20px">
+<div style="text-align:center;color:#999;padding:40px">⏳ Načítavam projekty...</div>
 </div>
-</div>
-<div id="weldbookPendingList" style="flex:1;overflow-y:auto;padding:20px">
-<div style="text-align:center;color:#999;padding:40px">✅ Žiadne pending zmeny</div>
-</div>
+
 <div style="padding:15px 20px;background:#f9fafb;border-top:2px solid #e5e7eb">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+<div style="font-size:14px;color:#666">
+<strong id="selectedCount">0 projektov</strong> vybraných
+<span id="selectedSize" style="margin-left:10px;color:#999">(0 KB)</span>
+</div>
+<div style="font-size:12px;color:#999">
+Voľné: <span id="availableSpace">~10 MB</span>
+</div>
+</div>
+<div style="display:flex;gap:10px;margin-bottom:10px">
+<button onclick="selectAllProjects()" style="flex:1;background:#6b7280;color:white;border:none;padding:10px;border-radius:6px;cursor:pointer;font-size:13px">☑️ Vybrať všetky</button>
+<button onclick="deselectAllProjects()" style="flex:1;background:#6b7280;color:white;border:none;padding:10px;border-radius:6px;cursor:pointer;font-size:13px">☐ Zrušiť výber</button>
+</div>
 <div style="display:flex;gap:10px">
-<button onclick="clearAllPendingWeldBook()" style="flex:1;background:#6b7280;color:white;border:none;padding:12px;border-radius:6px;cursor:pointer">🗑️ Zmazať všetky</button>
-<button onclick="syncAllPendingWeldBook()" id="syncWeldBookBtn" style="flex:2;background:#f59e0b;color:white;border:none;padding:12px;border-radius:6px;cursor:pointer;font-weight:700" disabled>📤 Sync všetky (0)</button>
+<button onclick="closeOfflinePackage()" style="flex:1;background:#6b7280;color:white;border:none;padding:14px;border-radius:8px;cursor:pointer;font-weight:600">Zrušiť</button>
+<button onclick="downloadSelectedProjects()" id="downloadOfflineBtn" style="flex:2;background:#f59e0b;color:white;border:none;padding:14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:15px" disabled>⬇️ Stiahnuť vybrané (0)</button>
 </div>
 </div>
-</div>
-
-</div>
-
 </div>
 </div>
 
