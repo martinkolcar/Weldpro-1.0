@@ -11311,6 +11311,12 @@ const badge=document.getElementById('pendingSyncCount');
 const syncBtn=document.getElementById('syncBtn');
 const detailsBtn=document.getElementById('detailsBtn');
 
+// ✅ Null check - staré tlačidlá už neexistujú
+if(!badge || !syncBtn || !detailsBtn){
+  console.log('⚠️ Staré offline tlačidlá neexistujú - skipujem updateSyncBadge');
+  return;
+}
+
 if(pendingChanges.length>0){
 badge.textContent=pendingChanges.length+' zmien';
 badge.style.display='inline-block';
@@ -12198,7 +12204,7 @@ function openOfflineProjectFromList2(projectId) {
       document.getElementById('undo').disabled = false;
       
       // Vykresli zvary a ostatné
-      render();
+      dw();
       showNotification('✅ Offline projekt načítaný: ' + projectId, 'success');
     };
     img.src = pd;
@@ -12503,7 +12509,7 @@ document.getElementById('cl').disabled=false;
 closeOfflineModeModal();
 
 // Vykresli
-render();
+dw();
 showNotification('✅ Offline projekt načítaný: ' + projectId, 'success');
 }
 
