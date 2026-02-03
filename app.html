@@ -12151,7 +12151,39 @@ function openOfflineProjectFromList2(projectId) {
   // Načítaj PDF data
   if (data.pdfData) {
     pd = data.pdfData;
-    loadImageFromData(pd);
+    
+    // Vytvor Image objekt a načítaj PDF
+    const img = new Image();
+    img.onload = function() {
+      ca.width = img.width;
+      ca.height = img.height;
+      ov.setAttribute('width', img.width);
+      ov.setAttribute('height', img.height);
+      ct.imageSmoothingEnabled = false;
+      ct.drawImage(img, 0, 0);
+      
+      // Skry upload, zobraz canvas
+      document.getElementById('up').style.display = 'none';
+      document.getElementById('cw').style.display = 'block';
+      document.getElementById('zoomInfo').style.display = 'block';
+      
+      // Enable tlačidlá
+      document.getElementById('zi').disabled = false;
+      document.getElementById('zo').disabled = false;
+      document.getElementById('zr').disabled = false;
+      document.getElementById('savepdf').disabled = false;
+      document.getElementById('savetolibrary').disabled = false;
+      document.getElementById('saveproj').disabled = false;
+      document.getElementById('cl').disabled = false;
+      document.getElementById('selectbtn').disabled = false;
+      document.getElementById('undo').disabled = false;
+      
+      // Vykresli zvary a ostatné
+      render();
+      showNotification('✅ Offline projekt načítaný: ' + projectId, 'success');
+    };
+    img.src = pd;
+    
     document.getElementById('fileName').textContent = projectId;
   }
   
@@ -12170,18 +12202,8 @@ function openOfflineProjectFromList2(projectId) {
   cn = data.currentNumber || 1;
   startNum = data.startNumber || 1;
   
-  // Enable tlačidlá
-  document.getElementById('savetolibrary').disabled = false;
-  document.getElementById('saveproj').disabled = false;
-  document.getElementById('savepdf').disabled = false;
-  document.getElementById('cl').disabled = false;
-  
   // Zavri modal
   closeLibraryManager();
-  
-  // Vykresli
-  render();
-  showNotification('✅ Offline projekt načítaný: ' + projectId, 'success');
 }
 
 function deleteOfflineProjectFromList2(projectId) {
