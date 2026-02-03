@@ -12381,29 +12381,112 @@ async function syncAllPendingWeldBook() {
   }
   
   const btn = document.getElementById('syncWeldBookBtn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Synchronizujem...';
+  if(btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Synchronizujem...';
+  }
   
   let synced = 0;
   let failed = 0;
   
-  for (const change of pendingWeldBookChanges) {
+  // ✅ Zoskup zmeny podľa projektu
+  const changesByProject = {};
+  pendingWeldBookChanges.forEach(change => {
+    if (!changesByProject[change.project]) {
+      changesByProject[change.project] = [];
+    }
+    changesByProject[change.project].push(change);
+  });
+  
+  // ✅ Spracuj každý projekt samostatne
+  for (const projectId of Object.keys(changesByProject)) {
     try {
-      const docId = change.project + '_' + change.weldId;
+      console.log('🔄 Synchronizujem projekt:', projectId);
       
-      await db.collection('weldbook').doc(docId).set({
-        weldId: change.weldId,
-        welderId: change.welderId,
-        dateWelding: change.dateWelding,
-        project: change.project,
-        syncedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        syncedBy: window.currentUser?.username || 'unknown'
+      // Načítaj projekt z Firebase
+      const projectRef = db.collection('projects').doc(projectId);
+      const projectDoc = await projectRef.get();
+      
+      if (!projectDoc.exists) {
+        console.error('❌ Projekt neexistuje:', projectId);
+        failed += changesByProject[projectId].length;
+        continue;
+      }
+      
+      // Stiahni projekt dáta (cez chunky)
+      const meta = projectDoc.data();
+      const chunks = meta.chunks || 0;
+      let jsonString = '';
+      
+      for (let i = 0; i < chunks; i++) {
+        const chunkDoc = await projectRef.collection('data').doc('c' + i).get();
+        if (chunkDoc.exists) {
+          jsonString += chunkDoc.data().d;
+        }
+      }
+      
+      const projectData = JSON.parse(jsonString);
+      
+      // ✅ Aktualizuj WeldBook dáta
+      if (!projectData.weldBookData) {
+        projectData.weldBookData = [];
+      }
+      
+      changesByProject[projectId].forEach(change => {
+        // Nájdi existujúci zvar
+        const existingIndex = projectData.weldBookData.findIndex(
+          w => String(w.weldId) === String(change.weldId)
+        );
+        
+        if (existingIndex >= 0) {
+          // Update existujúceho
+          projectData.weldBookData[existingIndex].welderId = change.welderId;
+          projectData.weldBookData[existingIndex].dateWelding = change.dateWelding;
+          console.log('✅ Updated zvar:', change.weldId);
+        } else {
+          // Pridaj nový
+          const splitName = splitIsometricName(projectId);
+          projectData.weldBookData.push({
+            part: splitName.part,
+            isometric: splitName.isometric,
+            sheets: 1,
+            weldId: String(change.weldId),
+            welderId: change.welderId,
+            dateWelding: change.dateWelding
+          });
+          console.log('✅ Added zvar:', change.weldId);
+        }
+        
+        synced++;
       });
       
-      synced++;
+      // ✅ Ulož projekt naspäť do Firebase (chunked)
+      const updatedJsonString = JSON.stringify(projectData);
+      const chunkSize = 800000;
+      const newChunks = [];
+      
+      for (let i = 0; i < updatedJsonString.length; i += chunkSize) {
+        newChunks.push(updatedJsonString.substring(i, i + chunkSize));
+      }
+      
+      // Ulož metadata
+      await projectRef.set({
+        chunks: newChunks.length,
+        size: updatedJsonString.length,
+        lastModified: new Date().toISOString(),
+        modifiedBy: window.currentUser?.username || 'unknown'
+      }, { merge: true });
+      
+      // Ulož chunky
+      for (let i = 0; i < newChunks.length; i++) {
+        await projectRef.collection('data').doc('c' + i).set({ d: newChunks[i] });
+      }
+      
+      console.log('✅ Projekt uložený:', projectId);
+      
     } catch (error) {
-      console.error('❌ Sync failed:', change, error);
-      failed++;
+      console.error('❌ Sync failed for project:', projectId, error);
+      failed += changesByProject[projectId].length;
     }
   }
   
@@ -12419,6 +12502,11 @@ async function syncAllPendingWeldBook() {
   
   loadWeldBookPending();
   updateWeldBookBadge();
+  
+  if(btn) {
+    btn.disabled = false;
+    btn.textContent = `📤 Sync všetky (0)`;
+  }
 }
 
 // Sync tlačidlo v ribbonu
