@@ -2435,12 +2435,16 @@ var hasWelder = false;
 if(weldBookData && weldBookData.length > 0){
 for(var wbi=0; wbi<weldBookData.length; wbi++){
 var wbEntry = weldBookData[wbi];
-// Match podľa weldId (nie weldNumber!)
-if(String(wbEntry.weldId) === String(w.displayNum)){
+// ✅ KRITICKÁ OPRAVA - Match podľa weldId A isometric!
+var isThisWeld = String(wbEntry.weldId) === String(w.displayNum);
+var isThisIsometric = wbEntry.isometric === originalFileName || 
+                       wbEntry.isometric === (originalFileName || '').replace(/\.[^/.]+$/, '');
+                       
+if(isThisWeld && isThisIsometric){
 // Check či má vyplneného zvarača (welderId nie welder!)
 if(wbEntry.welderId && wbEntry.welderId.trim() !== ''){
 hasWelder = true;
-console.log('✅ MONTÁŽ: Zvar',w.displayNum,'má zvarača:',wbEntry.welderId);
+console.log('✅ MONTÁŽ: Zvar',w.displayNum,'izometria:',originalFileName,'má zvarača:',wbEntry.welderId);
 break;
 }
 }
@@ -10206,9 +10210,11 @@ async function loadFromLibraryFirebase(projectName) {
     arrows = [];
     texts = [];
     curves = [];
-    spoolData = [];
+    spoolData = {};
     weldLogMaterials = [];
     weldAssignments = {};
+    weldBookData = [];  // ✅ VYČISTI WeldBook!
+    kontrolaData = {};
     
     ws = projectData.welds || [];
     spools = projectData.spools || [];
@@ -10218,11 +10224,14 @@ async function loadFromLibraryFirebase(projectName) {
     arrows = projectData.arrows || [];
     texts = projectData.texts || [];
     curves = projectData.curves || [];
+    weldBookData = projectData.weldBookData || [];  // ✅ Načítaj WeldBook TOHTO projektu!
+    kontrolaData = projectData.kontrolaData || {};
+    spoolData = projectData.spoolData || {};
     cn = projectData.currentNumber || 1;
     startNum = projectData.startNumber || 1;
     originalFileName = projectData.projectName || 'zvary';
     
-    console.log('🔵 Data loaded, welds:', ws.length);
+    console.log('🔵 Data loaded, welds:', ws.length, 'weldBook:', weldBookData.length);
     
     if (projectData.pdfData) {
       console.log('🔵 Loading PDF...');
