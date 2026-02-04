@@ -12409,7 +12409,8 @@ function saveOfflineProject(projectId, projectData) {
   }
 }
 
-function loadOfflineProject(projectId) {
+// Načítať dáta z offline projektu (s dekompresiou)
+function loadOfflineProjectData(projectId) {
   try {
     const rawData = localStorage.getItem('offline_project_' + projectId);
     if (!rawData) {
@@ -12426,6 +12427,153 @@ function loadOfflineProject(projectId) {
     }
   } catch (e) {
     return {success: false, error: e.message};
+  }
+}
+
+// Načítať a zobraziť offline projekt
+function loadOfflineProject(projectId) {
+  try {
+    console.log('📱 Loading offline project:', projectId);
+    
+    // Načítaj dáta
+    const result = loadOfflineProjectData(projectId);
+    if (!result.success) {
+      alert('❌ Chyba: ' + result.error);
+      return;
+    }
+    
+    const projectData = result.data;
+    console.log('📱 Project data loaded:', projectData);
+    
+    // 🧹 VYČISTIŤ VŠETKO PRED NAČÍTANÍM NOVÉHO PROJEKTU!
+    console.log('🧹 Čistenie starých dát...');
+    ws = [];
+    spools = [];
+    crosses = [];
+    dimensions = [];
+    lines = [];
+    arrows = [];
+    texts = [];
+    curves = [];
+    spoolData = {};
+    weldLogMaterials = [];
+    weldAssignments = {};
+    // ✅ weldBookData SA NEMAŽE! Je to globálna databáza!
+    // ✅ kontrolaData SA NEMAŽE! Je to globálna databáza!
+    
+    // Načítaj dáta
+    ws = projectData.welds || [];
+    spools = projectData.spools || [];
+    crosses = projectData.crosses || [];
+    dimensions = projectData.dimensions || [];
+    lines = projectData.lines || [];
+    arrows = projectData.arrows || [];
+    texts = projectData.texts || [];
+    curves = projectData.curves || [];
+    spoolData = projectData.spoolData || {};
+    cn = projectData.currentNumber || 1;
+    startNum = projectData.startNumber || 1;
+    originalFileName = projectData.projectName || projectId;
+    
+    console.log('📱 Data loaded, welds:', ws.length);
+    
+    // Načítaj PDF
+    if (projectData.pdfData) {
+      console.log('📱 Loading PDF...');
+      const img = new Image();
+      img.onload = function() {
+        console.log('📱 PDF loaded!');
+        
+        loadedImage = img;
+        baseImageWidth = img.naturalWidth || img.width;
+        baseImageHeight = img.naturalHeight || img.height;
+        
+        // Zobraz canvas
+        document.getElementById('up').style.display = 'none';
+        document.getElementById('cw').style.display = 'block';
+        
+        // Aktivuj tlačidlá
+        try {
+          document.getElementById('zoomInfo').style.display='block';
+          document.getElementById('zi').disabled=false;
+          document.getElementById('zo').disabled=false;
+          document.getElementById('zr').disabled=false;
+          document.getElementById('savepdf').disabled=false;
+          document.getElementById('saveproj').disabled=false;
+          if(document.getElementById('savetolibrary')) document.getElementById('savetolibrary').disabled=false;
+          document.getElementById('loadprojbtn').disabled=false;
+          document.getElementById('editmode').disabled=false;
+          if(document.getElementById('editcrossmode')) document.getElementById('editcrossmode').disabled=false;
+          if(document.getElementById('setstart')) document.getElementById('setstart').disabled=false;
+          if(document.getElementById('selectbtn')) document.getElementById('selectbtn').disabled=false;
+          if(document.getElementById('crossbtn')) document.getElementById('crossbtn').disabled=false;
+          if(document.getElementById('spoolbtn')) document.getElementById('spoolbtn').disabled=false;
+          if(document.getElementById('spoollistbtn')) document.getElementById('spoollistbtn').disabled=false;
+          if(document.getElementById('refreshspoolbtn')) document.getElementById('refreshspoolbtn').disabled=false;
+          if(document.getElementById('addmontazweld')) document.getElementById('addmontazweld').disabled=false;
+          if(document.getElementById('spoolspreview')) document.getElementById('spoolspreview').disabled=false;
+          if(document.getElementById('montazline')) document.getElementById('montazline').disabled=false;
+          if(document.getElementById('montaztext')) document.getElementById('montaztext').disabled=false;
+          if(document.getElementById('weldlogbtn')) document.getElementById('weldlogbtn').disabled=false;
+          if(document.getElementById('oneclickbtn')) document.getElementById('oneclickbtn').disabled=false;
+          if(document.getElementById('twoclickbtn')) document.getElementById('twoclickbtn').disabled=false;
+          document.getElementById('weldscaleminus').disabled=false;
+          document.getElementById('weldscaleplus').disabled=false;
+          if(document.getElementById('mtobtn')) document.getElementById('mtobtn').disabled=false;
+          if(document.getElementById('dimensionbtn')) document.getElementById('dimensionbtn').disabled=false;
+          document.getElementById('prefab_linebtn').disabled=false;
+          document.getElementById('prefab_textbtn').disabled=false;
+          document.getElementById('prefab_arrowbtn').disabled=false;
+          document.getElementById('prefab_doublearrowbtn').disabled=false;
+          document.getElementById('prefab_curvebtn').disabled=false;
+          if(document.getElementById('linebtn')) document.getElementById('linebtn').disabled=false;
+          if(document.getElementById('textbtn')) document.getElementById('textbtn').disabled=false;
+          if(document.getElementById('curvebtn')) document.getElementById('curvebtn').disabled=false;
+          if(document.getElementById('arrowbtn')) document.getElementById('arrowbtn').disabled=false;
+          if(document.getElementById('doublearrowbtn')) document.getElementById('doublearrowbtn').disabled=false;
+          if(document.getElementById('undo')) document.getElementById('undo').disabled=false;
+          console.log('✅ Všetky tlačidlá aktivované');
+        } catch(btnError) {
+          console.error('⚠️ Chyba pri aktivácii tlačidiel:', btnError);
+        }
+        
+        // Nastav zoom 100%
+        sc = 1.0;
+        var scaledWidth = baseImageWidth * sc;
+        var scaledHeight = baseImageHeight * sc;
+        
+        ca.width = scaledWidth;
+        ca.height = scaledHeight;
+        ov.setAttribute('width', scaledWidth);
+        ov.setAttribute('height', scaledHeight);
+        ct.clearRect(0, 0, scaledWidth, scaledHeight);
+        ct.imageSmoothingEnabled = false;
+        ct.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+        dw();
+        updateZoomDisplay();
+        
+        // Aktualizuj názov súboru
+        if(document.getElementById('fileName')) {
+          document.getElementById('fileName').textContent = originalFileName;
+        }
+        
+        // Refresh počet zvarov
+        updateWeldCount();
+        
+        alert('✅ Offline projekt načítaný!');
+      };
+      img.onerror = function() {
+        console.error('❌ PDF load failed!');
+        alert('❌ Chyba pri načítaní PDF!');
+      };
+      img.src = projectData.pdfData;
+    } else {
+      alert('⚠️ Projekt neobsahuje PDF dáta!');
+    }
+    
+  } catch (error) {
+    console.error('❌ Error loading offline project:', error);
+    alert('❌ Chyba: ' + error.message);
   }
 }
 
