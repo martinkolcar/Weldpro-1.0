@@ -1818,8 +1818,22 @@ var hasWelder=false;
 var weldBookEntry=null;
 if(weldBookData){
 for(var wbi=0;wbi<weldBookData.length;wbi++){
-if(String(weldBookData[wbi].weldId)===String(w.displayNum)){
-weldBookEntry=weldBookData[wbi];
+var wbEntry = weldBookData[wbi];
+// ✅ KRITICKÁ OPRAVA - kontroluj aj izometriu!
+var isThisWeld = String(wbEntry.weldId) === String(w.displayNum);
+var isThisIsometric = false;
+
+if(wbEntry.isometric && originalFileName){
+// Exact match alebo obsahuje
+if(wbEntry.isometric === originalFileName || 
+   originalFileName.includes(wbEntry.isometric) ||
+   wbEntry.isometric.includes(originalFileName)){
+isThisIsometric = true;
+}
+}
+
+if(isThisWeld && isThisIsometric){
+weldBookEntry=wbEntry;
 if(weldBookEntry.welderId && weldBookEntry.welderId.trim()!==''){
 hasWelder=true;
 }
