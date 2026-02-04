@@ -5700,7 +5700,7 @@ weldBookEntry.dateWelding=dateInput;
 var splitName=splitIsometricName(originalFileName||'Unknown');
 addWeldToWeldBook({
 part:splitName.part,
-isometric:splitName.isometric,
+isometric:originalFileName,  // ✅ OPRAVA - použi originalFileName!
 sheets:1,
 weldId:String(weld.displayNum),
 welderId:welderInput,
