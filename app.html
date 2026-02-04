@@ -7612,7 +7612,7 @@ console.log('🗑️ Všetko zmazané');
 // ============= GLOBÁLNE PREMENNÉ =============
 var weldBookGrid = null;
 var weldBookData = [];
-var currentOfflineProjectId = null; // ✅ PRIDANÉ: ID aktuálneho offline projektu
+var currentOfflineProjectId = null; // Tracking offline project for auto-save
 
 // ============= OTVORENIE WELDBOOK PANELU =============
 function openWeldBook() {
@@ -9240,37 +9240,45 @@ function loadCurrentPartWeldBook() {
 }
 
 function saveCurrentPartWeldBook() {
-  // Ulož do localStorage (pre offline prístup)
+  // Vždy ulož do localStorage (pre všetky režimy)
   saveWeldBookToStorage();
   
-  // Ak máme načítaný offline projekt, ulož aj do neho
+  // Ak máme načítaný OFFLINE projekt, ulož tam WeldBook
   if (currentOfflineProjectId) {
-    const result = loadOfflineProjectData(currentOfflineProjectId);
-    if (result.success) {
-      const wrappedData = result.data;
-      const projectData = wrappedData.data || wrappedData;
-      
-      // Aktualizuj weldBookData
-      projectData.weldBookData = weldBookData;
-      
-      // Ulož späť
-      wrappedData.data = projectData;
-      saveOfflineProject(currentOfflineProjectId, wrappedData.data);
-      
-      console.log('💾 WeldBook uložený do offline projektu:', currentOfflineProjectId);
+    try {
+      const result = loadOfflineProjectData(currentOfflineProjectId);
+      if (result.success) {
+        const wrappedData = result.data;
+        const projectData = wrappedData.data || wrappedData;
+        
+        // Aktualizuj weldBookData v projekte
+        projectData.weldBookData = weldBookData;
+        
+        // Ulož späť do offline storage
+        wrappedData.data = projectData;
+        saveOfflineProject(currentOfflineProjectId, wrappedData.data);
+        
+        console.log('💾 WeldBook auto-saved do offline projektu:', currentOfflineProjectId);
+      }
+    } catch(e) {
+      console.error('⚠️ Chyba pri auto-save do offline:', e);
     }
   }
   
-  // Ak sme online, ulož aj do starej štruktúry (pre kompatibilitu)
+  // Ulož aj do starej štruktúry (pre kompatibilitu)
   if (projectsData.currentProject && projectsData.currentPart) {
-    var currentProj = projectsData.projects[projectsData.currentProject];
-    if (currentProj && currentProj.parts) {
-      var currentPart = currentProj.parts[projectsData.currentPart];
-      if (currentPart) {
-        currentPart.weldBookData = weldBookData;
-        currentPart.lastModified = new Date().toISOString().slice(0,10);
-        saveProjectsToStorage();
+    try {
+      var currentProj = projectsData.projects[projectsData.currentProject];
+      if (currentProj && currentProj.parts) {
+        var currentPart = currentProj.parts[projectsData.currentPart];
+        if (currentPart) {
+          currentPart.weldBookData = weldBookData;
+          currentPart.lastModified = new Date().toISOString().slice(0,10);
+          saveProjectsToStorage();
+        }
       }
+    } catch(e) {
+      console.error('⚠️ Chyba pri ukladaní do projectsData:', e);
     }
   }
   
@@ -12457,7 +12465,7 @@ function loadOfflineProject(projectId) {
   try {
     console.log('📱 Loading offline project:', projectId);
     
-    // Nastav aktuálny offline projekt ID
+    // ✅ Nastav ID aktuálneho offline projektu (pre auto-save)
     currentOfflineProjectId = projectId;
     console.log('📱 Set currentOfflineProjectId:', currentOfflineProjectId);
     
@@ -13043,7 +13051,7 @@ function filterOfflineProjects() {
 
 // Načítať a zobraziť projekt z Firebase
 async function loadAndDisplayProject(projectName, part) {
-  // Resetuj offline projekt ID (načítavame online)
+  // ✅ Resetuj offline ID (načítavame ONLINE projekt)
   currentOfflineProjectId = null;
   
   // Zostav Firebase document ID (name + _ + part)
