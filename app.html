@@ -1632,14 +1632,16 @@ return;
 if(montazWeldMode){
 if(justFinishedRotation)return; // Blokuj len zvary po rotácii
 if(!pt){
-pt={x:x,y:y};
-console.log('📍 Začiatok zvaru:',pt);
+// 1. KLIK - ulož začiatok (normalizovaný)
+pt={x:x/ca.width, y:y/ca.height};
+console.log('📍 Začiatok zvaru (normalizovaný):',pt);
 }else{
+// 2. KLIK - vytvor zvar
 var weldId=Date.now()+'_'+Math.random();
 ws.push({
 id:weldId,
-start:{x:pt.x/ca.width,y:pt.y/ca.height},
-end:{x:x/ca.width,y:y/ca.height},
+start:{x:pt.x, y:pt.y},  // Už normalizované
+end:{x:x/ca.width, y:y/ca.height},  // Normalizuj koniec
 displayNum:montazWeldNumber,
 source:'new'  // NOVÝ ZVAR
 });
