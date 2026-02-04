@@ -5758,6 +5758,7 @@ if(weldNum===null || weldNum.trim()==='')return;
 
 montazWeldNumber=weldNum.trim();
 montazWeldMode=true;
+pt=null;  // ✅ RESET - vyčisti starú hodnotu!
 currentTool='weld';
 ca.style.cursor='crosshair';
 alert('Kliknite na ZAČIATOK zvaru, potom na KONIEC.');
