@@ -2437,8 +2437,40 @@ for(var wbi=0; wbi<weldBookData.length; wbi++){
 var wbEntry = weldBookData[wbi];
 // ✅ KRITICKÁ OPRAVA - Match podľa weldId A isometric!
 var isThisWeld = String(wbEntry.weldId) === String(w.displayNum);
-var isThisIsometric = wbEntry.isometric === originalFileName || 
-                       wbEntry.isometric === (originalFileName || '').replace(/\.[^/.]+$/, '');
+
+// ✅ DEBUG - vypisuj každý pokus o match pre zvar 1 a 9
+if(w.displayNum === 1 || w.displayNum === 9){
+console.log('🔍 DEBUG zvar', w.displayNum, ':');
+console.log('  wbEntry.weldId:', wbEntry.weldId);
+console.log('  wbEntry.isometric:', wbEntry.isometric);
+console.log('  originalFileName:', originalFileName);
+console.log('  isThisWeld:', isThisWeld);
+}
+
+// Flexibilné porovnanie izometrie
+var isThisIsometric = false;
+if(wbEntry.isometric && originalFileName){
+// Exact match
+if(wbEntry.isometric === originalFileName){
+isThisIsometric = true;
+}
+// Match bez prípony
+else if(wbEntry.isometric === originalFileName.replace(/\.[^/.]+$/, '')){
+isThisIsometric = true;
+}
+// Match obsahuje názov
+else if(originalFileName.includes(wbEntry.isometric)){
+isThisIsometric = true;
+}
+// Match opačne
+else if(wbEntry.isometric.includes(originalFileName)){
+isThisIsometric = true;
+}
+}
+
+if(w.displayNum === 1 || w.displayNum === 9){
+console.log('  isThisIsometric:', isThisIsometric);
+}
                        
 if(isThisWeld && isThisIsometric){
 // Check či má vyplneného zvarača (welderId nie welder!)
