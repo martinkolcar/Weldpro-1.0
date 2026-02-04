@@ -1630,13 +1630,20 @@ return;
 
 // MONTÁŽ MODE - pridanie nového zvaru
 if(montazWeldMode){
-if(justFinishedRotation)return; // Blokuj len zvary po rotácii
+console.log('🏗️ MONTÁŽ click - montazWeldMode=true');
+if(justFinishedRotation){
+  console.log('⚠️ Blokované - práve skončila rotácia');
+  return;
+}
 if(!pt){
 // 1. KLIK - ulož začiatok (normalizovaný)
+console.log('📍 1. KLIK - x:', x, 'y:', y, 'ca.width:', ca.width, 'ca.height:', ca.height);
 pt={x:x/ca.width, y:y/ca.height};
-console.log('📍 Začiatok zvaru (normalizovaný):',pt);
+console.log('📍 Začiatok zvaru (normalizovaný):', pt);
 }else{
 // 2. KLIK - vytvor zvar
+console.log('📍 2. KLIK - x:', x, 'y:', y);
+console.log('📍 pt pred vytvorením zvaru:', pt);
 var weldId=Date.now()+'_'+Math.random();
 ws.push({
 id:weldId,
@@ -1645,6 +1652,7 @@ end:{x:x/ca.width, y:y/ca.height},  // Normalizuj koniec
 displayNum:montazWeldNumber,
 source:'new'  // NOVÝ ZVAR
 });
+console.log('✅ Zvar vytvorený:', {start: pt, end: {x:x/ca.width, y:y/ca.height}});
 
 // Pridaj do WeldBook
 var splitName=splitIsometricName(originalFileName || 'Unknown');
@@ -5753,8 +5761,12 @@ console.log('✅ Zvar',weld.displayNum,'označený - zvarač:',welderInput,', d�
 }
 
 function addMontazWeld(){
+console.log('🚀 addMontazWeld() called');
 var weldNum=prompt('Zadajte číslo nového zvaru (napr: 5a, 10b):','');
-if(weldNum===null || weldNum.trim()==='')return;
+if(weldNum===null || weldNum.trim()===''){
+  console.log('⚠️ User cancelled or empty number');
+  return;
+}
 
 montazWeldNumber=weldNum.trim();
 montazWeldMode=true;
@@ -5763,6 +5775,9 @@ currentTool='weld';
 ca.style.cursor='crosshair';
 alert('Kliknite na ZAČIATOK zvaru, potom na KONIEC.');
 console.log('➕ Režim pridania zvaru:',montazWeldNumber);
+console.log('   montazWeldMode=', montazWeldMode);
+console.log('   pt=', pt);
+console.log('   currentTool=', currentTool);
 }
 
 function showSpoolsPreview(){
