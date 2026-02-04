@@ -10213,8 +10213,8 @@ async function loadFromLibraryFirebase(projectName) {
     spoolData = {};
     weldLogMaterials = [];
     weldAssignments = {};
-    weldBookData = [];  // ✅ VYČISTI WeldBook!
-    kontrolaData = {};
+    // ✅ weldBookData SA NEMAŽE! Je to globálna databáza všetkých zvarov!
+    // ✅ kontrolaData SA NEMAŽE! Je to globálna databáza kontrol!
     
     ws = projectData.welds || [];
     spools = projectData.spools || [];
@@ -10224,14 +10224,14 @@ async function loadFromLibraryFirebase(projectName) {
     arrows = projectData.arrows || [];
     texts = projectData.texts || [];
     curves = projectData.curves || [];
-    weldBookData = projectData.weldBookData || [];  // ✅ Načítaj WeldBook TOHTO projektu!
-    kontrolaData = projectData.kontrolaData || {};
+    // ✅ weldBookData NEPREPISUJEME - zostáva globálny!
+    // ✅ kontrolaData NEPREPISUJEME - zostáva globálny!
     spoolData = projectData.spoolData || {};
     cn = projectData.currentNumber || 1;
     startNum = projectData.startNumber || 1;
     originalFileName = projectData.projectName || 'zvary';
     
-    console.log('🔵 Data loaded, welds:', ws.length, 'weldBook:', weldBookData.length);
+    console.log('🔵 Data loaded, welds:', ws.length, 'weldBook ZACHOVANÝ:', weldBookData.length);
     
     if (projectData.pdfData) {
       console.log('🔵 Loading PDF...');
