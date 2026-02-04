@@ -11989,8 +11989,13 @@ const key=localStorage.key(i);
 if(key.startsWith('offline_project_')){
 const projectId=key.replace('offline_project_','');
 try{
-const data=JSON.parse(localStorage.getItem(key));
-offlineProjects.push({id:projectId,data:data});
+// ✅ POUŽIŤ NOVÚ FUNKCIU ktorá podporuje GZIP dekompresi!
+const result = loadOfflineProjectData(projectId);
+if (result.success) {
+  offlineProjects.push({id:projectId,data:result.data});
+} else {
+  console.error('Chyba pri čítaní offline projektu:',projectId,result.error);
+}
 }catch(e){
 console.error('Chyba pri čítaní offline projektu:',projectId,e);
 }
@@ -12009,19 +12014,19 @@ const name=meta.name||proj.id;
 const date=meta.date?new Date(meta.date).toLocaleDateString('sk-SK'):'';
 const size=JSON.stringify(proj.data).length;
 html+=`<div class="offline-mode-project" style="background:#e0e7ff;border:2px solid #8b5cf6;border-radius:8px;padding:15px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
-<div style="flex:1;cursor:pointer" onclick="loadOfflineProject('${proj.id}')">
+<div style="flex:1;cursor:pointer" onclick="loadOfflineProject('${proj.id}');closeOfflineModeModal();">
 <div style="font-weight:700;font-size:15px;color:#333">${name} <span style="background:#8b5cf6;color:white;padding:2px 8px;border-radius:4px;font-size:11px">📱 OFFLINE</span></div>
 <div style="font-size:12px;color:#666">${(size/1024).toFixed(1)} KB${date?' • '+date:''}</div>
 </div>
-<button onclick="event.stopPropagation();deleteOfflineProject('${proj.id}','${name}')" style="background:#ef4444;color:white;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:bold">🗑️ Zmazať</button>
+<button onclick="event.stopPropagation();deleteOfflineProjectOldModal('${proj.id}','${name}')" style="background:#ef4444;color:white;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:bold">🗑️ Zmazať</button>
 </div>`;
 });
 
 listEl.innerHTML=html;
 }
 
-function deleteOfflineProject(projectId,projectName){
-if(!confirm('Zmazať offline projekt "'+projectName+'"?\\n\\nUvoľní sa miesto v localStorage.')){
+function deleteOfflineProjectOldModal(projectId,projectName){
+if(!confirm('Zmazať offline projekt "'+projectName+'"?\n\nUvoľní sa miesto v localStorage.')){
 return;
 }
 localStorage.removeItem('offline_project_'+projectId);
@@ -12442,7 +12447,9 @@ function loadOfflineProject(projectId) {
       return;
     }
     
-    const projectData = result.data;
+    // OPRAVA: result.data obsahuje {id, data, savedAt}, takže potrebujeme .data.data
+    const wrappedData = result.data;
+    const projectData = wrappedData.data || wrappedData; // Fallback ak nie je wrapped
     console.log('📱 Project data loaded:', projectData);
     
     // 🧹 VYČISTIŤ VŠETKO PRED NAČÍTANÍM NOVÉHO PROJEKTU!
