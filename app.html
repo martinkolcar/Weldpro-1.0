@@ -7833,6 +7833,8 @@ function parseWeldId(weldId) {
 
 function addWeldToWeldBook(weldData) {
   console.log('➕ Pridávam zvar do WeldBook:', weldData);
+  console.log('📞 STACK TRACE:');
+  console.trace();
   
   // Parse weld number pre sorted insert
   var newWeldNum = parseWeldId(weldData.weldId);
