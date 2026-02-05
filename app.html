@@ -1815,7 +1815,7 @@ var clickedWeld=null;
 var clickType='';
 
 // MONTÁŽ MODE - klik na kruh zvaru pre označenie/odznačenie
-if(displayFilter.enabled && !editMode && !montazWeldMode){
+if(displayFilter.enabled && !montazWeldMode){
 for(var i=0;i<ws.length;i++){
 var w=ws[i];
 var wEndX=w.end.x*ca.width;
@@ -1823,7 +1823,7 @@ var wEndY=w.end.y*ca.height;
 var distEnd=Math.sqrt(Math.pow(x-wEndX,2)+Math.pow(y-wEndY,2));
 
 // Klik na KRUH (nie na palička)
-if(distEnd<35){ // Väčší radius pre ľahšie klikanie
+if(distEnd<25){ // Rovnaký radius ako v editMode
 clickedWeld=w;
 
 // Check či má vyplneného zvarača v WeldBook
@@ -7835,8 +7835,15 @@ function parseWeldId(weldId) {
 
 function addWeldToWeldBook(weldData) {
   console.log('➕ Pridávam zvar do WeldBook:', weldData);
-  console.log('📞 STACK TRACE:');
-  console.trace();
+  
+  // ⚠️ KRITICKÝ DEBUG - kde vznikajú "site" záznamy?
+  if(weldData.source === 'site') {
+    console.error('🚨🚨🚨 SITE ZÁZNAM VYTVORENÝ! 🚨🚨🚨');
+    console.error('   weldId:', weldData.weldId);
+    console.error('   isometric:', weldData.isometric);
+    console.error('📞 FULL STACK TRACE:');
+    console.trace();
+  }
   
   // Parse weld number pre sorted insert
   var newWeldNum = parseWeldId(weldData.weldId);
