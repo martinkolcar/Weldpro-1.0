@@ -730,6 +730,8 @@ async function listProjectsFromFirebase() {
 </div>
 <div class="ribbon-group">
 <button onclick="addMontazWeld()" id="addmontazweld" disabled>➕ Pridať zvar</button>
+<button onclick="toggleMontazEditMode()" id="montazeditbtn" disabled style="background:#f59e0b">✏️ Edit</button>
+<button onclick="deleteMontazWeld()" id="montazdeletebtn" disabled style="background:#ef4444">🗑️ Vymazať</button>
 <button onclick="showSpoolsPreview()" id="spoolspreview" disabled>📋 Náhľad spoolov</button>
 </div>
 <div class="ribbon-group">
@@ -1233,7 +1235,7 @@ document.getElementById('editcrossmode').disabled=false;
 document.getElementById('setstart').disabled=false;
 document.getElementById('selectbtn').disabled=false;
 document.getElementById('crossbtn').disabled=false;
-document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montaz_linebtn').disabled=false;document.getElementById('montaz_textbtn').disabled=false;document.getElementById('montaz_curvebtn').disabled=false;document.getElementById('montaz_arrowbtn').disabled=false;document.getElementById('montaz_doublearrowbtn').disabled=false;
+document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;if(document.getElementById('montazeditbtn'))document.getElementById('montazeditbtn').disabled=false;if(document.getElementById('montazdeletebtn'))document.getElementById('montazdeletebtn').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montaz_linebtn').disabled=false;document.getElementById('montaz_textbtn').disabled=false;document.getElementById('montaz_curvebtn').disabled=false;document.getElementById('montaz_arrowbtn').disabled=false;document.getElementById('montaz_doublearrowbtn').disabled=false;
 
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
@@ -1301,7 +1303,7 @@ document.getElementById('editcrossmode').disabled=false;
 document.getElementById('setstart').disabled=false;
 document.getElementById('selectbtn').disabled=false;
 document.getElementById('crossbtn').disabled=false;
-document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montaz_linebtn').disabled=false;document.getElementById('montaz_textbtn').disabled=false;document.getElementById('montaz_curvebtn').disabled=false;document.getElementById('montaz_arrowbtn').disabled=false;document.getElementById('montaz_doublearrowbtn').disabled=false;
+document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;if(document.getElementById('montazeditbtn'))document.getElementById('montazeditbtn').disabled=false;if(document.getElementById('montazdeletebtn'))document.getElementById('montazdeletebtn').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montaz_linebtn').disabled=false;document.getElementById('montaz_textbtn').disabled=false;document.getElementById('montaz_curvebtn').disabled=false;document.getElementById('montaz_arrowbtn').disabled=false;document.getElementById('montaz_doublearrowbtn').disabled=false;
 
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
@@ -1816,6 +1818,33 @@ var clickType='';
 
 // MONTÁŽ MODE - klik na kruh zvaru pre označenie/odznačenie
 if(displayFilter.enabled && !montazWeldMode){
+// ✅ MONTÁŽ DELETE MODE - vymazať zvar
+if(window.montazDeleteMode){
+for(var i=0;i<ws.length;i++){
+var w=ws[i];
+var wEndX=w.end.x*ca.width;
+var wEndY=w.end.y*ca.height;
+var distEnd=Math.sqrt(Math.pow(x-wEndX,2)+Math.pow(y-wEndY,2));
+
+if(distEnd<25){
+if(confirm('Vymazať zvar #'+w.displayNum+'?')){
+var deletedWeld = w;
+ws=ws.filter(function(weld){return weld.id!==w.id;});
+removeWeldFromWeldBook(deletedWeld.displayNum);
+crosses=crosses.filter(function(c){return c.weldId!==w.id;});
+console.log('🗑️ Zvar',w.displayNum,'zmazaný');
+dw();
+up();
+}
+window.montazDeleteMode = false;
+ca.style.cursor = 'default';
+return;
+}
+}
+alert('❌ Klikli ste mimo zvaru. Skúste znova alebo stlačte ESC.');
+return;
+}
+
 for(var i=0;i<ws.length;i++){
 var w=ws[i];
 var wEndX=w.end.x*ca.width;
@@ -1865,8 +1894,24 @@ dw();
 console.log('❌ Zvar',w.displayNum,'odznačený - zvarač vymazaný');
 }
 }else{
+// NEOZNAČENÝ ZVAR - ponúkni možnosti
+var action=prompt('Zvar #'+w.displayNum+'\n\n1 = Označiť (vyplniť zvarača)\n2 = Vymazať zvar','1');
+if(action==='1'){
 // OZNAČIŤ - otvor modal
 openMontazWelderModal(w, weldBookEntry);
+}else if(action==='2'){
+// VYMAZAŤ ZVAR
+if(confirm('Naozaj vymazať zvar #'+w.displayNum+'?')){
+var deletedWeld = w;
+ws=ws.filter(function(weld){return weld.id!==w.id;});
+removeWeldFromWeldBook(deletedWeld.displayNum);
+// Vymaž aj krížik ak existuje
+crosses=crosses.filter(function(c){return c.weldId!==w.id;});
+console.log('🗑️ Zvar',w.displayNum,'zmazaný z MONTÁŽ');
+dw();
+up();
+}
+}
 }
 return; // Exit po MONTÁŽ interakcii
 }
@@ -1904,7 +1949,8 @@ dw();
 return;
 }
 if(clickType==='start'){
-if(!editMode){
+if(!editMode && !displayFilter.enabled){
+// PREFABRIKÁCIA - automatický krížik (len ak NIE MONTÁŽ)
 var existingCross=crosses.find(function(c){return c.weldId===clickedWeld.id;});
 if(existingCross){
 alert('Krížik už existuje na tomto zvare!');
@@ -1919,7 +1965,9 @@ console.log('Pridaný krížik na zvar #'+clickedWeld.displayNum);
 dw();
 return;
 }
-var action=prompt('1=Presunúť palička, 2=Celý zvar, 3=Zmazať','1');
+if(editMode){
+// EDIT MODE - menu s možnosťami
+var action=prompt('1=Presunúť palička, 2=Celý zvar, 3=Zmazať zvar, 4=Zmazať krížik','1');
 if(action==='1'){
 editCrossMode=true;
 selectedWeldId=clickedWeld.id;
@@ -1932,7 +1980,8 @@ ca.style.cursor='move';
 dw();
 return;
 }else if(action==='3'){
-if(confirm('Zmazať?')){
+// ZMAZAŤ ZVAR
+if(confirm('Zmazať zvar #' + clickedWeld.displayNum + '?')){
 var deletedWeld = clickedWeld;
 ws=ws.filter(function(w){return w.id!==clickedWeld.id;});
 removeWeldFromWeldBook(deletedWeld.displayNum);
@@ -1958,6 +2007,17 @@ console.log('🗑️ Zvar',deletedWeld.displayNum,'zmazaný zo všetkých dát')
 
 up();
 dw();
+}
+return;
+}else if(action==='4'){
+// ZMAZAŤ LEN KRÍŽIK
+var existingCross=crosses.find(function(c){return c.weldId===clickedWeld.id;});
+if(existingCross){
+crosses=crosses.filter(function(c){return c.id!==existingCross.id;});
+console.log('✅ Krížik zmazaný zo zvaru #'+clickedWeld.displayNum);
+dw();
+}else{
+alert('❌ Na tomto zvare nie je krížik!');
 }
 return;
 }
@@ -5783,6 +5843,34 @@ console.log('   pt=', pt);
 console.log('   currentTool=', currentTool);
 }
 
+function toggleMontazEditMode(){
+console.log('✏️ Toggle MONTÁŽ Edit Mode');
+var btn = document.getElementById('montazeditbtn');
+if(editMode){
+// Vypni editMode
+editMode = false;
+btn.style.opacity = '1';
+btn.style.background = '#f59e0b';
+ca.style.cursor = 'default';
+console.log('✏️ Edit mode: OFF (označovanie)');
+}else{
+// Zapni editMode
+editMode = true;
+btn.style.opacity = '0.7';
+btn.style.background = '#10b981';
+ca.style.cursor = 'crosshair';
+console.log('✏️ Edit mode: ON (editácia paličky)');
+}
+}
+
+function deleteMontazWeld(){
+console.log('🗑️ Delete MONTÁŽ Weld mode');
+alert('Kliknite na KRUH zvaru ktorý chcete vymazať.');
+// Nastaví špeciálny režim
+window.montazDeleteMode = true;
+ca.style.cursor = 'crosshair';
+}
+
 function showSpoolsPreview(){
 alert('📋 Náhľad spoolov - funkcia v implementácii');
 // TODO: Zobrazí read-only panel so spoolmi
@@ -7046,7 +7134,7 @@ document.getElementById('editcrossmode').disabled=false;
 document.getElementById('setstart').disabled=false;
 document.getElementById('selectbtn').disabled=false;
 document.getElementById('crossbtn').disabled=false;
-document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montaz_linebtn').disabled=false;document.getElementById('montaz_textbtn').disabled=false;document.getElementById('montaz_curvebtn').disabled=false;document.getElementById('montaz_arrowbtn').disabled=false;document.getElementById('montaz_doublearrowbtn').disabled=false;
+document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;if(document.getElementById('montazeditbtn'))document.getElementById('montazeditbtn').disabled=false;if(document.getElementById('montazdeletebtn'))document.getElementById('montazdeletebtn').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montaz_linebtn').disabled=false;document.getElementById('montaz_textbtn').disabled=false;document.getElementById('montaz_curvebtn').disabled=false;document.getElementById('montaz_arrowbtn').disabled=false;document.getElementById('montaz_doublearrowbtn').disabled=false;
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
 document.getElementById('twoclickbtn').disabled=false;document.getElementById('weldscaleminus').disabled=false;document.getElementById('weldscaleplus').disabled=false;
@@ -10539,7 +10627,7 @@ async function loadFromLibraryFirebase(projectName) {
           if(document.getElementById('spoolbtn')) document.getElementById('spoolbtn').disabled=false;
           if(document.getElementById('spoollistbtn')) document.getElementById('spoollistbtn').disabled=false;
           if(document.getElementById('refreshspoolbtn')) document.getElementById('refreshspoolbtn').disabled=false;
-          if(document.getElementById('addmontazweld')) document.getElementById('addmontazweld').disabled=false;
+          if(document.getElementById('addmontazweld')) document.getElementById('addmontazweld').disabled=false;if(document.getElementById('montazeditbtn'))document.getElementById('montazeditbtn').disabled=false;if(document.getElementById('montazdeletebtn'))document.getElementById('montazdeletebtn').disabled=false;
           if(document.getElementById('spoolspreview')) document.getElementById('spoolspreview').disabled=false;
           if(document.getElementById('montazline')) document.getElementById('montazline').disabled=false;
           if(document.getElementById('montaztext')) document.getElementById('montaztext').disabled=false;
@@ -12221,7 +12309,7 @@ document.getElementById('crossbtn').disabled=false;
 document.getElementById('spoolbtn').disabled=false;
 document.getElementById('spoollistbtn').disabled=false;
 document.getElementById('refreshspoolbtn').disabled=false;
-document.getElementById('addmontazweld').disabled=false;
+document.getElementById('addmontazweld').disabled=false;if(document.getElementById('montazeditbtn'))document.getElementById('montazeditbtn').disabled=false;if(document.getElementById('montazdeletebtn'))document.getElementById('montazdeletebtn').disabled=false;
 document.getElementById('spoolspreview').disabled=false;
 document.getElementById('montaz_linebtn').disabled=false;
 document.getElementById('montaz_textbtn').disabled=false;
@@ -12651,7 +12739,7 @@ function loadOfflineProject(projectId) {
           if(document.getElementById('spoolbtn')) document.getElementById('spoolbtn').disabled=false;
           if(document.getElementById('spoollistbtn')) document.getElementById('spoollistbtn').disabled=false;
           if(document.getElementById('refreshspoolbtn')) document.getElementById('refreshspoolbtn').disabled=false;
-          if(document.getElementById('addmontazweld')) document.getElementById('addmontazweld').disabled=false;
+          if(document.getElementById('addmontazweld')) document.getElementById('addmontazweld').disabled=false;if(document.getElementById('montazeditbtn'))document.getElementById('montazeditbtn').disabled=false;if(document.getElementById('montazdeletebtn'))document.getElementById('montazdeletebtn').disabled=false;
           if(document.getElementById('spoolspreview')) document.getElementById('spoolspreview').disabled=false;
           if(document.getElementById('montazline')) document.getElementById('montazline').disabled=false;
           if(document.getElementById('montaztext')) document.getElementById('montaztext').disabled=false;
@@ -13238,7 +13326,7 @@ async function loadAndDisplayProject(projectName, part) {
           if(document.getElementById('spoolbtn')) document.getElementById('spoolbtn').disabled=false;
           if(document.getElementById('spoollistbtn')) document.getElementById('spoollistbtn').disabled=false;
           if(document.getElementById('refreshspoolbtn')) document.getElementById('refreshspoolbtn').disabled=false;
-          if(document.getElementById('addmontazweld')) document.getElementById('addmontazweld').disabled=false;
+          if(document.getElementById('addmontazweld')) document.getElementById('addmontazweld').disabled=false;if(document.getElementById('montazeditbtn'))document.getElementById('montazeditbtn').disabled=false;if(document.getElementById('montazdeletebtn'))document.getElementById('montazdeletebtn').disabled=false;
           if(document.getElementById('spoolspreview')) document.getElementById('spoolspreview').disabled=false;
           if(document.getElementById('montazline')) document.getElementById('montazline').disabled=false;
           if(document.getElementById('montaztext')) document.getElementById('montaztext').disabled=false;
