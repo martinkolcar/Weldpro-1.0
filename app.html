@@ -1038,11 +1038,11 @@ function switchRibbonTab(tabName) {
   // Ulož aktívnu záložku
   activeTab=tabName;
   
-  // MONTÁŽ - aktivuj filter a editMode
+  // MONTÁŽ - aktivuj filter, vypni editMode (len označovanie)
   if(tabName==='montaz'){
     displayFilter.enabled=true;
-    editMode=true;  // ✅ MONTÁŽ má vždy editMode (ako red pen)
-    console.log('🏗️ MONTÁŽ mode - filter ENABLED, editMode ENABLED');
+    editMode=false;  // ✅ Default: len označovanie kruhov
+    console.log('🏗️ MONTÁŽ mode - filter ENABLED, editMode DISABLED (označovanie)');
   } else {
     displayFilter.enabled=false;
     // editMode zostane ako je (prepína sa tlačidlom v PREFABRIKÁCIA)
@@ -1893,7 +1893,8 @@ break;
 }
 }
 if(clickedWeld){
-if(editMode&&clickType==='end'){
+if(editMode && clickType==='end' && !displayFilter.enabled){
+// PREFABRIKÁCIA - zmena čísla zvaru na kruhu
 var newNum=prompt('Nové označenie (napr: 5, 12A, 15b, 3X):',clickedWeld.displayNum);
 if(newNum!==null&&newNum.trim()!==''){
 clickedWeld.displayNum=newNum.trim();
@@ -7644,9 +7645,10 @@ function openWeldBook() {
   var content = '<div style="background:white;border-radius:4px;padding:30px;width:95%;height:90vh;display:flex;flex-direction:column">';
   content += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">';
   content += '<h2 style="margin:0;color:#667eea;font-size:24px">📊 WeldBook - Všetky zvary</h2>';
-  content += '<div style="display:flex;gap:10px">';
+  content += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
   content += '<button onclick="addWeldBookRow()" style="padding:10px 20px;background:#10b981;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">➕ Pridať riadok</button>';
   content += '<button onclick="deleteSelectedWeldBookRows()" style="padding:10px 20px;background:#ef4444;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🗑️ Zmazať označené</button>';
+  content += '<button onclick="cleanWeldBook()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🧹 Vyčistiť orphaned</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
   content += '<button onclick="importJSONProjects()" style="padding:10px 20px;background:#667eea;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z JSON</button>';
   content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button>';
@@ -8439,6 +8441,68 @@ function removeWeldFromWeldBook(weldId) {
   } else {
     console.log('⚠️ Zvar', weldId, 'nebol nájdený v WeldBook');
   }
+}
+
+// ============= VYČISTENIE WELDBOOK OD ORPHANED ZÁZNAMOV =============
+function cleanWeldBook() {
+  if (!originalFileName) {
+    alert('❌ Nie je načítaný žiadny projekt!');
+    return;
+  }
+  
+  var splitName = splitIsometricName(originalFileName);
+  var currentIso = splitName.isometric;
+  
+  console.log('🧹 Čistenie WeldBook pre izometriu:', currentIso);
+  
+  // Zoznam weldId ktoré SÚ na výkrese
+  var existingWeldIds = ws.map(function(w) { return String(w.displayNum); });
+  console.log('📊 Zvary na výkrese:', existingWeldIds);
+  
+  // Nájdi orphaned záznamy (v WeldBook ale NIE na výkrese)
+  var toRemove = [];
+  for (var i = 0; i < weldBookData.length; i++) {
+    var entry = weldBookData[i];
+    
+    // Kontroluj len záznamy pre TÚTO izometriu
+    if (entry.isometric === currentIso) {
+      var weldId = String(entry.weldId);
+      
+      if (!existingWeldIds.includes(weldId)) {
+        toRemove.push(entry);
+        console.log('🗑️ Orphaned záznam:', weldId, '(nie je na výkrese)');
+      }
+    }
+  }
+  
+  if (toRemove.length === 0) {
+    alert('✅ WeldBook je čistý! Žiadne nadbytočné záznamy.');
+    return;
+  }
+  
+  // Confirm
+  if (!confirm('🧹 Nájdených ' + toRemove.length + ' nadbytočných záznamov.\n\nVymazať?')) {
+    return;
+  }
+  
+  // Vymaž
+  for (var i = 0; i < toRemove.length; i++) {
+    var idx = weldBookData.indexOf(toRemove[i]);
+    if (idx !== -1) {
+      weldBookData.splice(idx, 1);
+    }
+  }
+  
+  // Update grid ak je otvorený
+  if (weldBookGrid && weldBookGrid.api) {
+    weldBookGrid.api.setGridOption('rowData', weldBookData);
+  }
+  
+  // Ulož
+  saveCurrentPartWeldBook();
+  
+  alert('✅ Vymazaných ' + toRemove.length + ' záznamov!\n\nWeldBook: ' + weldBookData.length + ' zvarov');
+  console.log('✅ WeldBook vyčistený!');
 }
 
 // ============= PRIDANIE PRÁZDNEHO RIADKU =============
