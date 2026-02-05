@@ -2182,8 +2182,8 @@ up();
 dw();
 document.getElementById('undo').disabled=false;
 }
-}else if(currentTool!=='select'){
-// TWO-CLICK MODE - len ak NIEJE select tool
+}else if(currentTool!=='select' && !montazWeldMode){
+// TWO-CLICK MODE - len ak NIEJE select tool A NIE JE montazWeldMode
 if(!pt){
 pt={x:x,y:y};
 dw();
