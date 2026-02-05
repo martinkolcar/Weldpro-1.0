@@ -1038,12 +1038,14 @@ function switchRibbonTab(tabName) {
   // Ulož aktívnu záložku
   activeTab=tabName;
   
-  // MONTÁŽ - aktivuj filter
+  // MONTÁŽ - aktivuj filter a editMode
   if(tabName==='montaz'){
     displayFilter.enabled=true;
-    console.log('🏗️ MONTÁŽ mode - filter ENABLED');
+    editMode=true;  // ✅ MONTÁŽ má vždy editMode (ako red pen)
+    console.log('🏗️ MONTÁŽ mode - filter ENABLED, editMode ENABLED');
   } else {
     displayFilter.enabled=false;
+    // editMode zostane ako je (prepína sa tlačidlom v PREFABRIKÁCIA)
   }
   
   // Skry bočný panel pri prepnutí záložiek
@@ -1146,23 +1148,23 @@ moveLineMode=false;
 
 console.log('🔧 Tool changed to:', tool);
 
-// Skry draw tool menu pri prepnutí
-document.getElementById('lineOptions').style.display='none';
-document.getElementById('textOptions').style.display='none';
-document.getElementById('curveOptions').style.display='none';
-document.getElementById('linebtn').style.opacity='0.7';
-document.getElementById('textbtn').style.opacity='0.7';
-document.getElementById('curvebtn').style.opacity='0.7';
+// Skry draw tool menu pri prepnutí (bezpečne)
+if(document.getElementById('lineOptions')) document.getElementById('lineOptions').style.display='none';
+if(document.getElementById('textOptions')) document.getElementById('textOptions').style.display='none';
+if(document.getElementById('curveOptions')) document.getElementById('curveOptions').style.display='none';
+if(document.getElementById('linebtn')) document.getElementById('linebtn').style.opacity='0.7';
+if(document.getElementById('textbtn')) document.getElementById('textbtn').style.opacity='0.7';
+if(document.getElementById('curvebtn')) document.getElementById('curvebtn').style.opacity='0.7';
 
 if(tool==='spool'){
 spoolMode=true;
 calculateSpoools();
-document.getElementById('spoolPanel').classList.add('active');
+if(document.getElementById('spoolPanel')) document.getElementById('spoolPanel').classList.add('active');
 }else{
 spoolMode=false;
-document.getElementById('spoolPanel').classList.remove('active');
+if(document.getElementById('spoolPanel')) document.getElementById('spoolPanel').classList.remove('active');
 }
-document.getElementById('selectbtn').style.opacity=tool==='select'?'1':'0.7';
+if(document.getElementById('selectbtn')) document.getElementById('selectbtn').style.opacity=tool==='select'?'1':'0.7';
 document.getElementById('crossbtn').style.opacity=tool==='cross'?'1':'0.7';
 document.getElementById('spoolbtn').style.opacity=tool==='spool'?'1':'0.7';
 document.getElementById('dimensionbtn').style.opacity='0.7';
