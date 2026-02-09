@@ -303,9 +303,38 @@ var jsPDF = window.jspdf.jsPDF;
 </script>
 
 <!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<!-- Firebase SDK - UNPKG CDN (alternatíva ku gstatic.com) -->
+<!-- Firebase v9 Modular SDK -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+  import { getFirestore, collection, getDocs, doc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+  import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBxM-CWiN7-m8bYOp0-0BQ9TvPl3XqGHrc",
+    authDomain: "weldpro-66d2a-8336e.firebaseapp.com",
+    projectId: "weldpro-66d2a-8336e",
+    storageBucket: "weldpro-66d2a-8336e.firebasestorage.app",
+    messagingSenderId: "1062303461642",
+    appId: "1:1062303461642:web:e90ff234366c88a5eccaf3"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  window.db = getFirestore(app);
+  window.auth = getAuth(app);
+  
+  signInAnonymously(window.auth)
+    .then(() => {
+      console.log('✅ Firebase v9 ready!');
+      window.firebaseReady = true;
+    })
+    .catch(err => console.error('❌ Firebase auth error:', err));
+</script>
+
+<!-- Fallback pre staršie browsery -->
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.22.0/firebase-app-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.22.0/firebase-auth-compat.js"></script>
 
 <script>
 // 🔒 SESSION CHECK - Ochrana proti neautorizovanému prístupu
@@ -375,15 +404,41 @@ const firebaseConfig = {
 
 let db = null;
 let auth = null;
+let firebaseReady = false;
 
-window.addEventListener('load', function() {
-  if (typeof firebase !== 'undefined') {
+// KRITICKÁ OPRAVA - Počkaj na Firebase SDK a potom inicializuj
+async function initFirebase() {
+  // Počkaj na Firebase SDK (max 10 sekúnd)
+  let attempts = 0;
+  while (typeof firebase === 'undefined' && attempts < 100) {
+    console.log('⏳ Čakám na Firebase SDK... (pokus', attempts + 1, '/ 100)');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    attempts++;
+  }
+  
+  if (typeof firebase === 'undefined') {
+    console.error('❌ Firebase SDK sa nenačítal!');
+    return;
+  }
+  
+  try {
+    console.log('🔥 Inicializujem Firebase...');
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
     auth = firebase.auth();
-    auth.signInAnonymously().then(() => console.log('✅ Firebase ready!')).catch(err => console.error(err));
+    
+    // Prihlás sa anonymne
+    await auth.signInAnonymously();
+    console.log('✅ Firebase ready!');
+    firebaseReady = true;
+  } catch(err) {
+    console.error('❌ Firebase init chyba:', err);
+    firebaseReady = false;
   }
-});
+}
+
+// Spusti inicializáciu hneď
+initFirebase();
 
 async function uploadProjectToFirebase(projectData) {
   if (!db) throw new Error('Firebase not ready');
@@ -8942,8 +8997,16 @@ async function saveProjectsToFirebase() {
 }
 
 async function loadProjectsFromFirebase() {
+  // Počkaj maximálne 5 sekúnd na Firebase
+  let attempts = 0;
+  while (!db && attempts < 50) {
+    console.log('⏳ Čakám na Firebase... (pokus', attempts + 1, '/ 50)');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    attempts++;
+  }
+  
   if(!db) {
-    console.warn('⚠️ Firebase nie je dostupný, používam localStorage');
+    console.warn('⚠️ Firebase nie je dostupný po 5 sekundách, používam localStorage');
     loadProjectsFromStorage();
     return;
   }
