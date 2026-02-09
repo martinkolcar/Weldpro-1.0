@@ -443,8 +443,23 @@ background: #dc2626;
     display: block;
   }
   
-  .ribbon-container {
+  .ribbon-tabs {
     display: none;
+  }
+  
+  .ribbon-container {
+    display: block;
+    padding: 4px 8px;
+  }
+  
+  .ribbon-content {
+    padding: 4px 8px;
+    flex-wrap: wrap;
+  }
+  
+  .ribbon-group {
+    flex-wrap: wrap;
+    gap: 4px;
   }
   
   .toolbar-main {
@@ -461,7 +476,7 @@ background: #dc2626;
   }
   
   .main {
-    padding-top: 80px;
+    padding-top: 120px;
     padding-bottom: 70px;
     padding-left: 10px;
     padding-right: 10px;
@@ -706,31 +721,55 @@ async function listProjectsFromFirebase() {
   <div class="mobile-menu-items">
     <div class="mobile-menu-item" onclick="mobileMenuAction('library')">
       <span style="font-size:20px">📚</span>
-      <span>Knižnica</span>
+      <span>Knižnica (Advanced)</span>
+    </div>
+    <div class="mobile-menu-item" onclick="mobileMenuAction('libraryOnline')">
+      <span style="font-size:20px">📚</span>
+      <span>Online Knižnica</span>
     </div>
     <div class="mobile-menu-item" onclick="mobileMenuAction('upload')">
       <span style="font-size:20px">📁</span>
       <span>Nahrať PDF</span>
     </div>
+    <div class="mobile-menu-item" onclick="mobileMenuAction('redpen')">
+      <span style="font-size:20px">✏️</span>
+      <span>Red Pen</span>
+    </div>
     <div class="mobile-menu-item" onclick="mobileMenuAction('weldlog')">
       <span style="font-size:20px">⚡</span>
       <span>WeldBook</span>
     </div>
-    <div class="mobile-menu-item" onclick="mobileMenuAction('mto')">
-      <span style="font-size:20px">📋</span>
-      <span>MTO</span>
+    <div class="mobile-menu-item" onclick="mobileMenuAction('prefab')">
+      <span style="font-size:20px">🏗️</span>
+      <span>Prefabrikácia</span>
+    </div>
+    <div class="mobile-menu-item" onclick="mobileMenuAction('vyroba')">
+      <span style="font-size:20px">🏭</span>
+      <span>Výroba</span>
     </div>
     <div class="mobile-menu-item" onclick="mobileMenuAction('kontrola')">
       <span style="font-size:20px">🔍</span>
       <span>Kontrola</span>
     </div>
+    <div class="mobile-menu-item" onclick="mobileMenuAction('montaz')">
+      <span style="font-size:20px">🔧</span>
+      <span>Montáž</span>
+    </div>
+    <div class="mobile-menu-item" onclick="mobileMenuAction('mto')">
+      <span style="font-size:20px">📋</span>
+      <span>MTO</span>
+    </div>
+    <div class="mobile-menu-item" onclick="mobileMenuAction('progres')">
+      <span style="font-size:20px">📊</span>
+      <span>Progres</span>
+    </div>
     <div class="mobile-menu-item" onclick="mobileMenuAction('export')">
       <span style="font-size:20px">📦</span>
       <span>Export</span>
     </div>
-    <div class="mobile-menu-item" onclick="mobileMenuAction('vyroba')">
-      <span style="font-size:20px">🏭</span>
-      <span>Výroba</span>
+    <div class="mobile-menu-item" onclick="mobileMenuAction('notifications')">
+      <span style="font-size:20px">🔔</span>
+      <span>Notifikácie</span>
     </div>
   </div>
 </div>
@@ -14412,18 +14451,57 @@ function mobileMenuAction(action) {
   setTimeout(function() {
     switch(action) {
       case 'library':
+        if (typeof openLibraryManagerReal === 'function') {
+          openLibraryManagerReal();
+        } else {
+          alert('Knižnica (Advanced) - funkcia zatiaľ nedostupná');
+        }
+        break;
+      case 'libraryOnline':
         if (typeof openLibrary === 'function') {
           openLibrary();
         } else {
-          alert('Knižnica - funkcia zatiaľ nedostupná');
+          alert('Online Knižnica - funkcia zatiaľ nedostupná');
         }
         break;
       case 'upload':
         document.getElementById('f').click();
         break;
+      case 'redpen':
+        // Prepnúť na Red Pen ribbon
+        var redpen = document.getElementById('ribbonRedpen');
+        if (redpen) {
+          var allRibbons = document.querySelectorAll('.ribbon-content');
+          for (var i = 0; i < allRibbons.length; i++) {
+            allRibbons[i].classList.remove('active');
+          }
+          redpen.classList.add('active');
+        }
+        break;
       case 'weldlog':
         if (typeof toggleWeldLog === 'function') {
           toggleWeldLog();
+        }
+        break;
+      case 'prefab':
+        // Prepnúť na Prefabrikácia ribbon
+        var prefab = document.getElementById('ribbonPrefab');
+        if (prefab) {
+          var allRibbons = document.querySelectorAll('.ribbon-content');
+          for (var i = 0; i < allRibbons.length; i++) {
+            allRibbons[i].classList.remove('active');
+          }
+          prefab.classList.add('active');
+        }
+        break;
+      case 'vyroba':
+        var vyrobaRibbon = document.getElementById('ribbonVyroba');
+        if (vyrobaRibbon) {
+          var allRibbons = document.querySelectorAll('.ribbon-content');
+          for (var i = 0; i < allRibbons.length; i++) {
+            allRibbons[i].classList.remove('active');
+          }
+          vyrobaRibbon.classList.add('active');
         }
         break;
       case 'mto':
@@ -14432,18 +14510,48 @@ function mobileMenuAction(action) {
         }
         break;
       case 'kontrola':
-        if (typeof openKontrolaTab === 'function') {
-          openKontrolaTab();
+        var kontrolaRibbon = document.getElementById('ribbonKontrola');
+        if (kontrolaRibbon) {
+          var allRibbons = document.querySelectorAll('.ribbon-content');
+          for (var i = 0; i < allRibbons.length; i++) {
+            allRibbons[i].classList.remove('active');
+          }
+          kontrolaRibbon.classList.add('active');
+        }
+        break;
+      case 'montaz':
+        var montazRibbon = document.getElementById('ribbonMontaz');
+        if (montazRibbon) {
+          var allRibbons = document.querySelectorAll('.ribbon-content');
+          for (var i = 0; i < allRibbons.length; i++) {
+            allRibbons[i].classList.remove('active');
+          }
+          montazRibbon.classList.add('active');
+        }
+        break;
+      case 'progres':
+        var progresRibbon = document.getElementById('ribbonProgres');
+        if (progresRibbon) {
+          var allRibbons = document.querySelectorAll('.ribbon-content');
+          for (var i = 0; i < allRibbons.length; i++) {
+            allRibbons[i].classList.remove('active');
+          }
+          progresRibbon.classList.add('active');
         }
         break;
       case 'export':
-        if (typeof openExportTab === 'function') {
-          openExportTab();
+        var exportRibbon = document.getElementById('ribbonExport');
+        if (exportRibbon) {
+          var allRibbons = document.querySelectorAll('.ribbon-content');
+          for (var i = 0; i < allRibbons.length; i++) {
+            allRibbons[i].classList.remove('active');
+          }
+          exportRibbon.classList.add('active');
         }
         break;
-      case 'vyroba':
-        if (typeof openVyrobaTab === 'function') {
-          openVyrobaTab();
+      case 'notifications':
+        if (typeof toggleNotificationsPanel === 'function') {
+          toggleNotificationsPanel();
         }
         break;
     }
