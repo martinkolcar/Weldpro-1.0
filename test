@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TEST Hamburger Menu</title>
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>eruda.init();</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Arial, sans-serif; padding: 20px; }
+.hamburger-btn {
+  position: fixed; top: 20px; left: 20px; width: 60px; height: 60px;
+  background: #0078D4; color: white; border: none; border-radius: 8px;
+  font-size: 32px; cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+  z-index: 10001; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.hamburger-menu {
+  position: fixed; top: 0; left: 0; width: 280px; height: 100vh;
+  background: white; z-index: 10000;
+  box-shadow: 4px 0 12px rgba(0,0,0,0.3);
+  transform: translateX(-100%); transition: transform 0.3s ease;
+}
+.hamburger-menu.active { transform: translateX(0); }
+.menu-header {
+  background: #0078D4; color: white; padding: 20px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.close-btn {
+  background: rgba(255,255,255,0.2); border: none; color: white;
+  width: 40px; height: 40px; border-radius: 50%;
+  font-size: 24px; cursor: pointer;
+}
+.menu-items { padding: 20px; }
+.menu-item {
+  padding: 15px; border-bottom: 1px solid #e5e7eb;
+  cursor: pointer; font-size: 16px;
+}
+.menu-item:hover { background: #f3f4f6; }
+.overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); z-index: 9999; display: none;
+}
+.overlay.active { display: block; }
+.info { margin-top: 100px; padding: 20px; background: #f0f0f0; border-radius: 8px; }
+</style>
+</head>
+<body>
+<h1>TEST - Hamburger Menu</h1>
+<button class="hamburger-btn" id="hamburgerBtn">☰</button>
+<div class="overlay" id="overlay"></div>
+<div class="hamburger-menu" id="hamburgerMenu">
+  <div class="menu-header">
+    <h2>Menu</h2>
+    <button class="close-btn" id="closeBtn">✕</button>
+  </div>
+  <div class="menu-items">
+    <div class="menu-item" data-action="test1">📚 Test 1</div>
+    <div class="menu-item" data-action="test2">📁 Test 2</div>
+    <div class="menu-item" data-action="test3">⚡ Test 3</div>
+  </div>
+</div>
+<div class="info">
+  <h3>Inštrukcie:</h3>
+  <ol>
+    <li>Otvorte ERUDA konzolu (zelené tlačidlo vpravo dole)</li>
+    <li>Kliknite na [☰] tlačidlo vľavo hore</li>
+    <li>Menu by sa malo vysunúť z ľava</li>
+    <li>V konzole uvidíte debug logy</li>
+  </ol>
+  <p><strong>Status:</strong> <span id="status">Čakám...</span></p>
+</div>
+<script>
+console.log('=====================');
+console.log('TEST HAMBURGER MENU');
+console.log('=====================');
+function updateStatus(msg) {
+  document.getElementById('status').textContent = msg;
+  console.log('📝 Status:', msg);
+}
+function toggleMenu() {
+  console.log('🍔 toggleMenu() CALLED!');
+  updateStatus('Toggle menu funkcia zavolaná!');
+  const menu = document.getElementById('hamburgerMenu');
+  const overlay = document.getElementById('overlay');
+  if (!menu) {
+    console.error('❌ Menu element nenájdený!');
+    updateStatus('ERROR: Menu element nenájdený!');
+    return;
+  }
+  if (menu.classList.contains('active')) {
+    console.log('🔒 Zatvárám menu');
+    updateStatus('Zatvárám menu...');
+    menu.classList.remove('active');
+    overlay.classList.remove('active');
+  } else {
+    console.log('🔓 Otváram menu');
+    updateStatus('Otváram menu...');
+    menu.classList.add('active');
+    overlay.classList.add('active');
+  }
+}
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('📱 DOMContentLoaded fired!');
+  updateStatus('DOM načítaný, pripájam listenery...');
+  const hamburgerBtn = document.getElementById('hamburgerBtn');
+  const closeBtn = document.getElementById('closeBtn');
+  const overlay = document.getElementById('overlay');
+  const menuItems = document.querySelectorAll('.menu-item');
+  console.log('Elementy:');
+  console.log('- hamburgerBtn:', hamburgerBtn ? '✅' : '❌');
+  console.log('- closeBtn:', closeBtn ? '✅' : '❌');
+  console.log('- overlay:', overlay ? '✅' : '❌');
+  console.log('- menuItems:', menuItems.length);
+  if (hamburgerBtn) {
+    hamburgerBtn.addEventListener('click', function() {
+      console.log('🖱️ Hamburger button CLICKED!');
+      updateStatus('Hamburger button kliknutý!');
+      toggleMenu();
+    });
+    console.log('✅ Hamburger listener pripojený');
+  } else {
+    console.error('❌ Hamburger button nenájdený!');
+  }
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function() {
+      console.log('❌ Close button CLICKED!');
+      toggleMenu();
+    });
+    console.log('✅ Close listener pripojený');
+  }
+  if (overlay) {
+    overlay.addEventListener('click', function() {
+      console.log('🌑 Overlay CLICKED!');
+      toggleMenu();
+    });
+    console.log('✅ Overlay listener pripojený');
+  }
+  menuItems.forEach(function(item) {
+    item.addEventListener('click', function() {
+      const action = this.getAttribute('data-action');
+      console.log('📌 Menu item clicked:', action);
+      updateStatus('Kliknuté: ' + action);
+      alert('Klikli ste na: ' + action);
+      toggleMenu();
+    });
+  });
+  console.log('✅ Menu items listenery pripojené');
+  updateStatus('Všetko pripravené! Kliknite na [☰]');
+  console.log('=====================');
+  console.log('✅ INICIALIZÁCIA OK!');
+  console.log('=====================');
+});
+console.log('📜 Script loaded!');
+</script>
+</body>
+</html>
+```
