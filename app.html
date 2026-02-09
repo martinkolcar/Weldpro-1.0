@@ -14515,6 +14515,21 @@ function mobileMenuAction(action) {
         break;
       case 'weldbook':
         // WELDBOOK - kontrola podľa izometrie
+        console.log('📗 Otváram WeldBook...');
+        console.log('   Projekt:', projectsData.currentProject || 'ŽIADNY');
+        console.log('   Časť:', projectsData.currentPart || 'ŽIADNA');
+        console.log('   WeldBook dáta:', weldBookData ? weldBookData.length : 0, 'zvarov');
+        
+        // Debug na mobile
+        if (window.innerWidth < 768) {
+          var debugMsg = 'WELDBOOK DEBUG:\n\n';
+          debugMsg += 'Projekt: ' + (projectsData.currentProject || 'ŽIADNY') + '\n';
+          debugMsg += 'Časť: ' + (projectsData.currentPart || 'ŽIADNA') + '\n';
+          debugMsg += 'Zvarov: ' + (weldBookData ? weldBookData.length : 0) + '\n';
+          debugMsg += '\nAk je to 0, vyberte najprv projekt v Knižnici!';
+          alert(debugMsg);
+        }
+        
         if (typeof openWeldBook === 'function') {
           openWeldBook();
         } else {
@@ -14704,21 +14719,38 @@ console.log('✅ Mobilná navigácia načítaná');
         e.preventDefault();
         var touch = e.touches[0];
         var rect = canvas.getBoundingClientRect();
-        var x = touch.clientX - rect.left;
-        var y = touch.clientY - rect.top;
         
-        console.log('👆 Touch na canvas:', x, y);
+        console.log('👆 Touch na canvas - rect:', rect);
+        console.log('   clientX:', touch.clientX, 'clientY:', touch.clientY);
+        
         showTouchFeedback(touch.clientX, touch.clientY);
         
-        // Simuluj click event
-        var clickEvent = new MouseEvent('click', {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-          clientX: touch.clientX,
-          clientY: touch.clientY
-        });
-        canvas.dispatchEvent(clickEvent);
+        // PRIAMO ZAVOLAJ canvas.onclick ak existuje
+        if (typeof canvas.onclick === 'function') {
+          console.log('✅ Volám canvas.onclick priamo!');
+          
+          // Vytvor fake MouseEvent objekt
+          var fakeEvent = {
+            clientX: touch.clientX,
+            clientY: touch.clientY,
+            preventDefault: function() {},
+            stopPropagation: function() {}
+          };
+          
+          canvas.onclick(fakeEvent);
+        } else {
+          console.warn('⚠️ canvas.onclick neexistuje!');
+          
+          // Fallback - skús dispatchEvent
+          var clickEvent = new MouseEvent('click', {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            clientX: touch.clientX,
+            clientY: touch.clientY
+          });
+          canvas.dispatchEvent(clickEvent);
+        }
       }, {passive: false});
       
       console.log('✅ Canvas touch listener pridaný');
