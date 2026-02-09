@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WeldPro 1.0 - Professional Welding Management</title>
+
+<!-- ERUDA - Mobilná Developer Console -->
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>eruda.init();</script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -547,6 +552,7 @@ display: block;
 .header {
 padding: 10px;
 height: auto;
+z-index: 9999; /* Nižší ako hamburger button (10001) */
 }
 
 h1 {
@@ -944,7 +950,7 @@ async function listProjectsFromFirebase() {
 <!-- ============================================ -->
 
 <!-- HAMBURGER BUTTON (zobrazí sa len na mobile) -->
-<button class="hamburger-btn" onclick="toggleHamburgerMenu()">
+<button class="hamburger-btn" id="hamburgerBtn">
 ☰
 </button>
 
@@ -952,42 +958,42 @@ async function listProjectsFromFirebase() {
 <div class="hamburger-menu" id="hamburgerMenu">
 <div class="hamburger-header">
 <h2 style="margin:0;font-size:18px">🔧 WeldPro Menu</h2>
-<button class="hamburger-close" onclick="toggleHamburgerMenu()">✕</button>
+<button class="hamburger-close" id="hamburgerClose">✕</button>
 </div>
 <div class="hamburger-menu-items">
-<div class="hamburger-menu-item" onclick="hamburgerAction('library')">
+<div class="hamburger-menu-item" data-action="library">
 <span style="font-size:20px">📚</span>
 <span>Knižnica</span>
 </div>
-<div class="hamburger-menu-item" onclick="hamburgerAction('upload')">
+<div class="hamburger-menu-item" data-action="upload">
 <span style="font-size:20px">📁</span>
 <span>Nahrať PDF</span>
 </div>
-<div class="hamburger-menu-item" onclick="hamburgerAction('weldlog')">
+<div class="hamburger-menu-item" data-action="weldlog">
 <span style="font-size:20px">⚡</span>
 <span>WeldBook</span>
 </div>
-<div class="hamburger-menu-item" onclick="hamburgerAction('mto')">
+<div class="hamburger-menu-item" data-action="mto">
 <span style="font-size:20px">📋</span>
 <span>MTO</span>
 </div>
-<div class="hamburger-menu-item" onclick="hamburgerAction('kontrola')">
+<div class="hamburger-menu-item" data-action="kontrola">
 <span style="font-size:20px">🔍</span>
 <span>Kontrola</span>
 </div>
-<div class="hamburger-menu-item" onclick="hamburgerAction('export')">
+<div class="hamburger-menu-item" data-action="export">
 <span style="font-size:20px">📦</span>
 <span>Export</span>
 </div>
-<div class="hamburger-menu-item" onclick="hamburgerAction('vyroba')">
+<div class="hamburger-menu-item" data-action="vyroba">
 <span style="font-size:20px">🏭</span>
 <span>Výroba</span>
 </div>
-<div class="hamburger-menu-item" onclick="hamburgerAction('projekty')">
+<div class="hamburger-menu-item" data-action="projekty">
 <span style="font-size:20px">📂</span>
 <span>Projekty</span>
 </div>
-<div class="hamburger-menu-item" onclick="hamburgerAction('notifications')">
+<div class="hamburger-menu-item" data-action="notifications">
 <span style="font-size:20px">🔔</span>
 <span>Notifikácie</span>
 </div>
@@ -995,28 +1001,28 @@ async function listProjectsFromFirebase() {
 </div>
 
 <!-- MENU OVERLAY (zatmavenie pozadia) -->
-<div class="menu-overlay" id="menuOverlay" onclick="toggleHamburgerMenu()"></div>
+<div class="menu-overlay" id="menuOverlay"></div>
 
 <!-- BOTTOM NAVIGATION BAR (fixed na spodku) -->
 <div class="bottom-nav">
 <div class="bottom-nav-items">
-<button class="bottom-nav-item active" onclick="bottomNavAction('pdf')">
+<button class="bottom-nav-item active" data-section="pdf">
 <div class="nav-icon">📄</div>
 <div>PDF</div>
 </button>
-<button class="bottom-nav-item" onclick="bottomNavAction('welds')">
+<button class="bottom-nav-item" data-section="welds">
 <div class="nav-icon">⚡</div>
 <div>Zvary</div>
 </button>
-<button class="bottom-nav-item" onclick="bottomNavAction('mto')">
+<button class="bottom-nav-item" data-section="mto">
 <div class="nav-icon">📋</div>
 <div>MTO</div>
 </button>
-<button class="bottom-nav-item" onclick="bottomNavAction('kontrola')">
+<button class="bottom-nav-item" data-section="kontrola">
 <div class="nav-icon">🔍</div>
 <div>Kontrola</div>
 </button>
-<button class="bottom-nav-item" onclick="bottomNavAction('more')">
+<button class="bottom-nav-item" data-section="more">
 <div class="nav-icon">⚙️</div>
 <div>Viac</div>
 </button>
@@ -14658,13 +14664,21 @@ Voľné: <span id="availableSpace">~10 MB</span>
 
 // Toggle Hamburger Menu
 function toggleHamburgerMenu() {
+  console.log('🍔 Toggle Hamburger Menu');
   const menu = document.getElementById('hamburgerMenu');
   const overlay = document.getElementById('menuOverlay');
   
+  if (!menu) {
+    console.error('❌ Hamburger menu element nenájdený!');
+    return;
+  }
+  
   if (menu.classList.contains('active')) {
+    console.log('🔒 Zatvárám menu');
     menu.classList.remove('active');
     overlay.classList.remove('active');
   } else {
+    console.log('🔓 Otváram menu');
     menu.classList.add('active');
     overlay.classList.add('active');
   }
@@ -14672,82 +14686,160 @@ function toggleHamburgerMenu() {
 
 // Hamburger menu akcie
 function hamburgerAction(action) {
+  console.log('🎯 Hamburger Action:', action);
+  
   // Zatvoriť menu
   toggleHamburgerMenu();
   
   // Vykonať akciu
-  switch(action) {
-    case 'library':
-      openLibrary();
-      break;
-    case 'upload':
-      document.getElementById('f').click();
-      break;
-    case 'weldlog':
-      toggleWeldLog();
-      break;
-    case 'mto':
-      openMTOGrid();
-      break;
-    case 'kontrola':
-      openKontrolaTab();
-      break;
-    case 'export':
-      openExportTab();
-      break;
-    case 'vyroba':
-      openVyrobaTab();
-      break;
-    case 'projekty':
-      // Otvorí projekty panel (na mobile cez modal možno)
-      showProjectsModal();
-      break;
-    case 'notifications':
-      toggleNotifications();
-      break;
+  try {
+    switch(action) {
+      case 'library':
+        console.log('📚 Otváram knižnicu...');
+        if (typeof openLibrary === 'function') {
+          openLibrary();
+        } else {
+          alert('⚠️ Knižnica momentálne nie je dostupná.\nPoskytne sa v ďalšej verzii.');
+        }
+        break;
+      case 'upload':
+        console.log('📁 Otváram file picker...');
+        const fileInput = document.getElementById('f');
+        if (fileInput) {
+          fileInput.click();
+        } else {
+          alert('❌ File input nenájdený!');
+        }
+        break;
+      case 'weldlog':
+        console.log('⚡ Otváram WeldBook...');
+        if (typeof toggleWeldLog === 'function') {
+          toggleWeldLog();
+        } else {
+          alert('❌ WeldLog funkcia nenájdená!');
+        }
+        break;
+      case 'mto':
+        console.log('📋 Otváram MTO...');
+        if (typeof openMTOGrid === 'function') {
+          openMTOGrid();
+        } else {
+          alert('❌ MTO funkcia nenájdená!');
+        }
+        break;
+      case 'kontrola':
+        console.log('🔍 Otváram Kontrolu...');
+        if (typeof openKontrolaTab === 'function') {
+          openKontrolaTab();
+        } else {
+          alert('❌ Kontrola funkcia nenájdená!');
+        }
+        break;
+      case 'export':
+        console.log('📦 Otváram Export...');
+        if (typeof openExportTab === 'function') {
+          openExportTab();
+        } else {
+          alert('❌ Export funkcia nenájdená!');
+        }
+        break;
+      case 'vyroba':
+        console.log('🏭 Otváram Výrobu...');
+        if (typeof openVyrobaTab === 'function') {
+          openVyrobaTab();
+        } else {
+          alert('❌ Výroba funkcia nenájdená!');
+        }
+        break;
+      case 'projekty':
+        console.log('📂 Otváram Projekty...');
+        showProjectsModal();
+        break;
+      case 'notifications':
+        console.log('🔔 Otváram Notifikácie...');
+        if (typeof toggleNotifications === 'function') {
+          toggleNotifications();
+        } else {
+          alert('❌ Notifikácie funkcia nenájdená!');
+        }
+        break;
+      default:
+        console.warn('⚠️ Neznáma akcia:', action);
+    }
+  } catch (error) {
+    console.error('❌ Chyba v hamburgerAction:', error);
+    alert('❌ Chyba: ' + error.message);
   }
 }
 
 // Bottom Navigation akcie
-function bottomNavAction(section) {
+function bottomNavAction(section, clickedElement) {
+  console.log('📱 Bottom Nav Action:', section);
+  
   // Odstráň active zo všetkých
   const items = document.querySelectorAll('.bottom-nav-item');
   items.forEach(item => item.classList.remove('active'));
   
   // Pridaj active na kliknutý
-  event.currentTarget.classList.add('active');
+  if (clickedElement) {
+    clickedElement.classList.add('active');
+  }
   
   // Vykonaj akciu
-  switch(section) {
-    case 'pdf':
-      // Skry WeldLog panel ak je otvorený
-      const weldPanel = document.getElementById('weldLogPanel');
-      if (weldPanel) weldPanel.classList.remove('active');
-      
-      // Skry Spool panel
-      const spoolPanel = document.getElementById('spoolPanel');
-      if (spoolPanel) spoolPanel.classList.remove('active');
-      
-      // Focus na PDF
-      scrollToTop();
-      break;
-      
-    case 'welds':
-      toggleWeldLog();
-      break;
-      
-    case 'mto':
-      openMTOGrid();
-      break;
-      
-    case 'kontrola':
-      openKontrolaTab();
-      break;
-      
-    case 'more':
-      // Otvoriť hamburger menu
-      toggleHamburgerMenu();
-      break;
+  try {
+    switch(section) {
+      case 'pdf':
+        console.log('📄 Bottom Nav: PDF');
+        // Skry WeldLog panel ak je otvorený
+        const weldPanel = document.getElementById('weldLogPanel');
+        if (weldPanel) weldPanel.classList.remove('active');
+        
+        // Skry Spool panel
+        const spoolPanel = document.getElementById('spoolPanel');
+        if (spoolPanel) spoolPanel.classList.remove('active');
+        
+        // Focus na PDF
+        scrollToTop();
+        break;
+        
+      case 'welds':
+        console.log('⚡ Bottom Nav: Welds');
+        if (typeof toggleWeldLog === 'function') {
+          toggleWeldLog();
+        } else {
+          alert('❌ WeldLog funkcia nenájdená!');
+        }
+        break;
+        
+      case 'mto':
+        console.log('📋 Bottom Nav: MTO');
+        if (typeof openMTOGrid === 'function') {
+          openMTOGrid();
+        } else {
+          alert('❌ MTO funkcia nenájdená!');
+        }
+        break;
+        
+      case 'kontrola':
+        console.log('🔍 Bottom Nav: Kontrola');
+        if (typeof openKontrolaTab === 'function') {
+          openKontrolaTab();
+        } else {
+          alert('❌ Kontrola funkcia nenájdená!');
+        }
+        break;
+        
+      case 'more':
+        console.log('⚙️ Bottom Nav: More (Hamburger)');
+        toggleHamburgerMenu();
+        break;
+        
+      default:
+        console.warn('⚠️ Neznáma sekcia:', section);
+    }
+  } catch (error) {
+    console.error('❌ Chyba v bottomNavAction:', error);
+    alert('❌ Chyba: ' + error.message);
   }
 }
 
@@ -14768,16 +14860,106 @@ function showProjectsModal() {
 
 // Detekcia veľkosti obrazovky pri načítaní
 window.addEventListener('DOMContentLoaded', function() {
-  console.log('📱 Responzívny režim aktívny');
-  console.log('Šírka obrazovky:', window.innerWidth);
+  console.log('========================================');
+  console.log('📱 WeldPro RESPONZÍVNY REŽIM AKTÍVNY');
+  console.log('========================================');
+  console.log('Šírka obrazovky:', window.innerWidth, 'px');
+  console.log('Výška obrazovky:', window.innerHeight, 'px');
   
   if (window.innerWidth < 768) {
-    console.log('📱 Mobilný režim');
+    console.log('📱 MOBILNÝ REŽIM');
   } else if (window.innerWidth < 1024) {
-    console.log('📱 Tabletový režim');
+    console.log('📱 TABLETOVÝ REŽIM');
   } else {
-    console.log('🖥️ Desktop režim');
+    console.log('🖥️ DESKTOP REŽIM');
   }
+  
+  // Test či sú mobilné prvky na mieste
+  const hamburgerBtn = document.getElementById('hamburgerBtn');
+  const hamburgerClose = document.getElementById('hamburgerClose');
+  const hamburgerMenu = document.getElementById('hamburgerMenu');
+  const bottomNav = document.querySelector('.bottom-nav');
+  const menuOverlay = document.getElementById('menuOverlay');
+  
+  console.log('--- Mobilné prvky: ---');
+  console.log('Hamburger tlačidlo:', hamburgerBtn ? '✅ OK' : '❌ CHÝBA');
+  console.log('Hamburger close:', hamburgerClose ? '✅ OK' : '❌ CHÝBA');
+  console.log('Hamburger menu:', hamburgerMenu ? '✅ OK' : '❌ CHÝBA');
+  console.log('Bottom navigation:', bottomNav ? '✅ OK' : '❌ CHÝBA');
+  console.log('Menu overlay:', menuOverlay ? '✅ OK' : '❌ CHÝBA');
+  
+  // Test funkcií
+  console.log('--- Funkcie: ---');
+  console.log('toggleHamburgerMenu:', typeof toggleHamburgerMenu === 'function' ? '✅ OK' : '❌ CHÝBA');
+  console.log('hamburgerAction:', typeof hamburgerAction === 'function' ? '✅ OK' : '❌ CHÝBA');
+  console.log('bottomNavAction:', typeof bottomNavAction === 'function' ? '✅ OK' : '❌ CHÝBA');
+  console.log('openLibrary:', typeof openLibrary === 'function' ? '✅ OK' : '❌ CHÝBA');
+  console.log('toggleWeldLog:', typeof toggleWeldLog === 'function' ? '✅ OK' : '❌ CHÝBA');
+  console.log('openMTOGrid:', typeof openMTOGrid === 'function' ? '✅ OK' : '❌ CHÝBA');
+  
+  console.log('========================================');
+  
+  // ============================================
+  // PRIPOJENIE EVENT LISTENEROV
+  // ============================================
+  console.log('🔗 Pripájam event listenery...');
+  
+  // Hamburger tlačidlo
+  if (hamburgerBtn) {
+    hamburgerBtn.addEventListener('click', function() {
+      console.log('🍔 Hamburger button CLICKED!');
+      toggleHamburgerMenu();
+    });
+    console.log('✅ Hamburger button listener pripojený');
+  } else {
+    console.error('❌ Hamburger button nenájdený!');
+  }
+  
+  // Hamburger close button
+  if (hamburgerClose) {
+    hamburgerClose.addEventListener('click', function() {
+      console.log('❌ Hamburger close CLICKED!');
+      toggleHamburgerMenu();
+    });
+    console.log('✅ Hamburger close listener pripojený');
+  }
+  
+  // Menu overlay
+  if (menuOverlay) {
+    menuOverlay.addEventListener('click', function() {
+      console.log('🌑 Overlay CLICKED!');
+      toggleHamburgerMenu();
+    });
+    console.log('✅ Overlay listener pripojený');
+  }
+  
+  // Hamburger menu items
+  const menuItems = document.querySelectorAll('.hamburger-menu-item');
+  console.log('📋 Našiel som', menuItems.length, 'menu items');
+  menuItems.forEach(function(item) {
+    item.addEventListener('click', function() {
+      const action = this.getAttribute('data-action');
+      console.log('📌 Menu item CLICKED:', action);
+      hamburgerAction(action);
+    });
+  });
+  console.log('✅ Menu items listenery pripojené');
+  
+  // Bottom navigation items
+  const bottomNavItems = document.querySelectorAll('.bottom-nav-item');
+  console.log('🔽 Našiel som', bottomNavItems.length, 'bottom nav items');
+  bottomNavItems.forEach(function(item) {
+    item.addEventListener('click', function() {
+      const section = this.getAttribute('data-section');
+      console.log('🔽 Bottom nav CLICKED:', section);
+      bottomNavAction(section, this);
+    });
+  });
+  console.log('✅ Bottom nav listenery pripojené');
+  
+  console.log('========================================');
+  console.log('✅ Inicializácia DOKONČENÁ!');
+  console.log('========================================');
 });
 
 // Sledovanie zmeny orientácie
