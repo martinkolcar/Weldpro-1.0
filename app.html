@@ -14597,6 +14597,126 @@ function bottomNavClick(section, btn) {
 }
 
 console.log('✅ Mobilná navigácia načítaná');
+
+// ==========================================
+// TOUCH PODPORA PRE MOBIL - UNIVERZÁLNA
+// ==========================================
+(function() {
+  console.log('📱 Inicializujem touch podporu...');
+  
+  // Konvertuj touch na click pre canvas a overlay
+  function initTouchSupport() {
+    var canvas = document.getElementById('pdfCanvas');
+    var overlay = document.getElementById('overlay');
+    
+    // Prevent double-tap zoom na mobile (okrem PDF canvas kde chceme zoom)
+    document.addEventListener('touchstart', function(e) {
+      if (e.touches.length > 1) {
+        // Multi-touch OK (pinch zoom)
+        return;
+      }
+      
+      // Povoliť zoom len na PDF canvas
+      var target = e.target;
+      if (!target.closest('#pdfCanvas')) {
+        var t2 = e.timeStamp;
+        var t1 = target.dataset && target.dataset.lastTouch ? parseFloat(target.dataset.lastTouch) : 0;
+        var dt = t2 - t1;
+        
+        if (target.dataset) {
+          target.dataset.lastTouch = t2;
+        }
+        
+        // Prevent double-tap zoom
+        if (dt && dt < 500) {
+          e.preventDefault();
+        }
+      }
+    }, {passive: false});
+    
+    if (canvas) {
+      console.log('✅ Canvas nájdený, pridávam touch support');
+      
+      canvas.addEventListener('touchstart', function(e) {
+        // Povoliť pinch zoom
+        if (e.touches.length > 1) return;
+        
+        e.preventDefault();
+        var touch = e.touches[0];
+        var rect = canvas.getBoundingClientRect();
+        var x = touch.clientX - rect.left;
+        var y = touch.clientY - rect.top;
+        
+        console.log('👆 Touch na canvas:', x, y);
+        
+        // Simuluj click event
+        var clickEvent = new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: touch.clientX,
+          clientY: touch.clientY
+        });
+        canvas.dispatchEvent(clickEvent);
+      }, {passive: false});
+      
+      console.log('✅ Canvas touch listener pridaný');
+    }
+    
+    if (overlay) {
+      console.log('✅ Overlay nájdený, pridávam touch support');
+      
+      overlay.addEventListener('touchstart', function(e) {
+        // Povoliť pinch zoom
+        if (e.touches.length > 1) return;
+        
+        e.preventDefault();
+        var touch = e.touches[0];
+        var rect = overlay.getBoundingClientRect();
+        var x = touch.clientX - rect.left;
+        var y = touch.clientY - rect.top;
+        
+        console.log('👆 Touch na overlay:', x, y);
+        
+        // Simuluj click event
+        var clickEvent = new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: touch.clientX,
+          clientY: touch.clientY
+        });
+        overlay.dispatchEvent(clickEvent);
+      }, {passive: false});
+      
+      console.log('✅ Overlay touch listener pridaný');
+    }
+    
+    // Touch feedback pre všetky tlačidlá
+    var buttons = document.querySelectorAll('button');
+    console.log('🔘 Našiel som', buttons.length, 'tlačidiel');
+    buttons.forEach(function(btn) {
+      btn.addEventListener('touchstart', function() {
+        this.style.opacity = '0.7';
+      });
+      btn.addEventListener('touchend', function() {
+        this.style.opacity = '1';
+      });
+    });
+  }
+  
+  // Inicializuj hneď
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTouchSupport);
+  } else {
+    initTouchSupport();
+  }
+  
+  // Re-inicializuj po 2 sekundách (pre istotu, ak sa elementy načítajú neskôr)
+  setTimeout(initTouchSupport, 2000);
+  
+  console.log('✅ Touch support inicializovaný');
+})();
 </script>
 
 </body></html>
