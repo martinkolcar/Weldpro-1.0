@@ -14987,29 +14987,6 @@ window.addEventListener('resize', function() {
   }, 250);
 });
 
-// Prevent zoom na mobile pri double-tap
-document.addEventListener('touchstart', function(e) {
-  if (e.touches.length > 1) {
-    // Multi-touch (pinch zoom) je OK
-    return;
-  }
-  
-  const t2 = e.timeStamp;
-  const t1 = e.currentTarget.dataset.lastTouch || t2;
-  const dt = t2 - t1;
-  const fingers = e.touches.length;
-  e.currentTarget.dataset.lastTouch = t2;
-  
-  // Prevent double-tap zoom (okrem PDF canvas kde chceme zoom)
-  if (!dt || dt > 500 || fingers > 1) return;
-  
-  const target = e.target;
-  if (!target.closest('#pdfCanvas')) {
-    e.preventDefault();
-    target.click();
-  }
-}, { passive: false });
-
 console.log('✅ Responzívna navigácia načítaná!');
 </script>
 
