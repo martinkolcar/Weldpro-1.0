@@ -9868,6 +9868,11 @@ function loadCurrentPartWeldBook() {
 }
 
 function saveCurrentPartWeldBook() {
+  console.log('💾 saveCurrentPartWeldBook() volané');
+  console.log('   Projekt:', projectsData.currentProject);
+  console.log('   Časť:', projectsData.currentPart);
+  console.log('   Zvarov v weldBookData:', weldBookData.length);
+  
   // Vždy ulož do localStorage (pre všetky režimy)
   saveWeldBookToStorage();
   
@@ -9900,12 +9905,17 @@ function saveCurrentPartWeldBook() {
       if (currentProj && currentProj.parts) {
         var currentPart = currentProj.parts[projectsData.currentPart];
         if (currentPart) {
+          console.log('   Pred uložením - currentPart.weldBookData.length:', currentPart.weldBookData ? currentPart.weldBookData.length : 0);
           currentPart.weldBookData = weldBookData;
+          console.log('   Po uložení - currentPart.weldBookData.length:', currentPart.weldBookData.length);
           currentPart.lastModified = new Date().toISOString().slice(0,10);
           saveProjectsToStorage();
           
           // ✅ KRITICKÁ OPRAVA - Ulož aj do Firebase!
-          saveProjectsToFirebase().catch(function(err) {
+          console.log('🔥 Ukladám do Firebase...');
+          saveProjectsToFirebase().then(function() {
+            console.log('✅ Firebase sync DOKONČENÝ!');
+          }).catch(function(err) {
             console.error('⚠️ Chyba pri Firebase sync:', err);
           });
         }
