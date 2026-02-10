@@ -9845,7 +9845,8 @@ function loadCurrentPartWeldBook() {
   var currentProj = projectsData.projects[projectsData.currentProject];
   var currentPart = currentProj.parts[projectsData.currentPart];
   
-  weldBookData = currentPart.weldBookData || [];
+  // ✅ KRITICKÁ OPRAVA - Vytvor KÓPIU array, nie referenciu!
+  weldBookData = currentPart.weldBookData ? JSON.parse(JSON.stringify(currentPart.weldBookData)) : [];
   
   // MIGRÁCIA: Rozdeliť staré dáta ak nemajú stĺpec "part"
   var needsMigration = false;
