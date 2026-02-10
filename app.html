@@ -526,6 +526,25 @@ background: #dc2626;
     min-width: 44px !important;
     font-size: 13px !important;
   }
+  
+  /* MONTÁŽ MODAL - MOBILE FIX */
+  #montazWelderModal {
+    display: none !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 99999 !important;
+    background: rgba(0,0,0,0.7) !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+  
+  #montazWelderModal[style*="display: flex"],
+  #montazWelderModal[style*="display:flex"] {
+    display: flex !important;
+  }
 }
 </style>
 <!-- QR Scanner Library -->
@@ -6108,15 +6127,53 @@ var montazWeldNumber='';
 var montazCurrentWeld=null; // Pre modal - ktorý zvar upravujeme
 
 function openMontazWelderModal(weld, weldBookEntry){
+console.log('🔧 openMontazWelderModal() volané!');
+console.log('   weld.displayNum:', weld.displayNum);
+console.log('   weldBookEntry:', weldBookEntry);
+
+// ✅ MOBILE DEBUG - ukáž alert
+alert('📱 MONTÁŽ: Otváram modal pre zvar #' + weld.displayNum);
+
 montazCurrentWeld={weld:weld, weldBookEntry:weldBookEntry};
-document.getElementById('montazWelderWeldNum').textContent='#'+weld.displayNum;
-document.getElementById('montazWelderInput').value='';
+
+var modalEl = document.getElementById('montazWelderModal');
+var weldNumEl = document.getElementById('montazWelderWeldNum');
+var welderInputEl = document.getElementById('montazWelderInput');
+var dateInputEl = document.getElementById('montazDateInput');
+
+console.log('   Modal element:', modalEl ? 'EXISTS' : 'NULL');
+console.log('   WeldNum element:', weldNumEl ? 'EXISTS' : 'NULL');
+console.log('   Input elements:', welderInputEl ? 'EXISTS' : 'NULL', dateInputEl ? 'EXISTS' : 'NULL');
+
+if(!modalEl) {
+  alert('❌ CHYBA: Modal element neexistuje!');
+  return;
+}
+
+weldNumEl.textContent='#'+weld.displayNum;
+welderInputEl.value='';
+
 // Nastav dnešný dátum
 var today=new Date().toISOString().split('T')[0];
-document.getElementById('montazDateInput').value=today;
-document.getElementById('montazWelderModal').style.display='flex';
-// Focus na input
-setTimeout(function(){document.getElementById('montazWelderInput').focus();},100);
+dateInputEl.value=today;
+
+// ✅ MOBILE FIX - Force display pre iPhone Safari
+modalEl.style.display='block'; // ← flex nefunguje na Safari!
+modalEl.style.position='fixed';
+modalEl.style.zIndex='99999';
+modalEl.style.top='0';
+modalEl.style.left='0';
+modalEl.style.width='100%';
+modalEl.style.height='100%';
+modalEl.style.overflow='auto';
+
+console.log('✅ Modal zobrazený!');
+
+// Focus na input (na mobile nefunguje vždy, ale skúsime)
+setTimeout(function(){
+  welderInputEl.focus();
+  console.log('📝 Focus na input');
+},100);
 }
 
 function closeMontazWelderModal(){
@@ -8121,6 +8178,15 @@ console.log('Spool data saved:',spoolData);
 }
 
 function cl(){
+// ✅ MOBILE FIX - force enable button
+var clBtn = document.getElementById('cl');
+if(clBtn && clBtn.disabled) {
+  console.log('⚠️ Tlačidlo Zmazať je disabled, aktivujem...');
+  clBtn.disabled = false;
+  alert('ℹ️ Tlačidlo Zmazať je teraz aktívne. Kliknite znova.');
+  return;
+}
+
 if(confirm('Zmazať všetko?')){
 ws=[];
 lines=[];
@@ -14486,20 +14552,22 @@ Voľné: <span id="availableSpace">~10 MB</span>
 </div>
 
 <!-- MODAL: Pridať zvarača v MONTÁŽ -->
-<div id="montazWelderModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;justify-content:center;align-items:center;">
-<div style="background:white;padding:30px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:400px;width:90%;">
+<div id="montazWelderModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999;overflow:auto;">
+<div style="min-height:100%;display:flex;justify-content:center;align-items:center;padding:20px;">
+<div style="background:white;padding:30px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:400px;width:100%;margin:auto;">
 <h3 style="margin:0 0 20px 0;color:#333;">Označiť zvar <span id="montazWelderWeldNum"></span></h3>
 <div style="margin-bottom:15px;">
 <label style="display:block;margin-bottom:5px;font-weight:bold;color:#555;">Welder ID:</label>
-<input type="text" id="montazWelderInput" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px;" placeholder="Napr: SD5">
+<input type="text" id="montazWelderInput" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:4px;font-size:16px;box-sizing:border-box;" placeholder="Napr: SD5">
 </div>
 <div style="margin-bottom:20px;">
 <label style="display:block;margin-bottom:5px;font-weight:bold;color:#555;">Dátum zvarania:</label>
-<input type="date" id="montazDateInput" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+<input type="date" id="montazDateInput" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:4px;font-size:16px;box-sizing:border-box;">
 </div>
-<div style="display:flex;gap:10px;">
-<button onclick="saveMontazWelder()" style="flex:1;padding:10px;background:#10b981;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;">✅ Uložiť</button>
-<button onclick="closeMontazWelderModal()" style="flex:1;padding:10px;background:#e5e5e5;color:#333;border:none;border-radius:4px;cursor:pointer;font-size:14px;">❌ Zrušiť</button>
+<div style="display:flex;gap:10px;flex-wrap:wrap;">
+<button onclick="saveMontazWelder()" style="flex:1;min-width:120px;padding:14px;background:#10b981;color:white;border:none;border-radius:4px;cursor:pointer;font-size:16px;font-weight:bold;touch-action:manipulation;">✅ Uložiť</button>
+<button onclick="closeMontazWelderModal()" style="flex:1;min-width:120px;padding:14px;background:#e5e5e5;color:#333;border:none;border-radius:4px;cursor:pointer;font-size:16px;touch-action:manipulation;">❌ Zrušiť</button>
+</div>
 </div>
 </div>
 </div>
