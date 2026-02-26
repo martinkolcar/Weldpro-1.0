@@ -14767,9 +14767,37 @@ async function updateTotalUnreadBadge(){
   } catch(e){ console.error(e); }
 }
 
-// Pravidelný refresh badge každých 30 sekúnd
+// ✅ REALTIME badge - listener na všetky chaty kde som účastník
+let globalBadgeListener = null;
+function startGlobalBadgeListener(){
+  if(!db || !window.currentUser) return;
+  if(globalBadgeListener) globalBadgeListener();
+
+  // Listener na skupinový chat
+  const unsubGroup = db.collection('chats').doc(GROUP_CHAT_ID)
+    .collection('messages').where('read','==',false)
+    .onSnapshot(() => updateTotalUnreadBadge());
+
+  // Listener na všetky súkromné chaty
+  const unsubPrivate = db.collection('chats')
+    .where('participants','array-contains', window.currentUser.username)
+    .onSnapshot(snap => {
+      // Pre každý chat spusti listener na nové správy
+      snap.docChanges().forEach(change => {
+        if(change.type === 'added' || change.type === 'modified'){
+          db.collection('chats').doc(change.doc.id)
+            .collection('messages').where('read','==',false)
+            .onSnapshot(() => updateTotalUnreadBadge());
+        }
+      });
+      updateTotalUnreadBadge();
+    });
+
+  globalBadgeListener = () => { unsubGroup(); unsubPrivate(); };
+}
+
 if(window.currentUser){
-  setInterval(updateTotalUnreadBadge, 30000);
+  startGlobalBadgeListener();
   updateTotalUnreadBadge();
 }
 
