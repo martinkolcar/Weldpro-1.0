@@ -2882,14 +2882,14 @@ var displayText = String(w.displayNum); // Celý text (môže obsahovať písmen
 var textLen = displayText.length;
 
 // Vypočítaj šírku textu (približne)
-var charWidth = 16; // Priemerná šírka znaku
+var charWidth = 11; // Priemerná šírka znaku
 var textWidth = textLen * charWidth * sc * weldScale;
 
 // Radius Y (vertikálny) - fixný
-var radiusY = 22 * sc * weldScale;
+var radiusY = 16 * sc * weldScale;
 
 // Radius X (horizontálny) - dynamický podľa textu + padding
-var radiusX = Math.max(radiusY, (textWidth / 2) + (8 * sc * weldScale));
+var radiusX = Math.max(radiusY, (textWidth / 2) + (5 * sc * weldScale));
 
 // Pre krátky text (1-2 znaky) použi kruh
 if(textLen <= 2) {
