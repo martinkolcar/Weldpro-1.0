@@ -14723,15 +14723,22 @@ async function sendChatMessage(){
     } else {
       await db.collection('chats').doc(currentChatId).set({type:'private',participants:currentChatId.split('_'),lastMessage:text,lastTimestamp:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       await db.collection('chats').doc(currentChatId).collection('messages').add(messageData);
-      // ✅ Zapíš notifikáciu priamo pre príjemcu - zaručí že mu badge svieti
+      // ✅ Zapíš notifikáciu priamo pre príjemcu
       const recipient = currentChatId.split('_').find(u => u !== window.currentUser.username);
       if(recipient){
-        await db.collection('user_notifications').doc(recipient).set({
-          unread: firebase.firestore.FieldValue.increment(1),
-          lastFrom: window.currentUser.displayName || window.currentUser.username,
-          lastText: text.substring(0, 50),
-          lastTimestamp: firebase.firestore.FieldValue.serverTimestamp()
-        }, {merge: true});
+        console.log('📨 Zapisujem notifikáciu pre:', recipient);
+        try{
+          const notifRef = db.collection('user_notifications').doc(recipient);
+          const notifDoc = await notifRef.get();
+          const currentUnread = notifDoc.exists ? (notifDoc.data().unread || 0) : 0;
+          await notifRef.set({
+            unread: currentUnread + 1,
+            lastFrom: window.currentUser.displayName || window.currentUser.username,
+            lastText: text.substring(0, 50),
+            lastTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          console.log('✅ Notifikácia zapísaná, unread:', currentUnread + 1);
+        } catch(ne){ console.error('❌ Notif chyba:', ne); }
       }
     }
     input.value = '';
@@ -14773,93 +14780,98 @@ async function markChatAsRead(chatId){
 }
 
 async function updateTotalUnreadBadge(){
-  try{
-    if(!db || !window.currentUser) return;
-    let total = 0;
-    total += await getUnreadCountForChat(GROUP_CHAT_ID);
-    const chatsSnap = await db.collection('chats').where('participants','array-contains',window.currentUser.username).get();
-    for(const doc of chatsSnap.docs){
-      if(doc.id !== GROUP_CHAT_ID) total += await getUnreadCountForChat(doc.id);
-    }
-    chatUnreadCount = total;
-    const badge = document.getElementById('chatUnreadBadge');
-    if(total > 0){ badge.textContent = total > 99 ? '99+' : total; badge.style.display = 'block'; }
-    else { badge.style.display = 'none'; }
-  } catch(e){ console.error(e); }
+  await refreshBadge();
 }
 
-// ✅ REALTIME badge - počúva správy ktoré mi prišli a sú unread
+// ✅ REALTIME badge - jednoduchý priamy systém
 let globalBadgeListener = null;
-let activeMessageListeners = {}; // chatId -> unsubscribe
+let activeMessageListeners = {};
+
+function setBadge(count){
+  chatUnreadCount = count;
+  const badge = document.getElementById('chatUnreadBadge');
+  if(!badge) return;
+  const panel = document.getElementById('chatPanel');
+  const panelOpen = panel && panel.style.display === 'flex';
+  if(count > 0 && !panelOpen){
+    badge.textContent = count > 99 ? '99+' : count;
+    badge.style.display = 'block';
+    console.log('🔴 Badge:', count);
+  } else {
+    badge.style.display = 'none';
+  }
+}
 
 function startGlobalBadgeListener(){
   if(!db || !window.currentUser) return;
-  if(globalBadgeListener) globalBadgeListener();
+  if(globalBadgeListener){ globalBadgeListener(); }
+  console.log('🎯 startGlobalBadgeListener pre:', window.currentUser.username);
 
   const me = window.currentUser.username;
+  const unsubs = [];
 
-  // 1. Listener na skupinový chat - správy od iných unread
-  const unsubGroup = db.collection('chats').doc(GROUP_CHAT_ID)
-    .collection('messages').where('read','==',false)
+  // Skupinový chat - poslúchaj všetky nové správy
+  const u1 = db.collection('chats').doc(GROUP_CHAT_ID)
+    .collection('messages')
     .onSnapshot(snap => {
-      // Počítaj len správy nie od mňa
-      const unread = snap.docs.filter(d => d.data().from !== me).length;
-      updateBadgeDisplay();
+      const unread = snap.docs.filter(d => !d.data().read && d.data().from !== me).length;
+      console.log('💬 Skupina unread:', unread);
+      refreshBadge();
     });
+  unsubs.push(u1);
 
-  // 2. Listener na chats kolekciu - keď sa vytvorí nový chat alebo príde správa
-  const unsubChats = db.collection('chats')
+  // Všetky chaty kde som účastník
+  const u2 = db.collection('chats')
     .where('participants','array-contains', me)
     .onSnapshot(snap => {
-      snap.docChanges().forEach(change => {
-        const chatId = change.doc.id;
-        if(chatId === GROUP_CHAT_ID) return;
-        // Spusti listener na správy tohto chatu ak ešte nebeží
-        if(!activeMessageListeners[chatId]){
-          activeMessageListeners[chatId] = db.collection('chats').doc(chatId)
-            .collection('messages').where('read','==',false)
-            .onSnapshot(() => updateBadgeDisplay());
-        }
+      snap.docs.forEach(chatDoc => {
+        const chatId = chatDoc.id;
+        if(activeMessageListeners[chatId]) return; // už počúva
+        const u = db.collection('chats').doc(chatId)
+          .collection('messages')
+          .onSnapshot(msgs => {
+            console.log('📨 Správy v chate', chatId, '- total:', msgs.size);
+            refreshBadge();
+          });
+        activeMessageListeners[chatId] = u;
+        unsubs.push(u);
       });
-      updateBadgeDisplay();
+      refreshBadge();
     });
-
-  // 3. ✅ PRIAMY listener na user_notifications - okamžite svieti badge
-  // Toto funguje aj keď chat dokument ešte neexistuje!
-  const unsubNotif = db.collection('user_notifications').doc(me)
-    .onSnapshot(doc => {
-      console.log('🔔 user_notifications snapshot:', doc.exists, doc.data());
-      const badge = document.getElementById('chatUnreadBadge');
-      if(!badge) return;
-      const unread = doc.exists ? (doc.data().unread || 0) : 0;
-      chatUnreadCount = unread;
-      // Zobraz badge len keď je chat zatvorený
-      const panel = document.getElementById('chatPanel');
-      const panelOpen = panel && panel.style.display === 'flex';
-      if(unread > 0 && !panelOpen){
-        badge.textContent = unread > 99 ? '99+' : unread;
-        badge.style.display = 'block';
-        console.log('🔴 Badge zobrazený:', unread);
-      } else {
-        badge.style.display = 'none';
-      }
-    });
-
-  // 4. Každých 15 sekúnd tiež skontroluj - fallback
-  const intervalId = setInterval(() => updateTotalUnreadBadge(), 15000);
+  unsubs.push(u2);
 
   globalBadgeListener = () => {
-    unsubGroup();
-    unsubChats();
-    unsubNotif();
-    clearInterval(intervalId);
+    unsubs.forEach(u => u());
     Object.values(activeMessageListeners).forEach(u => u());
     activeMessageListeners = {};
   };
+
+  // Okamžitý refresh
+  refreshBadge();
+}
+
+async function refreshBadge(){
+  if(!db || !window.currentUser) return;
+  const me = window.currentUser.username;
+  try{
+    let total = 0;
+    // Skupinový chat
+    const grpSnap = await db.collection('chats').doc(GROUP_CHAT_ID).collection('messages').get();
+    total += grpSnap.docs.filter(d => !d.data().read && d.data().from !== me).length;
+    // Súkromné chaty
+    const chatsSnap = await db.collection('chats').where('participants','array-contains',me).get();
+    for(const chatDoc of chatsSnap.docs){
+      if(chatDoc.id === GROUP_CHAT_ID) continue;
+      const msgsSnap = await db.collection('chats').doc(chatDoc.id).collection('messages').get();
+      total += msgsSnap.docs.filter(d => !d.data().read && d.data().from !== me).length;
+    }
+    console.log('🔢 Celkový unread:', total);
+    setBadge(total);
+  } catch(e){ console.error('refreshBadge chyba:', e); }
 }
 
 async function updateBadgeDisplay(){
-  await updateTotalUnreadBadge();
+  await refreshBadge();
 }
 
 // ✅ Počkaj kým je Firebase (db) ready, potom spusti listener
