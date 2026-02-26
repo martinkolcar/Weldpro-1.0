@@ -12635,296 +12635,7 @@ originalSaveProject();
 }
 };
 
-// 💬 CHAT SYSTÉM - KONVERZÁCIE + SKUPINA
-let currentChatId=null;
-let currentChatType=null;
-let chatUnreadCount=0;
-let chatListeners=[];
-const GROUP_CHAT_ID='group_all';
 
-function toggleChatPanel(){
-  const panel = document.getElementById('chatPanel');
-  const btn = document.getElementById('chatFloatingBtn');
-  const isVisible = panel.style.display === 'flex';
-  if(!isVisible){
-    panel.style.display = 'flex';
-    btn.style.display = 'none';
-    initChatPanel();
-  } else {
-    panel.style.display = 'none';
-    btn.style.display = 'block';
-  }
-}
-
-// Realtime listenery pre chat
-let chatListeners = [];
-let currentChatId = null;
-let currentChatType = null;
-let chatUnreadCount = 0;
-let usersListener = null;
-let conversationsListener = null;
-const GROUP_CHAT_ID = 'group_all';
-
-function initChatPanel(){
-  // Spusti realtime listener pre online používateľov + konverzácie
-  loadUsersRealtime();
-  listenConversations();
-}
-
-// ✅ REALTIME - online používatelia + všetky chaty
-function loadUsersRealtime(){
-  if(!db || !window.currentUser) return;
-  // Zrušíme starý listener
-  if(usersListener) usersListener();
-
-  // Realtime listener na users kolekciu
-  usersListener = db.collection('users').onSnapshot(async snapshot => {
-    let onlineHtml = '';
-    let offlineHtml = '';
-    const me = window.currentUser.username;
-
-    for(const doc of snapshot.docs){
-      if(doc.id === me) continue;
-      const user = doc.data();
-      const isOnline = activeSessions.some(s => s.id === doc.id);
-      const displayName = user.displayName || doc.id;
-      const role = user.role || '';
-      const chatId = getChatId(me, doc.id);
-      const unread = await getUnreadCountForChat(chatId);
-      const badgeHtml = unread > 0
-        ? `<span style="background:#ef4444;color:white;border-radius:50%;min-width:22px;height:22px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px">${unread}</span>`
-        : '';
-      const isActive = currentChatId === chatId;
-      const item = `<div onclick="openPrivateChat('${chatId}','${doc.id}','${displayName}')"
-        style="padding:10px 12px;border-radius:8px;cursor:pointer;margin-bottom:6px;
-        background:${isActive ? 'linear-gradient(135deg,#667eea,#764ba2)' : 'white'};
-        color:${isActive ? 'white' : '#333'};
-        border:2px solid ${isActive ? '#667eea' : (isOnline ? '#22c55e' : '#e5e7eb')};
-        transition:all 0.2s"
-        onmouseover="if(this.style.background!='linear-gradient(135deg,#667eea,#764ba2)')this.style.background='#f3f4f6'"
-        onmouseout="if(this.style.background!='linear-gradient(135deg,#667eea,#764ba2)')this.style.background='white'">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="position:relative">
-            <div style="width:38px;height:38px;border-radius:50%;background:${isOnline ? 'linear-gradient(135deg,#22c55e,#16a34a)' : '#e5e7eb'};
-              display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:white">
-              ${displayName.charAt(0).toUpperCase()}
-            </div>
-            <div style="position:absolute;bottom:0;right:0;width:11px;height:11px;border-radius:50%;
-              background:${isOnline ? '#22c55e' : '#9ca3af'};border:2px solid white"></div>
-          </div>
-          <div style="flex:1;min-width:0">
-            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${displayName}</div>
-            <div style="font-size:11px;opacity:0.7">${isOnline ? '🟢 Online' : '⚫ Offline'}${role ? ' · ' + role : ''}</div>
-          </div>
-          ${badgeHtml}
-        </div>
-      </div>`;
-      if(isOnline) onlineHtml += item;
-      else offlineHtml += item;
-    }
-
-    // Group chat unread
-    const groupUnread = await getUnreadCountForChat(GROUP_CHAT_ID);
-    const groupBadge = groupUnread > 0
-      ? `<span style="background:#ef4444;color:white;border-radius:50%;min-width:22px;height:22px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px">${groupUnread}</span>`
-      : '';
-    const groupActive = currentChatId === GROUP_CHAT_ID;
-    const groupItem = `<div onclick="openGroupChat()"
-      style="padding:10px 12px;border-radius:8px;cursor:pointer;margin-bottom:6px;
-      background:${groupActive ? 'linear-gradient(135deg,#667eea,#764ba2)' : 'white'};
-      color:${groupActive ? 'white' : '#333'};border:2px solid ${groupActive ? '#667eea' : '#e5e7eb'}"
-      onmouseover="if(this.style.background!='linear-gradient(135deg,#667eea,#764ba2)')this.style.background='#f3f4f6'"
-      onmouseout="if(this.style.background!='linear-gradient(135deg,#667eea,#764ba2)')this.style.background='white'">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);
-          display:flex;align-items:center;justify-content:center;font-size:18px">💬</div>
-        <div style="flex:1"><div style="font-weight:700;font-size:13px">Skupina VŠETCI</div>
-        <div style="font-size:11px;opacity:0.7">Skupinový chat</div></div>
-        ${groupBadge}
-      </div>
-    </div>`;
-
-    const listEl = document.getElementById('chatConversationsList');
-    let html = groupItem;
-    if(onlineHtml) html += `<div style="font-size:10px;font-weight:700;color:#22c55e;padding:4px 4px 2px;text-transform:uppercase;letter-spacing:1px">● Online</div>` + onlineHtml;
-    if(offlineHtml) html += `<div style="font-size:10px;font-weight:700;color:#9ca3af;padding:6px 4px 2px;text-transform:uppercase;letter-spacing:1px">● Offline</div>` + offlineHtml;
-    listEl.innerHTML = html;
-    updateTotalUnreadBadge();
-  });
-}
-
-// ✅ REALTIME konverzácie - listener na nové správy
-function listenConversations(){
-  if(!db || !window.currentUser) return;
-  if(conversationsListener) conversationsListener();
-  // Keď príde nová správa do aktuálneho chatu, refresh badge
-  conversationsListener = db.collection('chats')
-    .where('participants', 'array-contains', window.currentUser.username)
-    .onSnapshot(() => {
-      updateTotalUnreadBadge();
-      loadUsersRealtime(); // Refresh unread badges na používateľoch
-    });
-}
-
-function openGroupChat(){
-  currentChatId = GROUP_CHAT_ID;
-  currentChatType = 'group';
-  document.getElementById('chatHeaderName').textContent = '💬 Skupina VŠETCI';
-  document.getElementById('chatMessageInput').disabled = false;
-  document.getElementById('chatSendBtn').disabled = false;
-  loadUsersRealtime();
-  loadChatMessages(GROUP_CHAT_ID, 'group');
-  markChatAsRead(GROUP_CHAT_ID);
-}
-
-function openPrivateChat(chatId, otherUser, displayName){
-  currentChatId = chatId;
-  currentChatType = 'private';
-  const isOnline = activeSessions.some(s => s.id === otherUser);
-  document.getElementById('chatHeaderName').innerHTML =
-    `<span style="display:inline-flex;align-items:center;gap:6px">
-      <span style="width:8px;height:8px;border-radius:50%;background:${isOnline ? '#22c55e' : '#9ca3af'};display:inline-block"></span>
-      ${displayName}
-    </span>`;
-  document.getElementById('chatMessageInput').disabled = false;
-  document.getElementById('chatSendBtn').disabled = false;
-  loadUsersRealtime();
-  loadChatMessages(chatId, 'private');
-  markChatAsRead(chatId);
-}
-
-let msgListeners = [];
-async function loadChatMessages(chatId, type){
-  const messagesEl = document.getElementById('chatMessagesArea');
-  messagesEl.innerHTML = '<div style="text-align:center;color:#999;padding:20px">⏳</div>';
-  if(!db) return;
-  // Zruš staré listenery
-  msgListeners.forEach(u => u());
-  msgListeners = [];
-  const unsubscribe = db.collection('chats').doc(chatId).collection('messages')
-    .orderBy('timestamp', 'asc')
-    .onSnapshot(s => {
-      displayChatMessages(s, type);
-      markChatAsRead(chatId);
-      updateTotalUnreadBadge();
-      loadUsersRealtime();
-    });
-  msgListeners.push(unsubscribe);
-}
-
-function displayChatMessages(snapshot, type){
-  const messagesEl = document.getElementById('chatMessagesArea');
-  if(snapshot.empty){
-    messagesEl.innerHTML = `<div style="text-align:center;color:#999;padding:40px;font-size:13px">
-      <div style="font-size:40px;margin-bottom:10px">💬</div>
-      <p>Začni konverzáciu!</p></div>`;
-    return;
-  }
-  const me = window.currentUser.username;
-  let html = '';
-  snapshot.forEach(doc => {
-    const msg = doc.data();
-    const isOwn = msg.from === me;
-    const timeStr = msg.timestamp
-      ? new Date(msg.timestamp.toDate()).toLocaleTimeString('sk-SK', {hour:'2-digit', minute:'2-digit'})
-      : '';
-    if(type === 'group'){
-      html += `<div style="margin-bottom:12px;${isOwn ? 'display:flex;flex-direction:column;align-items:flex-end' : ''}">
-        ${!isOwn ? `<div style="font-size:10px;font-weight:700;color:#667eea;margin-bottom:3px;padding-left:4px">${msg.fromName||msg.from}</div>` : ''}
-        <div style="max-width:75%;padding:10px 14px;border-radius:${isOwn ? '16px 16px 4px 16px' : '16px 16px 16px 4px'};
-          font-size:13px;line-height:1.4;
-          background:${isOwn ? 'linear-gradient(135deg,#667eea,#764ba2)' : '#f3f4f6'};
-          color:${isOwn ? 'white' : '#1f2937'}">
-          <div>${msg.text}</div>
-          <div style="font-size:10px;opacity:0.6;margin-top:3px;text-align:right">${timeStr}</div>
-        </div>
-      </div>`;
-    } else {
-      html += `<div style="margin-bottom:12px;display:flex;${isOwn ? 'flex-direction:row-reverse' : 'flex-direction:row'}">
-        <div style="max-width:72%;padding:10px 14px;border-radius:${isOwn ? '16px 16px 4px 16px' : '16px 16px 16px 4px'};
-          font-size:13px;line-height:1.4;
-          background:${isOwn ? 'linear-gradient(135deg,#667eea,#764ba2)' : '#f3f4f6'};
-          color:${isOwn ? 'white' : '#1f2937'}">
-          <div>${msg.text}</div>
-          <div style="font-size:10px;opacity:0.6;margin-top:3px;text-align:right">${timeStr}</div>
-        </div>
-      </div>`;
-    }
-  });
-  messagesEl.innerHTML = html;
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-}
-
-async function sendChatMessage(){
-  const input = document.getElementById('chatMessageInput');
-  const text = input.value.trim();
-  if(!text || !currentChatId) return;
-  try{
-    const messageData = {
-      from: window.currentUser.username,
-      fromName: window.currentUser.displayName || window.currentUser.username,
-      text: text,
-      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-      read: false
-    };
-    if(currentChatType === 'group'){
-      await db.collection('chats').doc(GROUP_CHAT_ID).set({type:'group',lastMessage:text,lastTimestamp:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-      await db.collection('chats').doc(GROUP_CHAT_ID).collection('messages').add(messageData);
-    } else {
-      await db.collection('chats').doc(currentChatId).set({type:'private',participants:currentChatId.split('_'),lastMessage:text,lastTimestamp:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-      await db.collection('chats').doc(currentChatId).collection('messages').add(messageData);
-    }
-    input.value = '';
-  } catch(error){ console.error(error); alert('❌ ' + error.message); }
-}
-
-function getChatId(user1, user2){
-  return user1 < user2 ? user1 + '_' + user2 : user2 + '_' + user1;
-}
-
-async function getUnreadCountForChat(chatId){
-  try{
-    if(!db || !window.currentUser) return 0;
-    const snapshot = await db.collection('chats').doc(chatId).collection('messages')
-      .where('from', '!=', window.currentUser.username)
-      .where('read', '==', false).get();
-    return snapshot.size;
-  } catch(e){ return 0; }
-}
-
-async function markChatAsRead(chatId){
-  try{
-    if(!db || !window.currentUser) return;
-    const snapshot = await db.collection('chats').doc(chatId).collection('messages')
-      .where('from', '!=', window.currentUser.username)
-      .where('read', '==', false).get();
-    const batch = db.batch();
-    snapshot.docs.forEach(doc => batch.update(doc.ref, {read: true}));
-    if(!snapshot.empty) await batch.commit();
-  } catch(e){ console.error(e); }
-}
-
-async function updateTotalUnreadBadge(){
-  try{
-    if(!db || !window.currentUser) return;
-    let total = 0;
-    total += await getUnreadCountForChat(GROUP_CHAT_ID);
-    const chatsSnap = await db.collection('chats').where('participants','array-contains',window.currentUser.username).get();
-    for(const doc of chatsSnap.docs){
-      if(doc.id !== GROUP_CHAT_ID) total += await getUnreadCountForChat(doc.id);
-    }
-    chatUnreadCount = total;
-    const badge = document.getElementById('chatUnreadBadge');
-    if(total > 0){ badge.textContent = total > 99 ? '99+' : total; badge.style.display = 'block'; }
-    else { badge.style.display = 'none'; }
-  } catch(e){ console.error(e); }
-}
-
-// Pravidelný refresh badge každých 30 sekúnd
-if(window.currentUser){
-  setInterval(updateTotalUnreadBadge, 30000);
-  updateTotalUnreadBadge();
-}
 
 // 📦 OFFLINE PACKAGE SYSTÉM
 let selectedProjects=new Set();
@@ -14741,6 +14452,293 @@ Voľné: <span id="availableSpace">~10 MB</span>
 </div>
 
 <script>
+
+// 💬 CHAT SYSTÉM - KONVERZÁCIE + SKUPINA
+
+function toggleChatPanel(){
+  const panel = document.getElementById('chatPanel');
+  const btn = document.getElementById('chatFloatingBtn');
+  const isVisible = panel.style.display === 'flex';
+  if(!isVisible){
+    panel.style.display = 'flex';
+    btn.style.display = 'none';
+    initChatPanel();
+  } else {
+    panel.style.display = 'none';
+    btn.style.display = 'block';
+  }
+}
+
+// Realtime listenery pre chat
+let chatListeners = [];
+let currentChatId = null;
+let currentChatType = null;
+let chatUnreadCount = 0;
+let usersListener = null;
+let conversationsListener = null;
+const GROUP_CHAT_ID = 'group_all';
+
+function initChatPanel(){
+  // Spusti realtime listener pre online používateľov + konverzácie
+  loadUsersRealtime();
+  listenConversations();
+}
+
+// ✅ REALTIME - online používatelia + všetky chaty
+function loadUsersRealtime(){
+  if(!db || !window.currentUser) return;
+  // Zrušíme starý listener
+  if(usersListener) usersListener();
+
+  // Realtime listener na users kolekciu
+  usersListener = db.collection('users').onSnapshot(async snapshot => {
+    let onlineHtml = '';
+    let offlineHtml = '';
+    const me = window.currentUser.username;
+
+    for(const doc of snapshot.docs){
+      if(doc.id === me) continue;
+      const user = doc.data();
+      const isOnline = activeSessions.some(s => s.id === doc.id);
+      const displayName = user.displayName || doc.id;
+      const role = user.role || '';
+      const chatId = getChatId(me, doc.id);
+      const unread = await getUnreadCountForChat(chatId);
+      const badgeHtml = unread > 0
+        ? `<span style="background:#ef4444;color:white;border-radius:50%;min-width:22px;height:22px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px">${unread}</span>`
+        : '';
+      const isActive = currentChatId === chatId;
+      const item = `<div onclick="openPrivateChat('${chatId}','${doc.id}','${displayName}')"
+        style="padding:10px 12px;border-radius:8px;cursor:pointer;margin-bottom:6px;
+        background:${isActive ? 'linear-gradient(135deg,#667eea,#764ba2)' : 'white'};
+        color:${isActive ? 'white' : '#333'};
+        border:2px solid ${isActive ? '#667eea' : (isOnline ? '#22c55e' : '#e5e7eb')};
+        transition:all 0.2s"
+        onmouseover="if(this.style.background!='linear-gradient(135deg,#667eea,#764ba2)')this.style.background='#f3f4f6'"
+        onmouseout="if(this.style.background!='linear-gradient(135deg,#667eea,#764ba2)')this.style.background='white'">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="position:relative">
+            <div style="width:38px;height:38px;border-radius:50%;background:${isOnline ? 'linear-gradient(135deg,#22c55e,#16a34a)' : '#e5e7eb'};
+              display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:white">
+              ${displayName.charAt(0).toUpperCase()}
+            </div>
+            <div style="position:absolute;bottom:0;right:0;width:11px;height:11px;border-radius:50%;
+              background:${isOnline ? '#22c55e' : '#9ca3af'};border:2px solid white"></div>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${displayName}</div>
+            <div style="font-size:11px;opacity:0.7">${isOnline ? '🟢 Online' : '⚫ Offline'}${role ? ' · ' + role : ''}</div>
+          </div>
+          ${badgeHtml}
+        </div>
+      </div>`;
+      if(isOnline) onlineHtml += item;
+      else offlineHtml += item;
+    }
+
+    // Group chat unread
+    const groupUnread = await getUnreadCountForChat(GROUP_CHAT_ID);
+    const groupBadge = groupUnread > 0
+      ? `<span style="background:#ef4444;color:white;border-radius:50%;min-width:22px;height:22px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px">${groupUnread}</span>`
+      : '';
+    const groupActive = currentChatId === GROUP_CHAT_ID;
+    const groupItem = `<div onclick="openGroupChat()"
+      style="padding:10px 12px;border-radius:8px;cursor:pointer;margin-bottom:6px;
+      background:${groupActive ? 'linear-gradient(135deg,#667eea,#764ba2)' : 'white'};
+      color:${groupActive ? 'white' : '#333'};border:2px solid ${groupActive ? '#667eea' : '#e5e7eb'}"
+      onmouseover="if(this.style.background!='linear-gradient(135deg,#667eea,#764ba2)')this.style.background='#f3f4f6'"
+      onmouseout="if(this.style.background!='linear-gradient(135deg,#667eea,#764ba2)')this.style.background='white'">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);
+          display:flex;align-items:center;justify-content:center;font-size:18px">💬</div>
+        <div style="flex:1"><div style="font-weight:700;font-size:13px">Skupina VŠETCI</div>
+        <div style="font-size:11px;opacity:0.7">Skupinový chat</div></div>
+        ${groupBadge}
+      </div>
+    </div>`;
+
+    const listEl = document.getElementById('chatConversationsList');
+    let html = groupItem;
+    if(onlineHtml) html += `<div style="font-size:10px;font-weight:700;color:#22c55e;padding:4px 4px 2px;text-transform:uppercase;letter-spacing:1px">● Online</div>` + onlineHtml;
+    if(offlineHtml) html += `<div style="font-size:10px;font-weight:700;color:#9ca3af;padding:6px 4px 2px;text-transform:uppercase;letter-spacing:1px">● Offline</div>` + offlineHtml;
+    listEl.innerHTML = html;
+    updateTotalUnreadBadge();
+  });
+}
+
+// ✅ REALTIME konverzácie - listener na nové správy
+function listenConversations(){
+  if(!db || !window.currentUser) return;
+  if(conversationsListener) conversationsListener();
+  // Keď príde nová správa do aktuálneho chatu, refresh badge
+  conversationsListener = db.collection('chats')
+    .where('participants', 'array-contains', window.currentUser.username)
+    .onSnapshot(() => {
+      updateTotalUnreadBadge();
+      loadUsersRealtime(); // Refresh unread badges na používateľoch
+    });
+}
+
+function openGroupChat(){
+  currentChatId = GROUP_CHAT_ID;
+  currentChatType = 'group';
+  document.getElementById('chatHeaderName').textContent = '💬 Skupina VŠETCI';
+  document.getElementById('chatMessageInput').disabled = false;
+  document.getElementById('chatSendBtn').disabled = false;
+  loadUsersRealtime();
+  loadChatMessages(GROUP_CHAT_ID, 'group');
+  markChatAsRead(GROUP_CHAT_ID);
+}
+
+function openPrivateChat(chatId, otherUser, displayName){
+  currentChatId = chatId;
+  currentChatType = 'private';
+  const isOnline = activeSessions.some(s => s.id === otherUser);
+  document.getElementById('chatHeaderName').innerHTML =
+    `<span style="display:inline-flex;align-items:center;gap:6px">
+      <span style="width:8px;height:8px;border-radius:50%;background:${isOnline ? '#22c55e' : '#9ca3af'};display:inline-block"></span>
+      ${displayName}
+    </span>`;
+  document.getElementById('chatMessageInput').disabled = false;
+  document.getElementById('chatSendBtn').disabled = false;
+  loadUsersRealtime();
+  loadChatMessages(chatId, 'private');
+  markChatAsRead(chatId);
+}
+
+let msgListeners = [];
+async function loadChatMessages(chatId, type){
+  const messagesEl = document.getElementById('chatMessagesArea');
+  messagesEl.innerHTML = '<div style="text-align:center;color:#999;padding:20px">⏳</div>';
+  if(!db) return;
+  // Zruš staré listenery
+  msgListeners.forEach(u => u());
+  msgListeners = [];
+  const unsubscribe = db.collection('chats').doc(chatId).collection('messages')
+    .orderBy('timestamp', 'asc')
+    .onSnapshot(s => {
+      displayChatMessages(s, type);
+      markChatAsRead(chatId);
+      updateTotalUnreadBadge();
+      loadUsersRealtime();
+    });
+  msgListeners.push(unsubscribe);
+}
+
+function displayChatMessages(snapshot, type){
+  const messagesEl = document.getElementById('chatMessagesArea');
+  if(snapshot.empty){
+    messagesEl.innerHTML = `<div style="text-align:center;color:#999;padding:40px;font-size:13px">
+      <div style="font-size:40px;margin-bottom:10px">💬</div>
+      <p>Začni konverzáciu!</p></div>`;
+    return;
+  }
+  const me = window.currentUser.username;
+  let html = '';
+  snapshot.forEach(doc => {
+    const msg = doc.data();
+    const isOwn = msg.from === me;
+    const timeStr = msg.timestamp
+      ? new Date(msg.timestamp.toDate()).toLocaleTimeString('sk-SK', {hour:'2-digit', minute:'2-digit'})
+      : '';
+    if(type === 'group'){
+      html += `<div style="margin-bottom:12px;${isOwn ? 'display:flex;flex-direction:column;align-items:flex-end' : ''}">
+        ${!isOwn ? `<div style="font-size:10px;font-weight:700;color:#667eea;margin-bottom:3px;padding-left:4px">${msg.fromName||msg.from}</div>` : ''}
+        <div style="max-width:75%;padding:10px 14px;border-radius:${isOwn ? '16px 16px 4px 16px' : '16px 16px 16px 4px'};
+          font-size:13px;line-height:1.4;
+          background:${isOwn ? 'linear-gradient(135deg,#667eea,#764ba2)' : '#f3f4f6'};
+          color:${isOwn ? 'white' : '#1f2937'}">
+          <div>${msg.text}</div>
+          <div style="font-size:10px;opacity:0.6;margin-top:3px;text-align:right">${timeStr}</div>
+        </div>
+      </div>`;
+    } else {
+      html += `<div style="margin-bottom:12px;display:flex;${isOwn ? 'flex-direction:row-reverse' : 'flex-direction:row'}">
+        <div style="max-width:72%;padding:10px 14px;border-radius:${isOwn ? '16px 16px 4px 16px' : '16px 16px 16px 4px'};
+          font-size:13px;line-height:1.4;
+          background:${isOwn ? 'linear-gradient(135deg,#667eea,#764ba2)' : '#f3f4f6'};
+          color:${isOwn ? 'white' : '#1f2937'}">
+          <div>${msg.text}</div>
+          <div style="font-size:10px;opacity:0.6;margin-top:3px;text-align:right">${timeStr}</div>
+        </div>
+      </div>`;
+    }
+  });
+  messagesEl.innerHTML = html;
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function sendChatMessage(){
+  const input = document.getElementById('chatMessageInput');
+  const text = input.value.trim();
+  if(!text || !currentChatId) return;
+  try{
+    const messageData = {
+      from: window.currentUser.username,
+      fromName: window.currentUser.displayName || window.currentUser.username,
+      text: text,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      read: false
+    };
+    if(currentChatType === 'group'){
+      await db.collection('chats').doc(GROUP_CHAT_ID).set({type:'group',lastMessage:text,lastTimestamp:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      await db.collection('chats').doc(GROUP_CHAT_ID).collection('messages').add(messageData);
+    } else {
+      await db.collection('chats').doc(currentChatId).set({type:'private',participants:currentChatId.split('_'),lastMessage:text,lastTimestamp:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      await db.collection('chats').doc(currentChatId).collection('messages').add(messageData);
+    }
+    input.value = '';
+  } catch(error){ console.error(error); alert('❌ ' + error.message); }
+}
+
+function getChatId(user1, user2){
+  return user1 < user2 ? user1 + '_' + user2 : user2 + '_' + user1;
+}
+
+async function getUnreadCountForChat(chatId){
+  try{
+    if(!db || !window.currentUser) return 0;
+    const snapshot = await db.collection('chats').doc(chatId).collection('messages')
+      .where('from', '!=', window.currentUser.username)
+      .where('read', '==', false).get();
+    return snapshot.size;
+  } catch(e){ return 0; }
+}
+
+async function markChatAsRead(chatId){
+  try{
+    if(!db || !window.currentUser) return;
+    const snapshot = await db.collection('chats').doc(chatId).collection('messages')
+      .where('from', '!=', window.currentUser.username)
+      .where('read', '==', false).get();
+    const batch = db.batch();
+    snapshot.docs.forEach(doc => batch.update(doc.ref, {read: true}));
+    if(!snapshot.empty) await batch.commit();
+  } catch(e){ console.error(e); }
+}
+
+async function updateTotalUnreadBadge(){
+  try{
+    if(!db || !window.currentUser) return;
+    let total = 0;
+    total += await getUnreadCountForChat(GROUP_CHAT_ID);
+    const chatsSnap = await db.collection('chats').where('participants','array-contains',window.currentUser.username).get();
+    for(const doc of chatsSnap.docs){
+      if(doc.id !== GROUP_CHAT_ID) total += await getUnreadCountForChat(doc.id);
+    }
+    chatUnreadCount = total;
+    const badge = document.getElementById('chatUnreadBadge');
+    if(total > 0){ badge.textContent = total > 99 ? '99+' : total; badge.style.display = 'block'; }
+    else { badge.style.display = 'none'; }
+  } catch(e){ console.error(e); }
+}
+
+// Pravidelný refresh badge každých 30 sekúnd
+if(window.currentUser){
+  setInterval(updateTotalUnreadBadge, 30000);
+  updateTotalUnreadBadge();
+}
+
 // ==========================================
 // MOBILNÁ NAVIGÁCIA - JEDNODUCHÉ FUNKCIE
 // ==========================================
