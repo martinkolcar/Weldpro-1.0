@@ -14707,11 +14707,12 @@ async function renderUsersList(){
       const displayName = user.displayName || doc.id;
       const role = user.role || '';
       const chatId = getChatId(me, doc.id);
-      const unread = await getUnreadCountForChat(chatId);
+      const isActive = currentChatId === chatId;
+      // Ak je chat aktívne otvorený, unread = 0 (práve čítaš)
+      const unread = isActive ? 0 : await getUnreadCountForChat(chatId);
       const badgeHtml = unread > 0
         ? `<span style="background:#ef4444;color:white;border-radius:50%;min-width:22px;height:22px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px">${unread}</span>`
         : '';
-      const isActive = currentChatId === chatId;
       const item = `<div onclick="openPrivateChat('${chatId}','${doc.id}','${displayName}')"
         style="padding:10px 12px;border-radius:8px;cursor:pointer;margin-bottom:6px;
         background:${isActive ? 'linear-gradient(135deg,#667eea,#764ba2)' : 'white'};
@@ -14823,7 +14824,8 @@ async function loadChatMessages(chatId, type){
     .orderBy('timestamp', 'asc')
     .onSnapshot(s => {
       displayChatMessages(s, type);
-      // markChatAsRead sa NEvolá tu - len pri manuálnom otvorení chatu
+      // Keď prídu nové správy do aktívneho chatu, hneď ich označ ako prečítané
+      markChatAsRead(chatId);
     });
   msgListeners.push(unsubscribe);
 }
@@ -14931,7 +14933,6 @@ async function markChatAsRead(chatId){
   try{
     if(!db || !window.currentUser) return;
     const me = window.currentUser.username;
-    // Označ správy ako prečítané v DB
     const msgsSnap = await db.collection('chats').doc(chatId).collection('messages')
       .where('read','==',false).get();
     const toMark = msgsSnap.docs.filter(d => d.data().from !== me);
@@ -14939,16 +14940,16 @@ async function markChatAsRead(chatId){
       const batch = db.batch();
       toMark.forEach(d => batch.update(d.ref, {read: true}));
       await batch.commit();
-      // Znižuj inbox o počet prečítaných
-      const inboxRef = db.collection('inbox').doc(me);
-      await db.runTransaction(async t => {
-        const inboxDoc = await t.get(inboxRef);
-        const cur = inboxDoc.exists ? (inboxDoc.data().unread || 0) : 0;
-        const newVal = Math.max(0, cur - toMark.length);
-        t.set(inboxRef, {unread: newVal}, {merge: true});
-        console.log('✅ Inbox znížený:', cur, '->', newVal);
-      });
+      // Nuluj inbox priamo na 0 - je to správne lebo práve si prečítal AKTÍVNY chat
+      await db.collection('inbox').doc(me).set({unread: 0}, {merge: true});
+      console.log('✅ Inbox vynulovaný, prečítané správy:', toMark.length);
+    } else {
+      // Aj keď nie sú nové správy, vynuluj inbox (bezpečnosť)
+      await db.collection('inbox').doc(me).set({unread: 0}, {merge: true});
     }
+    // Refresh badge a zoznam používateľov
+    await refreshBadge();
+    renderUsersList();
   } catch(e){ console.error(e); }
 }
 
