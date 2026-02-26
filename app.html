@@ -1331,6 +1331,26 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
 var pd=null,sc=1.0,ca=document.getElementById('can'),ct=ca.getContext('2d'),ov=document.getElementById('ov'),ws=[],pt=null,cn=1,startNum=1,originalFileName='',editMode=false,moveMode=false,selectedWeldId=null,editCrossMode=false,activeTab='redpen';
 var loadedImage=null,baseImageWidth=0,baseImageHeight=0; // Pre zoom PNG obrázkov
 var weldHistory=[];
+var undoStack=[]; // ✅ Snapshot undo systém - 10 krokov späť
+
+function saveSnapshot(){
+  // Ulož kompletný stav pred každou akciou vrátane WeldBook
+  var snapshot = {
+    ws: JSON.parse(JSON.stringify(ws)),
+    lines: JSON.parse(JSON.stringify(lines)),
+    texts: JSON.parse(JSON.stringify(texts)),
+    arrows: JSON.parse(JSON.stringify(arrows)),
+    curves: JSON.parse(JSON.stringify(curves)),
+    crosses: JSON.parse(JSON.stringify(crosses)),
+    spools: JSON.parse(JSON.stringify(spools)),
+    weldBookData: JSON.parse(JSON.stringify(weldBookData || [])),
+    cn: cn
+  };
+  undoStack.push(snapshot);
+  if(undoStack.length > 10) undoStack.shift(); // Max 10 krokov
+  document.getElementById('undo').disabled = false;
+  document.getElementById('undo').title = 'Späť (' + undoStack.length + ' krokov)';
+}
 var projectsData={
   currentProject: null,
   currentPart: null,
@@ -1634,6 +1654,7 @@ rd.onload=function(){
 var dt=new Uint8Array(this.result);
 pdfjsLib.getDocument(dt).promise.then(function(p){
 pd=p;
+up(); // ✅ Aktivuj tlačidlo Zmazať ak existujú zvary z predošlého projektu
 originalFileName=fi.name.replace(/\.[^/.]+$/,'');
 var fileNameSpan=document.getElementById('fileName');
 if(fileNameSpan)fileNameSpan.textContent=fi.name;
@@ -2069,6 +2090,7 @@ console.log('📍 Začiatok zvaru (normalizovaný):', pt);
 console.log('📍 2. KLIK - x:', x, 'y:', y);
 console.log('📍 pt pred vytvorením zvaru:', pt);
 var weldId=Date.now()+'_'+Math.random();
+saveSnapshot(); // ✅ Ulož stav pred akciou
 ws.push({
 id:weldId,
 start:{x:pt.x, y:pt.y},  // Už normalizované
@@ -2356,6 +2378,7 @@ if(existingCross){
 alert('Krížik už existuje na tomto zvare!');
 return;
 }
+saveSnapshot(); // ✅ Ulož stav pred akciou
 crosses.push({
 id:'cross_'+Date.now()+'_'+Math.random(),
 weldId:clickedWeld.id,
@@ -2463,6 +2486,7 @@ dw();
 document.getElementById('undo').disabled=false;
 }else{
 var id=Date.now()+'_'+Math.random();
+saveSnapshot(); // ✅ Ulož stav pred akciou
 lines.push({
 id:id,
 start:{x:linePt.x/ca.width,y:linePt.y/ca.height},
@@ -2482,6 +2506,7 @@ if(currentTool==='text'){
 var userText=prompt('Zadajte text:');
 if(userText && userText.trim()!==''){
 var id=Date.now()+'_'+Math.random();
+saveSnapshot(); // ✅ Ulož stav pred akciou
 texts.push({
 id:id,
 text:userText.trim(),
@@ -2518,6 +2543,7 @@ var id=Date.now()+'_'+Math.random();
 var normalizedPts=curvePts.map(function(pt){
 return {x:pt.x/ca.width,y:pt.y/ca.height};
 });
+saveSnapshot(); // ✅ Ulož stav pred akciou
 curves.push({
 id:id,
 points:normalizedPts,
@@ -2539,6 +2565,7 @@ return;
 }
 
 if(currentTool==='cross'){
+saveSnapshot(); // ✅ Ulož stav pred akciou
 crosses.push({id:Date.now()+'_'+Math.random(),pos:{x:x/ca.width,y:y/ca.height}});
 dw();
 return;
@@ -2551,6 +2578,7 @@ console.log('→ Šípka začala');
 document.getElementById('undo').disabled=false;
 }else{
 var id=Date.now()+'_'+Math.random();
+saveSnapshot(); // ✅ Ulož stav pred akciou
 arrows.push({
 id:id,
 start:{x:arrowPt.x/ca.width,y:arrowPt.y/ca.height},
@@ -2574,6 +2602,7 @@ dw();
 document.getElementById('undo').disabled=false;
 }else{
 var id=Date.now()+'_'+Math.random();
+saveSnapshot(); // ✅ Ulož stav pred akciou
 spools.push({
 id:id,
 start:{x:pt.x/ca.width,y:pt.y/ca.height},
@@ -2592,6 +2621,7 @@ if(!pt){
 var clickPos={x:x,y:y};
 var id=Date.now()+'_'+Math.random();
 var smartEnd=findBestCirclePosition(clickPos.x,clickPos.y);
+saveSnapshot(); // ✅ Ulož stav pred akciou
 ws.push({
 id:id,
 start:{x:clickPos.x/ca.width,y:clickPos.y/ca.height},
@@ -2639,6 +2669,7 @@ dw();
 document.getElementById('undo').disabled=false;
 }else{
 var id=Date.now()+'_'+Math.random();
+saveSnapshot(); // ✅ Ulož stav pred akciou
 ws.push({
 id:id,
 start:{x:pt.x/ca.width,y:pt.y/ca.height},
@@ -4750,41 +4781,42 @@ alert('✅ Materiály uložené!\n\nKomponentov: '+weldLogMaterials.length);
 
 
 function undo(){
-// Zruš dočasné body
-if(pt){
-pt=null;
-dw();
-console.log('↩️ Undo - zrušený dočasný bod');
-return;
-}
-if(linePt){
-linePt=null;
-dw();
-console.log('↩️ Undo - zrušená dočasná palička');
-return;
-}
-if(arrowPt){
-arrowPt=null;
-dw();
-console.log('↩️ Undo - zrušená dočasná šípka');
-return;
-}
-if(crossPt){
-crossPt=null;
-dw();
-console.log('↩️ Undo - zrušený dočasný krížik');
-return;
-}
-if(curvePts.length>0){
-curvePts=[];
-dw();
-console.log('↩️ Undo - zrušený dočasný oblúčik');
-return;
-}
+  // Najprv zruš dočasné nedokončené body (bez snapshotu)
+  if(pt){ pt=null; dw(); return; }
+  if(linePt){ linePt=null; dw(); return; }
+  if(arrowPt){ arrowPt=null; dw(); return; }
+  if(crossPt){ crossPt=null; dw(); return; }
+  if(curvePts && curvePts.length>0){ curvePts=[]; dw(); return; }
 
-// HOTOVÉ OBJEKTY SA NEMAŽÚ - LEN MANUÁLNE CEZ EDITÁCIU
-console.log('⚠️ Undo: Hotové objekty sa mažú len manuálne v editačnom móde');
-alert('⚠️ Undo funguje len pre nedokončené veci.\n\nHotové zvary, texty, šípky sa mažú manuálne:\n1. Click na objekt\n2. Delete key');
+  // Snapshot undo - obnov predošlý stav
+  if(undoStack.length === 0){
+    console.log('↩️ Undo: žiadne kroky');
+    return;
+  }
+  var snapshot = undoStack.pop();
+  ws = snapshot.ws;
+  lines = snapshot.lines;
+  texts = snapshot.texts;
+  arrows = snapshot.arrows;
+  curves = snapshot.curves;
+  crosses = snapshot.crosses;
+  spools = snapshot.spools;
+  if(snapshot.weldBookData) {
+    weldBookData = snapshot.weldBookData;
+    saveWeldBookToStorage();
+  }
+  cn = snapshot.cn;
+
+  up();
+  dw();
+  console.log('↩️ Undo vykonaný, zostatok:', undoStack.length, 'krokov');
+  if(undoStack.length > 0){
+    document.getElementById('undo').title = 'Späť (' + undoStack.length + ' krokov)';
+    document.getElementById('undo').disabled = false;
+  } else {
+    document.getElementById('undo').title = 'Späť';
+    document.getElementById('undo').disabled = true; // Žiadne ďalšie kroky
+  }
 }
 
 function zi(){
@@ -8238,6 +8270,8 @@ crosses=[];
 spools=[];
 dimensions=[];
 weldHistory=[];
+undoStack=[]; // ✅ Vyčisti undo históriu pri novom projekte
+document.getElementById('undo').title='Späť';
 pt=null;
 linePt=null;
 arrowPt=null;
