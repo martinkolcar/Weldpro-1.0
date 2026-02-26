@@ -14264,9 +14264,9 @@ console.log('✅ Update notification center loaded!');
 </div>
 
 <!-- FLOATING CHAT BUTTON -->
-<button onclick="toggleChatPanel()" id="chatFloatingBtn" style="position:fixed;bottom:30px;right:30px;width:65px;height:65px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;box-shadow:0 8px 24px rgba(102,126,234,0.4);cursor:pointer;font-size:28px;z-index:9998;transition:all 0.3s">
+<button onclick="toggleChatPanel()" id="chatFloatingBtn" style="position:fixed;bottom:30px;right:30px;width:65px;height:65px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;box-shadow:0 8px 24px rgba(102,126,234,0.4);cursor:pointer;font-size:28px;z-index:9998;transition:all 0.3s;overflow:visible">
 💬
-<span id="chatUnreadBadge" style="display:none;position:absolute;top:-5px;right:-5px;background:#ef4444;color:white;border-radius:50%;width:24px;height:24px;font-size:12px;font-weight:700;line-height:24px;text-align:center;border:3px solid white"></span>
+<span id="chatUnreadBadge" style="display:none;position:absolute;top:-8px;right:-8px;background:#ef4444;color:white;border-radius:50%;min-width:22px;height:22px;font-size:11px;font-weight:700;line-height:22px;text-align:center;border:2px solid white;padding:0 4px;box-sizing:border-box;z-index:9999"></span>
 </button>
 
 <!-- CHAT PANEL -->
@@ -14796,10 +14796,16 @@ function startGlobalBadgeListener(){
   globalBadgeListener = () => { unsubGroup(); unsubPrivate(); };
 }
 
-if(window.currentUser){
-  startGlobalBadgeListener();
-  updateTotalUnreadBadge();
+// ✅ Počkaj kým je Firebase (db) ready, potom spusti listener
+function waitForDbAndStartBadge(){
+  if(db && window.currentUser){
+    startGlobalBadgeListener();
+    updateTotalUnreadBadge();
+  } else {
+    setTimeout(waitForDbAndStartBadge, 500); // Skús znova za 500ms
+  }
 }
+waitForDbAndStartBadge();
 
 // ==========================================
 // MOBILNÁ NAVIGÁCIA - JEDNODUCHÉ FUNKCIE
