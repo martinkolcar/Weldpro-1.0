@@ -2885,19 +2885,27 @@ var len=Math.sqrt(dx*dx+dy*dy);
 var displayText = String(w.displayNum); // Celý text (môže obsahovať písmená)
 var textLen = displayText.length;
 
-// Vypočítaj šírku textu (približne)
-var charWidth = 11; // Priemerná šírka znaku
+// Základný radius kruhu (fixný pre všetky)
+var radiusY = 18 * sc * weldScale;
+
+// fontSize sa vypočíta podľa dĺžky textu - musí sa vojsť do kruhu/elipsy
+var baseFontSize;
+if(textLen >= 7) baseFontSize = 14;
+else if(textLen >= 5) baseFontSize = 16;
+else if(textLen >= 4) baseFontSize = 17;
+else if(textLen >= 3) baseFontSize = 18;
+else baseFontSize = 20; // 1-2 znaky
+
+// Šírka textu podľa fontSize
+var charWidth = baseFontSize * 0.6; // ~0.6 pomer šírka/výška pre Arial
 var textWidth = textLen * charWidth * sc * weldScale;
 
-// Radius Y (vertikálny) - fixný
-var radiusY = 16 * sc * weldScale;
-
-// Radius X (horizontálny) - dynamický podľa textu + padding
-var radiusX = Math.max(radiusY, (textWidth / 2) + (5 * sc * weldScale));
-
-// Pre krátky text (1-2 znaky) použi kruh
+// Radius X - kruh pre krátky text, elipsa pre dlhší
+var radiusX;
 if(textLen <= 2) {
-  radiusX = radiusY;
+  radiusX = radiusY; // Kruh
+} else {
+  radiusX = Math.max(radiusY, (textWidth / 2) + (6 * sc * weldScale));
 }
 
 // ✅ OPRAVA - skutočný priesečník línie s elipsou (nie len radiusY)
@@ -3028,14 +3036,8 @@ cr.setAttribute('stroke',weldColor);
 cr.setAttribute('stroke-width',1.5*sc*weldScale); // Škáluj s zoom A weldScale
 ov.appendChild(cr);
 
-// ✅ Škáluj fontSize podľa dĺžky textu
-var baseFontSize=34;
-if(textLen>=7)baseFontSize=20; // Veľmi dlhý text (napr. 16A,B,C,D)
-else if(textLen>=5)baseFontSize=24; // Dlhý text (napr. 16G,H)
-else if(textLen>=4)baseFontSize=26;
-else if(textLen>=3)baseFontSize=28;
-else if(textLen>=2)baseFontSize=30;
-var fontSize=baseFontSize*sc*weldScale; // Škáluj s zoom A weldScale!
+// fontSize je vypočítaný vyššie pri radiusX (konzistentný s veľkosťou kruhu/elipsy)
+var fontSize = baseFontSize * sc * weldScale;
 
 var tx=document.createElementNS('http://www.w3.org/2000/svg','text');
 tx.setAttribute('x',endX);
