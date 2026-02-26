@@ -9060,140 +9060,210 @@ function exportWeldBookExcel() {
 
 // ============= IMPORT EXCELU DO WELDBOOK =============
 function importWeldBookExcel(){
-  // Mapping: Excel header → WeldBook field
+  // Presné mapovanie hlavičiek tvojho Excelu → WeldBook fields
   const COLUMN_MAP = {
-    // Slovenské aj anglické názvy
-    'cast': 'part', 'part': 'part', 'čast': 'part', 'časť': 'part',
-    'izometria': 'isometric', 'isometric': 'isometric', 'iso': 'isometric',
-    'sheets': 'sheets', 'sheet': 'sheets',
-    'ped': 'ped',
-    'rev': 'rev', 'rev.': 'rev', 'revision': 'rev',
-    'pipe class': 'pipeClass', 'pipeclass': 'pipeClass', 'class': 'pipeClass',
-    'weld id': 'weldId', 'weldid': 'weldId', 'weld no': 'weldId', 'weld no.': 'weldId', 'zvar': 'weldId', 'č. zvaru': 'weldId',
-    'source': 'source',
-    'welded item 1': 'item1', 'item 1': 'item1', 'item1': 'item1',
-    'heat nr. 1': 'heatNr1', 'heat nr 1': 'heatNr1', 'heat number 1': 'heatNr1', 'heatnr1': 'heatNr1',
-    'certificate nr. 1': 'certNr1', 'cert nr 1': 'certNr1', 'certnr1': 'certNr1',
-    'dimension 1': 'dimension1', 'dim 1': 'dimension1', 'dimension1': 'dimension1',
-    'wall thickness 1': 'thickness1', 'thickness 1': 'thickness1', 'wt 1': 'thickness1',
-    'material 1': 'material1', 'mat 1': 'material1', 'material1': 'material1',
-    'mat. group 1': 'matGroup1', 'mat group 1': 'matGroup1', 'matgroup1': 'matGroup1',
-    'welded item 2': 'item2', 'item 2': 'item2', 'item2': 'item2',
-    'heat nr. 2': 'heatNr2', 'heat nr 2': 'heatNr2', 'heatnr2': 'heatNr2',
-    'certificate nr. 2': 'certNr2', 'cert nr 2': 'certNr2', 'certnr2': 'certNr2',
-    'dimension 2': 'dimension2', 'dim 2': 'dimension2', 'dimension2': 'dimension2',
-    'wall thickness 2': 'thickness2', 'thickness 2': 'thickness2', 'wt 2': 'thickness2',
-    'material 2': 'material2', 'mat 2': 'material2', 'material2': 'material2',
-    'mat. group 2': 'matGroup2', 'mat group 2': 'matGroup2', 'matgroup2': 'matGroup2',
-    'wps': 'wps',
-    'wpqr': 'wpqr',
-    'welding method': 'weldingMethod', 'method': 'weldingMethod',
-    'type of joint': 'jointType', 'joint type': 'jointType', 'joint': 'jointType',
-    'type of welding': 'weldingType', 'welding type': 'weldingType',
-    'welding gas': 'weldingGas', 'gas': 'weldingGas',
-    'heat nr.': 'heatNrWeld', 'heat nr': 'heatNrWeld',
-    'certificate nr.': 'certNrWeld', 'cert nr': 'certNrWeld',
-    'welder id': 'welderId', 'welderid': 'welderId', 'welder': 'welderId',
-    'date of welding': 'dateWelding', 'welding date': 'dateWelding', 'date welding': 'dateWelding',
-    'vt inspection %': 'vtPercent', 'vt %': 'vtPercent', 'vt inspection': 'vtPercent',
-    'date of testing': 'vtDate', 'vt date': 'vtDate',
-    'vt report': 'vtReport',
-    'vt result': 'vtResult',
-    'pt inspection %': 'ptPercent', 'pt %': 'ptPercent',
-    'pt date': 'ptDate',
-    'pt report': 'ptReport',
-    'pt result': 'ptResult',
-    'rt inspection %': 'rtPercent', 'rt %': 'rtPercent',
-    'rt date': 'rtDate',
-    'rt report': 'rtReport',
-    'rt result': 'rtResult',
-    'ut inspection %': 'utPercent', 'ut %': 'utPercent',
-    'ut date': 'utDate',
-    'ut report': 'utReport',
-    'ut result': 'utResult',
-    'pwht': 'pwht',
-    'pressure test': 'pressureTest', 'pressure': 'pressureTest',
-    'remarks': 'remarks', 'poznamky': 'remarks', 'poznámky': 'remarks', 'note': 'remarks'
+    'isometric':             'isometric',
+    'sheets':                'sheets',
+    'ped':                   'ped',
+    'rev.':                  'rev',
+    'rev':                   'rev',
+    'pipe class':            'pipeClass',
+    'weld id':               'weldId',
+    'welded item 1':         'item1',
+    'heat nr. 1':            'heatNr1',
+    'certificate nr. 1':     'certNr1',
+    'dimension 1':           'dimension1',
+    'wall thickness 1':      'thickness1',
+    'material 1':            'material1',
+    'mat. group 1':          'matGroup1',
+    'welded item 2':         'item2',
+    'heat nr. 2':            'heatNr2',
+    'certificate nr. 2':     'certNr2',
+    'dimension 2':           'dimension2',
+    'wall thickness 2':      'thickness2',
+    'material 2':            'material2',
+    'mat. group 2':          'matGroup2',
+    'wps':                   'wps',
+    'wpqr':                  'wpqr',
+    'welding method':        'weldingMethod',
+    'type of joint':         'jointType',
+    'type of welding':       'weldingType',
+    'welding gas':           'weldingGas',
+    'heat nr.':              'heatNrWeld',
+    'heat nr':               'heatNrWeld',
+    'certificate nr.':       'certNrWeld',
+    'certificate nr':        'certNrWeld',
+    'welder id':             'welderId',
+    'date of welding':       'dateWelding',
+    'vt inspection %':       'vtPercent',
+    'vt report':             'vtReport',
+    'vt result':             'vtResult',
+    'vt defect lenght [mm]': 'vtDefect',
+    'vt additional information': 'vtInfo',
+    'vt repair date':        'vtRepairDate',
+    'vt repair result':      'vtRepairResult',
+    'pt inspection %':       'ptPercent',
+    'pt report':             'ptReport',
+    'pt result':             'ptResult',
+    'pt defect lenght [mm]': 'ptDefect',
+    'pt additional information': 'ptInfo',
+    'pt repair date':        'ptRepairDate',
+    'pt repair result':      'ptRepairResult',
+    'rt inspection %':       'rtPercent',
+    'rt report':             'rtReport',
+    'rt result':             'rtResult',
+    'rt defect lenght [mm]': 'rtDefect',
+    'rt additional information': 'rtInfo',
+    'rt repair date':        'rtRepairDate',
+    'rt repair result':      'rtRepairResult',
+    'inch/weld':             'inchWeld',
+    'prefab planned':        'prefabPlanned',
+    'prefab welded':         'prefabWelded',
+    'install planned':       'installPlanned',
+    'install welded':        'installWelded',
   };
 
-  // Vytvor skrytý file input
+  // Zisti aktuálnu časť projektu (SUL, LIG, DRY...)
+  const currentPart = projectsData && projectsData.currentPart
+    ? projectsData.currentPart.toUpperCase().trim()
+    : null;
+
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.xlsx,.xls,.csv';
+  input.accept = '.xlsx,.xls';
   input.style.display = 'none';
   document.body.appendChild(input);
 
-  input.onchange = function(e){
+  input.onchange = async function(e){
     const file = e.target.files[0];
     if(!file){ document.body.removeChild(input); return; }
+
+    // Zobraz loading
+    const loadingDiv = document.createElement('div');
+    loadingDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:30px 40px;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.3);z-index:99999;text-align:center;font-size:16px';
+    loadingDiv.innerHTML = '<div style="font-size:40px;margin-bottom:10px">⏳</div><div>Načítavam Excel...<br><small style="color:#999">Toto môže chvíľu trvať</small></div>';
+    document.body.appendChild(loadingDiv);
 
     const reader = new FileReader();
     reader.onload = function(ev){
       try{
         const data = new Uint8Array(ev.target.result);
-        const workbook = XLSX.read(data, {type: 'array', cellDates: true});
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ''});
+        const workbook = XLSX.read(data, {type:'array', cellDates:true, raw:false});
 
-        if(rows.length < 2){
-          alert('❌ Excel je prázdny alebo nemá header riadok.');
-          return;
+        // Nájdi správny sheet - zodpovedajúci aktuálnej časti
+        let targetSheet = null;
+        let targetSheetName = '';
+
+        if(currentPart){
+          // Hľadaj sheet ktorý sa zhoduje s aktuálnou časťou
+          for(const sName of workbook.SheetNames){
+            if(sName.toUpperCase().trim() === currentPart){
+              targetSheet = workbook.Sheets[sName];
+              targetSheetName = sName;
+              break;
+            }
+          }
+          if(!targetSheet){
+            // Skús čiastočnú zhodu
+            for(const sName of workbook.SheetNames){
+              if(currentPart.includes(sName.toUpperCase()) || sName.toUpperCase().includes(currentPart)){
+                targetSheet = workbook.Sheets[sName];
+                targetSheetName = sName;
+                break;
+              }
+            }
+          }
         }
 
-        // Nájdi header riadok (prvý neprázdny)
-        let headerRowIdx = 0;
-        for(let i = 0; i < Math.min(5, rows.length); i++){
-          if(rows[i].some(c => c !== '')) { headerRowIdx = i; break; }
+        if(!targetSheet){
+          document.body.removeChild(loadingDiv);
+          document.body.removeChild(input);
+          const available = workbook.SheetNames.join(', ');
+          const chosen = prompt('Sheet pre cast ' + (currentPart||'?') + ' nenajdeny. Dostupne: ' + available + '. Zadaj nazov:');
+          if(!chosen) return;
+          targetSheet = workbook.Sheets[chosen];
+          targetSheetName = chosen;
+          if(!targetSheet){ alert('Sheet "' + chosen + '" neexistuje.'); return; }
+          // Reopen loading
+          document.body.appendChild(loadingDiv);
         }
+
+        loadingDiv.innerHTML = '<div style="font-size:40px;margin-bottom:10px">⚙️</div><div>Spracovávam sheet <strong>' + targetSheetName + '</strong>...<br><small style="color:#999">Čakaj prosím</small></div>';
+
+        // Načítaj sheet - header je na riadku 3 (index 2)
+        const rows = XLSX.utils.sheet_to_json(targetSheet, {header:1, defval:'', raw:false});
+
+        // Nájdi header riadok - hľadaj riadok kde je "Weld ID"
+        let headerRowIdx = 2; // default riadok 3
+        for(let i = 0; i < Math.min(8, rows.length); i++){
+          const rowStr = rows[i].join('|').toLowerCase();
+          if(rowStr.includes('weld id') || rowStr.includes('weldid')){
+            headerRowIdx = i;
+            break;
+          }
+        }
+
         const headers = rows[headerRowIdx].map(h => String(h).toLowerCase().trim());
 
-        // Mapuj stĺpce
+        // Mapuj stĺpce - pozor na duplicitné hlavičky (Date of testing sa opakuje 3x)
         const colMapping = {}; // index → field
+        const usedFields = new Set();
+        // Pre duplicitné "Date of testing" - prvý je VT, druhý PT, tretí RT
+        const dateTestingFields = ['vtDate','ptDate','rtDate'];
+        let dateTestingCount = 0;
+
         headers.forEach((h, idx) => {
+          if(h === 'date of testing'){
+            if(dateTestingCount < dateTestingFields.length){
+              colMapping[idx] = dateTestingFields[dateTestingCount++];
+            }
+            return;
+          }
           const field = COLUMN_MAP[h];
-          if(field) colMapping[idx] = field;
+          if(field && !usedFields.has(field)){
+            colMapping[idx] = field;
+            usedFields.add(field);
+          }
         });
 
-        const mappedFields = Object.values(colMapping);
-        if(mappedFields.length === 0){
-          alert('Žiadne rozpoznané stĺpce. Skontroluj hlavičky Excelu.\nRozpoznané: ' + Object.keys(COLUMN_MAP).slice(0,10).join(', ') + '...');
-          return;
-        }
-
-        // Spracuj dátové riadky
+        // Spracuj dáta od riadku po headerRowIdx
         let updated = 0, added = 0, skipped = 0;
         const dataRows = rows.slice(headerRowIdx + 1);
 
         dataRows.forEach(row => {
-          if(row.every(c => c === '' || c === null || c === undefined)) return; // preskočiť prázdne riadky
+          if(!row || row.every(c => c === '' || c === null)) return;
 
-          // Vytvor objekt z riadku
-          const excelObj = {};
+          const obj = {part: targetSheetName};
           Object.entries(colMapping).forEach(([idx, field]) => {
             const val = row[idx];
             if(val !== '' && val !== null && val !== undefined){
-              excelObj[field] = String(val).trim();
+              let strVal = String(val).trim();
+              // Vyčisti formuly
+              if(strVal.startsWith('=')) return;
+              // Formátuj dátumy
+              if((field.includes('date') || field.includes('Date')) && strVal.includes('T')){
+                strVal = strVal.split('T')[0]; // 2026-02-19
+              }
+              obj[field] = strVal;
             }
           });
 
-          if(!excelObj.weldId){ skipped++; return; } // bez Weld ID preskočíme
+          if(!obj.weldId || obj.weldId === '' || obj.weldId === '0') { skipped++; return; }
 
-          // Hľadaj existujúci riadok podľa Weld ID
-          const existing = weldBookData.findIndex(r =>
-            String(r.weldId).trim().toLowerCase() === String(excelObj.weldId).trim().toLowerCase()
+          // Hľadaj existujúci zvar podľa isometric + weldId (kombinácia je unikátna)
+          const existingIdx = weldBookData.findIndex(r =>
+            String(r.weldId).trim() === String(obj.weldId).trim() &&
+            String(r.isometric||'').trim() === String(obj.isometric||'').trim()
           );
 
-          if(existing >= 0){
-            // Aktualizuj len neprázdne polia z Excelu
-            Object.entries(excelObj).forEach(([field, val]) => {
-              if(val !== '' && val !== undefined){
-                weldBookData[existing][field] = val;
-              }
+          if(existingIdx >= 0){
+            // Aktualizuj len neprázdne polia
+            Object.entries(obj).forEach(([field, val]) => {
+              if(val && val !== '') weldBookData[existingIdx][field] = val;
             });
             updated++;
           } else {
-            // Pridaj nový riadok
-            weldBookData.push(excelObj);
+            weldBookData.push(obj);
             added++;
           }
         });
@@ -9201,21 +9271,17 @@ function importWeldBookExcel(){
         // Refresh grid
         if(weldBookGridApi) weldBookGridApi.setRowData(weldBookData);
         saveWeldBookToStorage();
+        document.body.removeChild(loadingDiv);
+        document.body.removeChild(input);
 
-        const msg = `✅ Import dokončený!
-
-📝 Aktualizovaných: ${updated}
-➕ Pridaných: ${added}
-⏭️ Preskočených (bez Weld ID): ${skipped}
-
-🔗 Namatchované stĺpce: ${mappedFields.join(', ')}`;
-        alert(msg);
+        alert('Import: ' + targetSheetName + ' | Aktualizovanych: ' + updated + ' | Pridanych: ' + added + ' | Preskocenych: ' + skipped + ' | Celkom: ' + weldBookData.length);
 
       } catch(err){
         console.error('Import chyba:', err);
-        alert('❌ Chyba pri čítaní Excelu: ' + err.message);
+        if(document.body.contains(loadingDiv)) document.body.removeChild(loadingDiv);
+        if(document.body.contains(input)) document.body.removeChild(input);
+        alert('Chyba pri čítaní Excelu: ' + err.message);
       }
-      document.body.removeChild(input);
     };
     reader.readAsArrayBuffer(file);
   };
@@ -14824,8 +14890,12 @@ async function loadChatMessages(chatId, type){
     .orderBy('timestamp', 'asc')
     .onSnapshot(s => {
       displayChatMessages(s, type);
-      // Keď prídu nové správy do aktívneho chatu, hneď ich označ ako prečítané
-      markChatAsRead(chatId);
+      // Označ ako prečítané LEN ak je chat panel otvorený a tento chat je aktívny
+      const panel = document.getElementById('chatPanel');
+      const isOpen = panel && panel.style.display === 'flex';
+      if(isOpen && currentChatId === chatId){
+        markChatAsRead(chatId);
+      }
     });
   msgListeners.push(unsubscribe);
 }
@@ -14893,20 +14963,20 @@ async function sendChatMessage(){
       messageData.to = recipient;
       await db.collection('chats').doc(currentChatId).set({type:'private',participants:currentChatId.split('_'),lastMessage:text,lastTimestamp:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       await db.collection('chats').doc(currentChatId).collection('messages').add(messageData);
-      // ✅ Zapíš do inbox príjemcu cez transakciu - bezpečný increment
+      // ✅ Zapíš do inbox príjemcu
       if(recipient){
-        const inboxRef = db.collection('inbox').doc(recipient);
-        await db.runTransaction(async (t) => {
-          const inboxDoc = await t.get(inboxRef);
-          const cur = inboxDoc.exists ? (inboxDoc.data().unread || 0) : 0;
-          t.set(inboxRef, {
+        try{
+          const inboxRef = db.collection('inbox').doc(recipient);
+          const inboxSnap = await inboxRef.get();
+          const cur = inboxSnap.exists ? (inboxSnap.data().unread || 0) : 0;
+          await inboxRef.set({
             unread: cur + 1,
             lastFrom: window.currentUser.displayName || window.currentUser.username,
             lastText: text.substring(0,50),
             ts: firebase.firestore.FieldValue.serverTimestamp()
           }, {merge: true});
-          console.log('📬 Inbox transakcia pre:', recipient, 'unread:', cur + 1);
-        });
+          console.log('📬 Inbox zapísaný pre:', recipient, '| unread:', cur + 1);
+        } catch(inboxErr){ console.error('Inbox chyba:', inboxErr); }
       }
     }
     input.value = '';
