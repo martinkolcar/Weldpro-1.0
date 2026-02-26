@@ -1454,6 +1454,7 @@ function switchRibbonTab(tabName) {
   if(tabName==='montaz'){
     displayFilter.enabled=true;
     editMode=false;  // ✅ Default: len označovanie kruhov
+    montazWeldMode=false;  // ✅ KRITICKÁ OPRAVA - vypni "Pridať zvar" mode!
     console.log('🏗️ MONTÁŽ mode - filter ENABLED, editMode DISABLED (označovanie)');
   } else {
     displayFilter.enabled=false;
@@ -2875,13 +2876,27 @@ var endY=w.end.y*ca.height;
 var dx=endX-startX;
 var dy=endY-startY;
 var len=Math.sqrt(dx*dx+dy*dy);
-var numLen=String(w.displayNum).length;
-// ✅ Škáluj radius podľa zoom (sc) A weldScale
-var baseRadius=22;
-if(numLen>=4)baseRadius=30;
-else if(numLen>=3)baseRadius=26;
-else if(numLen>=2)baseRadius=24;
-var radius=baseRadius*sc*weldScale; // Škáluj s zoom A weldScale!
+
+// ✅ NOVÁ LOGIKA - dynamická elipsa podľa dĺžky textu
+var displayText = String(w.displayNum); // Celý text (môže obsahovať písmená)
+var textLen = displayText.length;
+
+// Vypočítaj šírku textu (približne)
+var charWidth = 16; // Priemerná šírka znaku
+var textWidth = textLen * charWidth * sc * weldScale;
+
+// Radius Y (vertikálny) - fixný
+var radiusY = 22 * sc * weldScale;
+
+// Radius X (horizontálny) - dynamický podľa textu + padding
+var radiusX = Math.max(radiusY, (textWidth / 2) + (8 * sc * weldScale));
+
+// Pre krátky text (1-2 znaky) použi kruh
+if(textLen <= 2) {
+  radiusX = radiusY;
+}
+
+var radius = radiusY; // Pre výpočet line end použi Y radius
 var ratio=(len-radius)/len;
 var lineEndX=startX+dx*ratio;
 var lineEndY=startY+dy*ratio;
@@ -2986,20 +3001,23 @@ l2.setAttribute('stroke',weldColor);
 l2.setAttribute('stroke-width',2*sc); // Škáluj s zoom
 ov.appendChild(l2);
 
-var cr=document.createElementNS('http://www.w3.org/2000/svg','circle');
+var cr=document.createElementNS('http://www.w3.org/2000/svg','ellipse');
 cr.setAttribute('cx',endX);
 cr.setAttribute('cy',endY);
-cr.setAttribute('r',radius);
+cr.setAttribute('rx',radiusX); // ✅ Horizontálny radius (šírka)
+cr.setAttribute('ry',radiusY); // ✅ Vertikálny radius (výška)
 cr.setAttribute('fill',fillColor); // VYPLŇ ak je hotový!
 cr.setAttribute('stroke',weldColor);
 cr.setAttribute('stroke-width',1.5*sc*weldScale); // Škáluj s zoom A weldScale
 ov.appendChild(cr);
 
-// ✅ Škáluj fontSize podľa zoom (sc) A weldScale
+// ✅ Škáluj fontSize podľa dĺžky textu
 var baseFontSize=34;
-if(numLen>=4)baseFontSize=24;
-else if(numLen>=3)baseFontSize=28;
-else if(numLen>=2)baseFontSize=30;
+if(textLen>=7)baseFontSize=20; // Veľmi dlhý text (napr. 16A,B,C,D)
+else if(textLen>=5)baseFontSize=24; // Dlhý text (napr. 16G,H)
+else if(textLen>=4)baseFontSize=26;
+else if(textLen>=3)baseFontSize=28;
+else if(textLen>=2)baseFontSize=30;
 var fontSize=baseFontSize*sc*weldScale; // Škáluj s zoom A weldScale!
 
 var tx=document.createElementNS('http://www.w3.org/2000/svg','text');
@@ -6130,9 +6148,6 @@ function openMontazWelderModal(weld, weldBookEntry){
 console.log('🔧 openMontazWelderModal() volané!');
 console.log('   weld.displayNum:', weld.displayNum);
 console.log('   weldBookEntry:', weldBookEntry);
-
-// ✅ MOBILE DEBUG - ukáž alert
-alert('📱 MONTÁŽ: Otváram modal pre zvar #' + weld.displayNum);
 
 montazCurrentWeld={weld:weld, weldBookEntry:weldBookEntry};
 
