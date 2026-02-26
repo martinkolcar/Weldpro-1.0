@@ -8319,6 +8319,7 @@ function openWeldBook() {
   content += '<button onclick="cleanWeldBook()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🧹 Vyčistiť orphaned</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
   content += '<button onclick="importJSONProjects()" style="padding:10px 20px;background:#667eea;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z JSON</button>';
+  content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu</button>';
   content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button>';
   content += '<button onclick="closeWeldBook()" style="padding:10px 20px;background:#6b7280;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✕ Zavrieť</button>';
   content += '</div></div>';
@@ -9055,6 +9056,171 @@ function exportWeldBookExcel() {
     console.error('❌ Export error:', err);
     alert('❌ Chyba pri exporte: ' + err.message + '\n\n💾 Dáta sú však bezpečne uložené v prehliadači!');
   }
+}
+
+// ============= IMPORT EXCELU DO WELDBOOK =============
+function importWeldBookExcel(){
+  // Mapping: Excel header → WeldBook field
+  const COLUMN_MAP = {
+    // Slovenské aj anglické názvy
+    'cast': 'part', 'part': 'part', 'čast': 'part', 'časť': 'part',
+    'izometria': 'isometric', 'isometric': 'isometric', 'iso': 'isometric',
+    'sheets': 'sheets', 'sheet': 'sheets',
+    'ped': 'ped',
+    'rev': 'rev', 'rev.': 'rev', 'revision': 'rev',
+    'pipe class': 'pipeClass', 'pipeclass': 'pipeClass', 'class': 'pipeClass',
+    'weld id': 'weldId', 'weldid': 'weldId', 'weld no': 'weldId', 'weld no.': 'weldId', 'zvar': 'weldId', 'č. zvaru': 'weldId',
+    'source': 'source',
+    'welded item 1': 'item1', 'item 1': 'item1', 'item1': 'item1',
+    'heat nr. 1': 'heatNr1', 'heat nr 1': 'heatNr1', 'heat number 1': 'heatNr1', 'heatnr1': 'heatNr1',
+    'certificate nr. 1': 'certNr1', 'cert nr 1': 'certNr1', 'certnr1': 'certNr1',
+    'dimension 1': 'dimension1', 'dim 1': 'dimension1', 'dimension1': 'dimension1',
+    'wall thickness 1': 'thickness1', 'thickness 1': 'thickness1', 'wt 1': 'thickness1',
+    'material 1': 'material1', 'mat 1': 'material1', 'material1': 'material1',
+    'mat. group 1': 'matGroup1', 'mat group 1': 'matGroup1', 'matgroup1': 'matGroup1',
+    'welded item 2': 'item2', 'item 2': 'item2', 'item2': 'item2',
+    'heat nr. 2': 'heatNr2', 'heat nr 2': 'heatNr2', 'heatnr2': 'heatNr2',
+    'certificate nr. 2': 'certNr2', 'cert nr 2': 'certNr2', 'certnr2': 'certNr2',
+    'dimension 2': 'dimension2', 'dim 2': 'dimension2', 'dimension2': 'dimension2',
+    'wall thickness 2': 'thickness2', 'thickness 2': 'thickness2', 'wt 2': 'thickness2',
+    'material 2': 'material2', 'mat 2': 'material2', 'material2': 'material2',
+    'mat. group 2': 'matGroup2', 'mat group 2': 'matGroup2', 'matgroup2': 'matGroup2',
+    'wps': 'wps',
+    'wpqr': 'wpqr',
+    'welding method': 'weldingMethod', 'method': 'weldingMethod',
+    'type of joint': 'jointType', 'joint type': 'jointType', 'joint': 'jointType',
+    'type of welding': 'weldingType', 'welding type': 'weldingType',
+    'welding gas': 'weldingGas', 'gas': 'weldingGas',
+    'heat nr.': 'heatNrWeld', 'heat nr': 'heatNrWeld',
+    'certificate nr.': 'certNrWeld', 'cert nr': 'certNrWeld',
+    'welder id': 'welderId', 'welderid': 'welderId', 'welder': 'welderId',
+    'date of welding': 'dateWelding', 'welding date': 'dateWelding', 'date welding': 'dateWelding',
+    'vt inspection %': 'vtPercent', 'vt %': 'vtPercent', 'vt inspection': 'vtPercent',
+    'date of testing': 'vtDate', 'vt date': 'vtDate',
+    'vt report': 'vtReport',
+    'vt result': 'vtResult',
+    'pt inspection %': 'ptPercent', 'pt %': 'ptPercent',
+    'pt date': 'ptDate',
+    'pt report': 'ptReport',
+    'pt result': 'ptResult',
+    'rt inspection %': 'rtPercent', 'rt %': 'rtPercent',
+    'rt date': 'rtDate',
+    'rt report': 'rtReport',
+    'rt result': 'rtResult',
+    'ut inspection %': 'utPercent', 'ut %': 'utPercent',
+    'ut date': 'utDate',
+    'ut report': 'utReport',
+    'ut result': 'utResult',
+    'pwht': 'pwht',
+    'pressure test': 'pressureTest', 'pressure': 'pressureTest',
+    'remarks': 'remarks', 'poznamky': 'remarks', 'poznámky': 'remarks', 'note': 'remarks'
+  };
+
+  // Vytvor skrytý file input
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.xlsx,.xls,.csv';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+
+  input.onchange = function(e){
+    const file = e.target.files[0];
+    if(!file){ document.body.removeChild(input); return; }
+
+    const reader = new FileReader();
+    reader.onload = function(ev){
+      try{
+        const data = new Uint8Array(ev.target.result);
+        const workbook = XLSX.read(data, {type: 'array', cellDates: true});
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ''});
+
+        if(rows.length < 2){
+          alert('❌ Excel je prázdny alebo nemá header riadok.');
+          return;
+        }
+
+        // Nájdi header riadok (prvý neprázdny)
+        let headerRowIdx = 0;
+        for(let i = 0; i < Math.min(5, rows.length); i++){
+          if(rows[i].some(c => c !== '')) { headerRowIdx = i; break; }
+        }
+        const headers = rows[headerRowIdx].map(h => String(h).toLowerCase().trim());
+
+        // Mapuj stĺpce
+        const colMapping = {}; // index → field
+        headers.forEach((h, idx) => {
+          const field = COLUMN_MAP[h];
+          if(field) colMapping[idx] = field;
+        });
+
+        const mappedFields = Object.values(colMapping);
+        if(mappedFields.length === 0){
+          alert('Žiadne rozpoznané stĺpce. Skontroluj hlavičky Excelu.\nRozpoznané: ' + Object.keys(COLUMN_MAP).slice(0,10).join(', ') + '...');
+          return;
+        }
+
+        // Spracuj dátové riadky
+        let updated = 0, added = 0, skipped = 0;
+        const dataRows = rows.slice(headerRowIdx + 1);
+
+        dataRows.forEach(row => {
+          if(row.every(c => c === '' || c === null || c === undefined)) return; // preskočiť prázdne riadky
+
+          // Vytvor objekt z riadku
+          const excelObj = {};
+          Object.entries(colMapping).forEach(([idx, field]) => {
+            const val = row[idx];
+            if(val !== '' && val !== null && val !== undefined){
+              excelObj[field] = String(val).trim();
+            }
+          });
+
+          if(!excelObj.weldId){ skipped++; return; } // bez Weld ID preskočíme
+
+          // Hľadaj existujúci riadok podľa Weld ID
+          const existing = weldBookData.findIndex(r =>
+            String(r.weldId).trim().toLowerCase() === String(excelObj.weldId).trim().toLowerCase()
+          );
+
+          if(existing >= 0){
+            // Aktualizuj len neprázdne polia z Excelu
+            Object.entries(excelObj).forEach(([field, val]) => {
+              if(val !== '' && val !== undefined){
+                weldBookData[existing][field] = val;
+              }
+            });
+            updated++;
+          } else {
+            // Pridaj nový riadok
+            weldBookData.push(excelObj);
+            added++;
+          }
+        });
+
+        // Refresh grid
+        if(weldBookGridApi) weldBookGridApi.setRowData(weldBookData);
+        saveWeldBookToStorage();
+
+        const msg = `✅ Import dokončený!
+
+📝 Aktualizovaných: ${updated}
+➕ Pridaných: ${added}
+⏭️ Preskočených (bez Weld ID): ${skipped}
+
+🔗 Namatchované stĺpce: ${mappedFields.join(', ')}`;
+        alert(msg);
+
+      } catch(err){
+        console.error('Import chyba:', err);
+        alert('❌ Chyba pri čítaní Excelu: ' + err.message);
+      }
+      document.body.removeChild(input);
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  input.click();
 }
 
 // ============= ZMAZANIE ZVARU Z WELDBOOK =============
@@ -14765,9 +14931,24 @@ async function markChatAsRead(chatId){
   try{
     if(!db || !window.currentUser) return;
     const me = window.currentUser.username;
-    // Vynuluj inbox
-    await db.collection('inbox').doc(me).set({unread: 0}, {merge: true});
-    console.log('✅ Inbox vynulovaný pre:', me);
+    // Označ správy ako prečítané v DB
+    const msgsSnap = await db.collection('chats').doc(chatId).collection('messages')
+      .where('read','==',false).get();
+    const toMark = msgsSnap.docs.filter(d => d.data().from !== me);
+    if(toMark.length > 0){
+      const batch = db.batch();
+      toMark.forEach(d => batch.update(d.ref, {read: true}));
+      await batch.commit();
+      // Znižuj inbox o počet prečítaných
+      const inboxRef = db.collection('inbox').doc(me);
+      await db.runTransaction(async t => {
+        const inboxDoc = await t.get(inboxRef);
+        const cur = inboxDoc.exists ? (inboxDoc.data().unread || 0) : 0;
+        const newVal = Math.max(0, cur - toMark.length);
+        t.set(inboxRef, {unread: newVal}, {merge: true});
+        console.log('✅ Inbox znížený:', cur, '->', newVal);
+      });
+    }
   } catch(e){ console.error(e); }
 }
 
@@ -14783,9 +14964,9 @@ function setBadge(count){
   chatUnreadCount = count;
   const badge = document.getElementById('chatUnreadBadge');
   if(!badge) return;
-  const panel = document.getElementById('chatPanel');
-  const panelOpen = panel && panel.style.display === 'flex';
-  if(count > 0 && !panelOpen){
+  // Zobraz badge vždy keď count > 0, aj keď je panel otvorený
+  // (panel môže byť otvorený na inej konverzácii)
+  if(count > 0){
     badge.textContent = count > 99 ? '99+' : count;
     badge.style.display = 'block';
     console.log('🔴 Badge:', count);
