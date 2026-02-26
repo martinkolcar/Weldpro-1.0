@@ -14651,13 +14651,13 @@ async function loadChatMessages(chatId, type){
   // Zruš staré listenery
   msgListeners.forEach(u => u());
   msgListeners = [];
+  // Okamžite označ ako prečítané pri otvorení
+  markChatAsRead(chatId);
   const unsubscribe = db.collection('chats').doc(chatId).collection('messages')
     .orderBy('timestamp', 'asc')
     .onSnapshot(s => {
       displayChatMessages(s, type);
-      markChatAsRead(chatId);
-      updateTotalUnreadBadge();
-      renderUsersList();
+      // markChatAsRead sa NEvolá tu - len pri manuálnom otvorení chatu
     });
   msgListeners.push(unsubscribe);
 }
@@ -14725,19 +14725,20 @@ async function sendChatMessage(){
       messageData.to = recipient;
       await db.collection('chats').doc(currentChatId).set({type:'private',participants:currentChatId.split('_'),lastMessage:text,lastTimestamp:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       await db.collection('chats').doc(currentChatId).collection('messages').add(messageData);
-      // ✅ Zapíš do inbox príjemcu - okamžitý badge
+      // ✅ Zapíš do inbox príjemcu cez transakciu - bezpečný increment
       if(recipient){
-        // Manuálny increment - FieldValue.increment môže spôsobiť 400 error
         const inboxRef = db.collection('inbox').doc(recipient);
-        const inboxDoc = await inboxRef.get();
-        const currentUnread = inboxDoc.exists ? (inboxDoc.data().unread || 0) : 0;
-        await inboxRef.set({
-          unread: currentUnread + 1,
-          lastFrom: window.currentUser.displayName || window.currentUser.username,
-          lastText: text.substring(0,50),
-          ts: firebase.firestore.FieldValue.serverTimestamp()
-        }, {merge:true});
-        console.log('📬 Inbox zapísaný pre:', recipient, 'unread:', currentUnread + 1);
+        await db.runTransaction(async (t) => {
+          const inboxDoc = await t.get(inboxRef);
+          const cur = inboxDoc.exists ? (inboxDoc.data().unread || 0) : 0;
+          t.set(inboxRef, {
+            unread: cur + 1,
+            lastFrom: window.currentUser.displayName || window.currentUser.username,
+            lastText: text.substring(0,50),
+            ts: firebase.firestore.FieldValue.serverTimestamp()
+          }, {merge: true});
+          console.log('📬 Inbox transakcia pre:', recipient, 'unread:', cur + 1);
+        });
       }
     }
     input.value = '';
@@ -14764,17 +14765,9 @@ async function markChatAsRead(chatId){
   try{
     if(!db || !window.currentUser) return;
     const me = window.currentUser.username;
-    // ✅ Bez != operátora (nevyžaduje composite index)
-    const snapshot = await db.collection('chats').doc(chatId).collection('messages')
-      .where('read', '==', false).get();
-    // Filtruj v JS - len správy od iných
-    const toMark = snapshot.docs.filter(d => d.data().from !== me);
-    if(toMark.length === 0) return;
-    const batch = db.batch();
-    toMark.forEach(doc => batch.update(doc.ref, {read: true}));
-    await batch.commit();
-    // ✅ Zmaž inbox pre mňa
+    // Vynuluj inbox
     await db.collection('inbox').doc(me).set({unread: 0}, {merge: true});
+    console.log('✅ Inbox vynulovaný pre:', me);
   } catch(e){ console.error(e); }
 }
 
