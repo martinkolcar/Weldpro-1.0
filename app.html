@@ -2896,10 +2896,23 @@ if(textLen <= 2) {
   radiusX = radiusY;
 }
 
-var radius = radiusY; // Pre výpočet line end použi Y radius
-var ratio=(len-radius)/len;
-var lineEndX=startX+dx*ratio;
-var lineEndY=startY+dy*ratio;
+// ✅ OPRAVA - skutočný priesečník línie s elipsou (nie len radiusY)
+// Parametrická rovnica elipsy: (x/rx)^2 + (y/ry)^2 = 1
+// Smer od stredu elipsy (endX,endY) k štartu (startX,startY)
+var dirX = startX - endX;
+var dirY = startY - endY;
+var dirLen = Math.sqrt(dirX*dirX + dirY*dirY);
+if(dirLen > 0) {
+  var ndx = dirX / dirLen;
+  var ndy = dirY / dirLen;
+  // t = 1 / sqrt((ndx/rx)^2 + (ndy/ry)^2)
+  var t = 1 / Math.sqrt((ndx/radiusX)*(ndx/radiusX) + (ndy/radiusY)*(ndy/radiusY));
+  var lineEndX = endX + ndx * t;
+  var lineEndY = endY + ndy * t;
+} else {
+  var lineEndX = endX;
+  var lineEndY = endY;
+}
 
 // FARBA podľa WELDBOOK - ak má vyplneného zvarača
 var weldColor='#FF0000'; // Stroke VŽDY červený!
