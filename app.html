@@ -14485,21 +14485,51 @@ function initChatPanel(){
 }
 
 // ✅ REALTIME - online používatelia + všetky chaty
+let sessionsListener = null;
+let onlineSessionsCache = new Set(); // Cache online IDs z realtime listenera
+
 function loadUsersRealtime(){
   if(!db || !window.currentUser) return;
-  // Zrušíme starý listener
   if(usersListener) usersListener();
 
-  // Realtime listener na users kolekciu
-  usersListener = db.collection('users').onSnapshot(async snapshot => {
+  // ✅ Realtime listener na active_sessions - okamžitá aktualizácia online statusu
+  if(sessionsListener) sessionsListener();
+  sessionsListener = db.collection('active_sessions').onSnapshot(snap => {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    onlineSessionsCache = new Set();
+    snap.forEach(doc => {
+      const s = doc.data();
+      if(s.lastActivity && s.lastActivity.toDate() > fiveMinutesAgo){
+        onlineSessionsCache.add(doc.id);
+      }
+    });
+    // Refresh UI keď sa zmení online status
+    renderUsersList();
+  });
+
+  // ✅ Realtime listener na users kolekciu
+  usersListener = db.collection('users').onSnapshot(() => renderUsersList());
+
+  // Prvý render
+  renderUsersList();
+}
+
+async function renderUsersList(){
+  if(!db || !window.currentUser) return;
+  const listEl = document.getElementById('chatConversationsList');
+  if(!listEl) return;
+
+  try{
+    const me = window.currentUser.username;
+    const snapshot = await db.collection('users').get();
+    const onlineSessions = onlineSessionsCache;
     let onlineHtml = '';
     let offlineHtml = '';
-    const me = window.currentUser.username;
 
     for(const doc of snapshot.docs){
       if(doc.id === me) continue;
       const user = doc.data();
-      const isOnline = activeSessions.some(s => s.id === doc.id);
+      const isOnline = onlineSessions.has(doc.id);
       const displayName = user.displayName || doc.id;
       const role = user.role || '';
       const chatId = getChatId(me, doc.id);
@@ -14557,13 +14587,12 @@ function loadUsersRealtime(){
       </div>
     </div>`;
 
-    const listEl = document.getElementById('chatConversationsList');
     let html = groupItem;
     if(onlineHtml) html += `<div style="font-size:10px;font-weight:700;color:#22c55e;padding:4px 4px 2px;text-transform:uppercase;letter-spacing:1px">● Online</div>` + onlineHtml;
     if(offlineHtml) html += `<div style="font-size:10px;font-weight:700;color:#9ca3af;padding:6px 4px 2px;text-transform:uppercase;letter-spacing:1px">● Offline</div>` + offlineHtml;
     listEl.innerHTML = html;
     updateTotalUnreadBadge();
-  });
+  } catch(e){ console.error('renderUsersList:', e); }
 }
 
 // ✅ REALTIME konverzácie - listener na nové správy
@@ -14575,7 +14604,7 @@ function listenConversations(){
     .where('participants', 'array-contains', window.currentUser.username)
     .onSnapshot(() => {
       updateTotalUnreadBadge();
-      loadUsersRealtime(); // Refresh unread badges na používateľoch
+      renderUsersList(); // Refresh unread badges na používateľoch
     });
 }
 
@@ -14585,7 +14614,7 @@ function openGroupChat(){
   document.getElementById('chatHeaderName').textContent = '💬 Skupina VŠETCI';
   document.getElementById('chatMessageInput').disabled = false;
   document.getElementById('chatSendBtn').disabled = false;
-  loadUsersRealtime();
+  renderUsersList();
   loadChatMessages(GROUP_CHAT_ID, 'group');
   markChatAsRead(GROUP_CHAT_ID);
 }
@@ -14601,7 +14630,7 @@ function openPrivateChat(chatId, otherUser, displayName){
     </span>`;
   document.getElementById('chatMessageInput').disabled = false;
   document.getElementById('chatSendBtn').disabled = false;
-  loadUsersRealtime();
+  renderUsersList();
   loadChatMessages(chatId, 'private');
   markChatAsRead(chatId);
 }
@@ -14620,7 +14649,7 @@ async function loadChatMessages(chatId, type){
       displayChatMessages(s, type);
       markChatAsRead(chatId);
       updateTotalUnreadBadge();
-      loadUsersRealtime();
+      renderUsersList();
     });
   msgListeners.push(unsubscribe);
 }
@@ -14698,22 +14727,27 @@ function getChatId(user1, user2){
 async function getUnreadCountForChat(chatId){
   try{
     if(!db || !window.currentUser) return 0;
+    // ✅ Bez != operátora (nevyžaduje composite index)
     const snapshot = await db.collection('chats').doc(chatId).collection('messages')
-      .where('from', '!=', window.currentUser.username)
       .where('read', '==', false).get();
-    return snapshot.size;
+    // Filtruj v JS - len správy od iných
+    const count = snapshot.docs.filter(d => d.data().from !== window.currentUser.username).length;
+    return count;
   } catch(e){ return 0; }
 }
 
 async function markChatAsRead(chatId){
   try{
     if(!db || !window.currentUser) return;
+    // ✅ Bez != operátora (nevyžaduje composite index)
     const snapshot = await db.collection('chats').doc(chatId).collection('messages')
-      .where('from', '!=', window.currentUser.username)
       .where('read', '==', false).get();
+    // Filtruj v JS - len správy od iných
+    const toMark = snapshot.docs.filter(d => d.data().from !== window.currentUser.username);
+    if(toMark.length === 0) return;
     const batch = db.batch();
-    snapshot.docs.forEach(doc => batch.update(doc.ref, {read: true}));
-    if(!snapshot.empty) await batch.commit();
+    toMark.forEach(doc => batch.update(doc.ref, {read: true}));
+    await batch.commit();
   } catch(e){ console.error(e); }
 }
 
