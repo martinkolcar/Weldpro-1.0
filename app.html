@@ -1624,6 +1624,11 @@ weldLogMaterials=[];
 weldAssignments={};
 document.getElementById('materialsList').innerHTML='<div class="material-item" style="text-align:center;color:#999">Klikni na "📋 Načítať z izometrie"</div>';
 if(fi.type==='application/pdf'){
+// ✅ OKAMŽITE zmaž starý obrázok z knižnice - synchrónne pred akýmkoľvek callbackom!
+loadedImage = null;
+baseImageWidth = 0;
+baseImageHeight = 0;
+pd = null; // Zmaž aj starý pd kým sa načítava nový
 var rd=new FileReader();
 rd.onload=function(){
 var dt=new Uint8Array(this.result);
