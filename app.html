@@ -14864,14 +14864,20 @@ async function updateBadgeDisplay(){
 
 // ✅ Počkaj kým je Firebase (db) ready, potom spusti listener
 function waitForDbAndStartBadge(){
+  console.log('⏳ waitForDbAndStartBadge - db:', !!db, 'user:', !!window.currentUser);
   if(db && window.currentUser){
+    console.log('✅ Spúšťam badge listener pre:', window.currentUser.username);
     startGlobalBadgeListener();
     updateTotalUnreadBadge();
   } else {
-    setTimeout(waitForDbAndStartBadge, 500); // Skús znova za 500ms
+    setTimeout(waitForDbAndStartBadge, 500);
   }
 }
+// Spusti ihneď aj po DOMContentLoaded aj po načítaní
 waitForDbAndStartBadge();
+window.addEventListener('load', function(){
+  setTimeout(waitForDbAndStartBadge, 1000);
+});
 
 // ==========================================
 // MOBILNÁ NAVIGÁCIA - JEDNODUCHÉ FUNKCIE
