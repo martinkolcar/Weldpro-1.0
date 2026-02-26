@@ -1735,8 +1735,12 @@ ca.height=vp.height;
 ca.width=vp.width;
 ov.setAttribute('width',vp.width);
 ov.setAttribute('height',vp.height);
+ov.style.width=vp.width+'px';
+ov.style.height=vp.height+'px';
 ct.imageSmoothingEnabled=false;
-pg.render({canvasContext:ct,viewport:vp}).promise.then(dw);
+pg.render({canvasContext:ct,viewport:vp}).promise.then(function(){
+  requestAnimationFrame(function(){ dw(); });
+});
 updateZoomDisplay();
 });
 }
@@ -4778,8 +4782,8 @@ alert('⚠️ Undo funguje len pre nedokončené veci.\n\nHotové zvary, texty, 
 
 function zi(){
 sc+=0.2;
-if(pd)rp();
-else if(loadedImage)redrawImageWithZoom();
+if(loadedImage)redrawImageWithZoom(); // ✅ Knižnica má prioritu (PNG)
+else if(pd)rp();                      // Iba priamy PDF upload
 else dw();
 updateZoomDisplay();
 }
@@ -4787,8 +4791,8 @@ updateZoomDisplay();
 function zo(){
 if(sc>0.1){
 sc-=0.2;
-if(pd)rp();
-else if(loadedImage)redrawImageWithZoom();
+if(loadedImage)redrawImageWithZoom(); // ✅ Knižnica má prioritu (PNG)
+else if(pd)rp();                      // Iba priamy PDF upload
 else dw();
 updateZoomDisplay();
 }
@@ -4796,8 +4800,8 @@ updateZoomDisplay();
 
 function zr(){
 sc=1.0;
-if(pd)rp();
-else if(loadedImage)redrawImageWithZoom();
+if(loadedImage)redrawImageWithZoom(); // ✅ Knižnica má prioritu (PNG)
+else if(pd)rp();                      // Iba priamy PDF upload
 else dw();
 updateZoomDisplay();
 }
@@ -4811,11 +4815,13 @@ ca.width=newWidth;
 ca.height=newHeight;
 ov.setAttribute('width',newWidth);
 ov.setAttribute('height',newHeight);
+ov.style.width=newWidth+'px';
+ov.style.height=newHeight+'px';
 ct.clearRect(0,0,newWidth,newHeight);
 ct.imageSmoothingEnabled=false;
 ct.drawImage(loadedImage,0,0,newWidth,newHeight);
+// ✅ dw() hneď synchrónne - ca.width/height sú už správne nastavené
 dw();
-updateZoomDisplay();
 }
 
 // ============= SPOOL LIST SYSTEM =============
@@ -7439,7 +7445,7 @@ if(pd){
   
   // Použij ORIGINÁLNU veľkosť PDF, nie zoom
   pd.getPage(1).then(function(pg){
-    var viewport = pg.getViewport({scale: 1.4}); // Optimálne rozlíšenie 1.4x
+    var viewport = pg.getViewport({scale: 1.0}); // ✅ scale 1.0 = zvary sa zhodujú s canvasom
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     ctx.imageSmoothingEnabled = false;
@@ -7557,7 +7563,7 @@ if(pd){
   var canvas=document.createElement('canvas');
   var ctx=canvas.getContext('2d');
   pd.getPage(1).then(function(pg){
-    var viewport = pg.getViewport({scale: 1.4});
+    var viewport = pg.getViewport({scale: 1.0}); // ✅ scale 1.0 = zvary sa zhodujú s canvasom
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     ctx.imageSmoothingEnabled = false;
@@ -11115,6 +11121,8 @@ async function loadFromLibraryFirebase(projectName) {
     
     // 🧹 VYČISTIŤ VŠETKO PRED NAČÍTANÍM NOVÉHO PROJEKTU!
     console.log('🧹 Čistenie starých dát pred načítaním...');
+    pd = null;        // ✅ KRITICKÉ: zmaž starý PDF z uploadu - zoom nesmie použiť starý výkres!
+    loadedImage = null; // ✅ Zmaž starý obrázok
     ws = [];
     spools = [];
     crosses = [];
@@ -11163,6 +11171,9 @@ async function loadFromLibraryFirebase(projectName) {
       const img = new Image();
       img.onload = function() {
         console.log('🔵 PDF loaded, drawing...');
+        
+        // ✅ KRITICKÉ: Resetuj pd=null aby zoom používal loadedImage a nie starý PDF!
+        pd = null;
         
         // Ulož obrázok pre zoom
         loadedImage = img;
@@ -11278,6 +11289,8 @@ function loadFromLibrary(index) {
   if (projectData.pdfData) {
     const img = new Image();
     img.onload = function() {
+      // ✅ KRITICKÉ: Resetuj pd=null aby zoom používal loadedImage a nie starý PDF!
+      pd = null;
       // Ulož obrázok pre zoom
       loadedImage = img;
       baseImageWidth = img.naturalWidth || img.width;
@@ -13292,6 +13305,8 @@ function loadOfflineProject(projectId) {
     
     // 🧹 VYČISTIŤ VŠETKO PRED NAČÍTANÍM NOVÉHO PROJEKTU!
     console.log('🧹 Čistenie starých dát...');
+    pd = null;        // ✅ KRITICKÉ: zmaž starý PDF z uploadu!
+    loadedImage = null;
     ws = [];
     spools = [];
     crosses = [];
@@ -13335,7 +13350,8 @@ function loadOfflineProject(projectId) {
       const img = new Image();
       img.onload = function() {
         console.log('📱 PDF loaded!');
-        
+        // ✅ KRITICKÉ: Resetuj pd=null aby zoom používal loadedImage a nie starý PDF!
+        pd = null;
         loadedImage = img;
         baseImageWidth = img.naturalWidth || img.width;
         baseImageHeight = img.naturalHeight || img.height;
@@ -13896,6 +13912,8 @@ async function loadAndDisplayProject(projectName, part) {
     
     // 🧹 VYČISTIŤ VŠETKO PRED NAČÍTANÍM NOVÉHO PROJEKTU!
     console.log('🧹 Čistenie starých dát pred načítaním...');
+    pd = null;        // ✅ KRITICKÉ: zmaž starý PDF z uploadu!
+    loadedImage = null;
     ws = [];
     spools = [];
     crosses = [];
@@ -13937,6 +13955,8 @@ async function loadAndDisplayProject(projectName, part) {
       const img = new Image();
       img.onload = function() {
         console.log('🔵 PDF loaded, drawing...');
+        // ✅ KRITICKÉ: Resetuj pd=null aby zoom používal loadedImage a nie starý PDF!
+        pd = null;
         
         // Ulož obrázok pre zoom
         loadedImage = img;
