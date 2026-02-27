@@ -14686,7 +14686,7 @@ Voľné: <span id="availableSpace">~10 MB</span>
 
 <script>
 
-// 💬 CHAT SYSTÉM - KONVERZÁCIE + SKUPINA
+// 💬 CHAT SYSTÉM
 
 function toggleChatPanel(){
   const panel = document.getElementById('chatPanel');
@@ -14696,100 +14696,138 @@ function toggleChatPanel(){
   if(!isVisible){
     panel.style.display = 'flex';
     btn.style.display = 'none';
-    if(badge) badge.style.display = 'none'; // Skry badge keď sa chat otvorí
+    if(badge) badge.style.display = 'none';
     initChatPanel();
   } else {
     panel.style.display = 'none';
     btn.style.display = 'block';
-    // Obnov badge ak sú unread správy
-    if(chatUnreadCount > 0 && badge){
-      badge.textContent = chatUnreadCount > 99 ? '99+' : chatUnreadCount;
-      badge.style.display = 'block';
-    }
+    refreshBadge();
   }
 }
 
-// Realtime listenery pre chat
-let chatListeners = [];
+let msgListeners = [];
 let currentChatId = null;
 let currentChatType = null;
 let chatUnreadCount = 0;
 let usersListener = null;
-let conversationsListener = null;
+let onlineSessionsCache = new Set();
+let globalBadgeUnsub = null;
 const GROUP_CHAT_ID = 'group_all';
 
 function initChatPanel(){
-  // Spusti realtime listener pre online používateľov + konverzácie
-  loadUsersRealtime();
-  listenConversations();
-}
-
-// ✅ REALTIME - online používatelia + všetky chaty
-let sessionsListener = null;
-let onlineSessionsCache = new Set(); // Cache online IDs z realtime listenera
-
-function loadUsersRealtime(){
-  if(!db || !window.currentUser) return;
-  if(usersListener) usersListener();
-
-  // ✅ Realtime listener na active_sessions - okamžitá aktualizácia online statusu
-  if(sessionsListener) sessionsListener();
-  sessionsListener = db.collection('active_sessions').onSnapshot(snap => {
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    onlineSessionsCache = new Set();
-    snap.forEach(doc => {
-      const s = doc.data();
-      if(s.lastActivity && s.lastActivity.toDate() > fiveMinutesAgo){
-        onlineSessionsCache.add(doc.id);
-      }
-    });
-    // Refresh UI keď sa zmení online status
+  refreshOnlineSessions().then(() => {
     renderUsersList();
+    startBadgeListener();
   });
-
-  // ✅ Realtime listener na users kolekciu
-  usersListener = db.collection('users').onSnapshot(() => renderUsersList());
-
-  // Prvý render
-  renderUsersList();
 }
 
-async function renderUsersList(){
-  if(!db || !window.currentUser) return;
-  const listEl = document.getElementById('chatConversationsList');
-  if(!listEl) return;
-
+async function refreshOnlineSessions(){
   try{
-    const me = window.currentUser.username;
-    const snapshot = await db.collection('users').get();
-    const onlineSessions = onlineSessionsCache;
-    let onlineHtml = '';
-    let offlineHtml = '';
+    const fiveMin = new Date(Date.now() - 5*60*1000);
+    const snap = await db.collection('active_sessions').get();
+    onlineSessionsCache = new Set();
+    snap.forEach(d => {
+      const s = d.data();
+      if(s.lastActivity && s.lastActivity.toDate() > fiveMin) onlineSessionsCache.add(d.id);
+    });
+  } catch(e){}
+}
 
-    for(const doc of snapshot.docs){
+// =============================================
+// BADGE - počíta priamo read=false správy
+// =============================================
+function startBadgeListener(){
+  if(!db || !window.currentUser) return;
+  if(globalBadgeUnsub){ globalBadgeUnsub(); globalBadgeUnsub = null; }
+  const me = window.currentUser.username;
+  // Poslúchaj všetky chaty kde som účastník
+  globalBadgeUnsub = db.collection('chats')
+    .where('participants','array-contains', me)
+    .onSnapshot(() => refreshBadge());
+  // Aj skupinový chat
+  db.collection('chats').doc(GROUP_CHAT_ID).collection('messages')
+    .onSnapshot(() => refreshBadge());
+  refreshBadge();
+}
+
+async function refreshBadge(){
+  if(!db || !window.currentUser) return;
+  const me = window.currentUser.username;
+  const panel = document.getElementById('chatPanel');
+  const panelOpen = panel && panel.style.display === 'flex';
+  try{
+    let total = 0;
+    // Skupinový chat
+    const grp = await db.collection('chats').doc(GROUP_CHAT_ID).collection('messages')
+      .where('read','==',false).get();
+    total += grp.docs.filter(d => d.data().from !== me).length;
+    // Súkromné chaty
+    const chats = await db.collection('chats').where('participants','array-contains',me).get();
+    for(const chat of chats.docs){
+      if(chat.id === GROUP_CHAT_ID) continue;
+      // Ak je tento chat práve otvorený, nerátaj - práve čítaš
+      if(panelOpen && currentChatId === chat.id) continue;
+      const msgs = await db.collection('chats').doc(chat.id).collection('messages')
+        .where('read','==',false).get();
+      total += msgs.docs.filter(d => d.data().from !== me).length;
+    }
+    chatUnreadCount = total;
+    const badge = document.getElementById('chatUnreadBadge');
+    if(!badge) return;
+    if(total > 0 && !panelOpen){
+      badge.textContent = total > 99 ? '99+' : total;
+      badge.style.display = 'block';
+    } else if(total > 0 && panelOpen){
+      // Panel otvorený - aktualizuj len zoznam používateľov
+      badge.style.display = 'none';
+      renderUsersList();
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch(e){ console.error('refreshBadge:', e); }
+}
+
+// =============================================
+// ZOZNAM POUŽÍVATEĽOV
+// =============================================
+async function renderUsersList(){
+  const listEl = document.getElementById('chatConversationsList');
+  if(!listEl || !db || !window.currentUser) return;
+  const me = window.currentUser.username;
+  try{
+    await refreshOnlineSessions();
+    const usersSnap = await db.collection('users').get();
+    let onlineHtml = '', offlineHtml = '';
+
+    for(const doc of usersSnap.docs){
       if(doc.id === me) continue;
       const user = doc.data();
-      const isOnline = onlineSessions.has(doc.id);
+      const isOnline = onlineSessionsCache.has(doc.id);
       const displayName = user.displayName || doc.id;
-      const role = user.role || '';
       const chatId = getChatId(me, doc.id);
       const isActive = currentChatId === chatId;
-      // Ak je chat aktívne otvorený, unread = 0 (práve čítaš)
-      const unread = isActive ? 0 : await getUnreadCountForChat(chatId);
+
+      // Unread count - 0 ak je chat aktívny
+      let unread = 0;
+      if(!isActive){
+        const msgs = await db.collection('chats').doc(chatId).collection('messages')
+          .where('read','==',false).get();
+        unread = msgs.docs.filter(d => d.data().from !== me).length;
+      }
+
       const badgeHtml = unread > 0
         ? `<span style="background:#ef4444;color:white;border-radius:50%;min-width:22px;height:22px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px">${unread}</span>`
         : '';
+
       const item = `<div onclick="openPrivateChat('${chatId}','${doc.id}','${displayName}')"
         style="padding:10px 12px;border-radius:8px;cursor:pointer;margin-bottom:6px;
         background:${isActive ? 'linear-gradient(135deg,#667eea,#764ba2)' : 'white'};
         color:${isActive ? 'white' : '#333'};
-        border:2px solid ${isActive ? '#667eea' : (isOnline ? '#22c55e' : '#e5e7eb')};
-        transition:all 0.2s"
-        onmouseover="if(this.style.background!='linear-gradient(135deg,#667eea,#764ba2)')this.style.background='#f3f4f6'"
-        onmouseout="if(this.style.background!='linear-gradient(135deg,#667eea,#764ba2)')this.style.background='white'">
+        border:2px solid ${isActive ? '#667eea' : (isOnline ? '#22c55e' : '#e5e7eb')}">
         <div style="display:flex;align-items:center;gap:10px">
           <div style="position:relative">
-            <div style="width:38px;height:38px;border-radius:50%;background:${isOnline ? 'linear-gradient(135deg,#22c55e,#16a34a)' : '#e5e7eb'};
+            <div style="width:38px;height:38px;border-radius:50%;
+              background:${isOnline ? 'linear-gradient(135deg,#22c55e,#16a34a)' : '#e5e7eb'};
               display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:white">
               ${displayName.charAt(0).toUpperCase()}
             </div>
@@ -14797,34 +14835,34 @@ async function renderUsersList(){
               background:${isOnline ? '#22c55e' : '#9ca3af'};border:2px solid white"></div>
           </div>
           <div style="flex:1;min-width:0">
-            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${displayName}</div>
-            <div style="font-size:11px;opacity:0.7">${isOnline ? '🟢 Online' : '⚫ Offline'}${role ? ' · ' + role : ''}</div>
+            <div style="font-weight:700;font-size:13px">${displayName}</div>
+            <div style="font-size:11px;opacity:0.7">${isOnline ? '🟢 Online' : '⚫ Offline'}</div>
           </div>
           ${badgeHtml}
         </div>
       </div>`;
-      if(isOnline) onlineHtml += item;
-      else offlineHtml += item;
+      if(isOnline) onlineHtml += item; else offlineHtml += item;
     }
 
     // Group chat unread
-    const groupUnread = await getUnreadCountForChat(GROUP_CHAT_ID);
-    const groupBadge = groupUnread > 0
-      ? `<span style="background:#ef4444;color:white;border-radius:50%;min-width:22px;height:22px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px">${groupUnread}</span>`
+    const grpMsgs = await db.collection('chats').doc(GROUP_CHAT_ID).collection('messages')
+      .where('read','==',false).get();
+    const grpUnread = grpMsgs.docs.filter(d => d.data().from !== me).length;
+    const grpActive = currentChatId === GROUP_CHAT_ID;
+    const grpBadge = grpUnread > 0
+      ? `<span style="background:#ef4444;color:white;border-radius:50%;min-width:22px;height:22px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px">${grpUnread}</span>`
       : '';
-    const groupActive = currentChatId === GROUP_CHAT_ID;
+
     const groupItem = `<div onclick="openGroupChat()"
       style="padding:10px 12px;border-radius:8px;cursor:pointer;margin-bottom:6px;
-      background:${groupActive ? 'linear-gradient(135deg,#667eea,#764ba2)' : 'white'};
-      color:${groupActive ? 'white' : '#333'};border:2px solid ${groupActive ? '#667eea' : '#e5e7eb'}"
-      onmouseover="if(this.style.background!='linear-gradient(135deg,#667eea,#764ba2)')this.style.background='#f3f4f6'"
-      onmouseout="if(this.style.background!='linear-gradient(135deg,#667eea,#764ba2)')this.style.background='white'">
+      background:${grpActive ? 'linear-gradient(135deg,#667eea,#764ba2)' : 'white'};
+      color:${grpActive ? 'white' : '#333'};border:2px solid ${grpActive ? '#667eea' : '#e5e7eb'}">
       <div style="display:flex;align-items:center;gap:10px">
         <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);
           display:flex;align-items:center;justify-content:center;font-size:18px">💬</div>
         <div style="flex:1"><div style="font-weight:700;font-size:13px">Skupina VŠETCI</div>
         <div style="font-size:11px;opacity:0.7">Skupinový chat</div></div>
-        ${groupBadge}
+        ${grpBadge}
       </div>
     </div>`;
 
@@ -14832,21 +14870,7 @@ async function renderUsersList(){
     if(onlineHtml) html += `<div style="font-size:10px;font-weight:700;color:#22c55e;padding:4px 4px 2px;text-transform:uppercase;letter-spacing:1px">● Online</div>` + onlineHtml;
     if(offlineHtml) html += `<div style="font-size:10px;font-weight:700;color:#9ca3af;padding:6px 4px 2px;text-transform:uppercase;letter-spacing:1px">● Offline</div>` + offlineHtml;
     listEl.innerHTML = html;
-    updateTotalUnreadBadge();
   } catch(e){ console.error('renderUsersList:', e); }
-}
-
-// ✅ REALTIME konverzácie - listener na nové správy
-function listenConversations(){
-  if(!db || !window.currentUser) return;
-  if(conversationsListener) conversationsListener();
-  // Keď príde nová správa do aktuálneho chatu, refresh badge
-  conversationsListener = db.collection('chats')
-    .where('participants', 'array-contains', window.currentUser.username)
-    .onSnapshot(() => {
-      updateTotalUnreadBadge();
-      renderUsersList(); // Refresh unread badges na používateľoch
-    });
 }
 
 function openGroupChat(){
@@ -14863,10 +14887,10 @@ function openGroupChat(){
 function openPrivateChat(chatId, otherUser, displayName){
   currentChatId = chatId;
   currentChatType = 'private';
-  const isOnline = activeSessions.some(s => s.id === otherUser);
+  const isOnline = onlineSessionsCache.has(otherUser);
   document.getElementById('chatHeaderName').innerHTML =
     `<span style="display:inline-flex;align-items:center;gap:6px">
-      <span style="width:8px;height:8px;border-radius:50%;background:${isOnline ? '#22c55e' : '#9ca3af'};display:inline-block"></span>
+      <span style="width:8px;height:8px;border-radius:50%;background:${isOnline?'#22c55e':'#9ca3af'};display:inline-block"></span>
       ${displayName}
     </span>`;
   document.getElementById('chatMessageInput').disabled = false;
@@ -14876,36 +14900,30 @@ function openPrivateChat(chatId, otherUser, displayName){
   markChatAsRead(chatId);
 }
 
-let msgListeners = [];
 async function loadChatMessages(chatId, type){
   const messagesEl = document.getElementById('chatMessagesArea');
   messagesEl.innerHTML = '<div style="text-align:center;color:#999;padding:20px">⏳</div>';
   if(!db) return;
-  // Zruš staré listenery
   msgListeners.forEach(u => u());
   msgListeners = [];
-  // Okamžite označ ako prečítané pri otvorení
-  markChatAsRead(chatId);
-  const unsubscribe = db.collection('chats').doc(chatId).collection('messages')
-    .orderBy('timestamp', 'asc')
+  const unsub = db.collection('chats').doc(chatId).collection('messages')
+    .orderBy('timestamp','asc')
     .onSnapshot(s => {
       displayChatMessages(s, type);
-      // Označ ako prečítané LEN ak je chat panel otvorený a tento chat je aktívny
+      // Označ ako prečítané len ak je tento chat aktívny a otvorený
       const panel = document.getElementById('chatPanel');
-      const isOpen = panel && panel.style.display === 'flex';
-      if(isOpen && currentChatId === chatId){
+      if(panel && panel.style.display === 'flex' && currentChatId === chatId){
         markChatAsRead(chatId);
       }
     });
-  msgListeners.push(unsubscribe);
+  msgListeners.push(unsub);
 }
 
 function displayChatMessages(snapshot, type){
   const messagesEl = document.getElementById('chatMessagesArea');
   if(snapshot.empty){
     messagesEl.innerHTML = `<div style="text-align:center;color:#999;padding:40px;font-size:13px">
-      <div style="font-size:40px;margin-bottom:10px">💬</div>
-      <p>Začni konverzáciu!</p></div>`;
+      <div style="font-size:40px;margin-bottom:10px">💬</div><p>Začni konverzáciu!</p></div>`;
     return;
   }
   const me = window.currentUser.username;
@@ -14914,29 +14932,22 @@ function displayChatMessages(snapshot, type){
     const msg = doc.data();
     const isOwn = msg.from === me;
     const timeStr = msg.timestamp
-      ? new Date(msg.timestamp.toDate()).toLocaleTimeString('sk-SK', {hour:'2-digit', minute:'2-digit'})
-      : '';
+      ? new Date(msg.timestamp.toDate()).toLocaleTimeString('sk-SK',{hour:'2-digit',minute:'2-digit'}) : '';
     if(type === 'group'){
-      html += `<div style="margin-bottom:12px;${isOwn ? 'display:flex;flex-direction:column;align-items:flex-end' : ''}">
-        ${!isOwn ? `<div style="font-size:10px;font-weight:700;color:#667eea;margin-bottom:3px;padding-left:4px">${msg.fromName||msg.from}</div>` : ''}
-        <div style="max-width:75%;padding:10px 14px;border-radius:${isOwn ? '16px 16px 4px 16px' : '16px 16px 16px 4px'};
-          font-size:13px;line-height:1.4;
-          background:${isOwn ? 'linear-gradient(135deg,#667eea,#764ba2)' : '#f3f4f6'};
-          color:${isOwn ? 'white' : '#1f2937'}">
+      html += `<div style="margin-bottom:12px;${isOwn?'display:flex;flex-direction:column;align-items:flex-end':''}">
+        ${!isOwn?`<div style="font-size:10px;font-weight:700;color:#667eea;margin-bottom:3px;padding-left:4px">${msg.fromName||msg.from}</div>`:''}
+        <div style="max-width:75%;padding:10px 14px;border-radius:${isOwn?'16px 16px 4px 16px':'16px 16px 16px 4px'};
+          font-size:13px;line-height:1.4;background:${isOwn?'linear-gradient(135deg,#667eea,#764ba2)':'#f3f4f6'};color:${isOwn?'white':'#1f2937'}">
           <div>${msg.text}</div>
           <div style="font-size:10px;opacity:0.6;margin-top:3px;text-align:right">${timeStr}</div>
-        </div>
-      </div>`;
+        </div></div>`;
     } else {
-      html += `<div style="margin-bottom:12px;display:flex;${isOwn ? 'flex-direction:row-reverse' : 'flex-direction:row'}">
-        <div style="max-width:72%;padding:10px 14px;border-radius:${isOwn ? '16px 16px 4px 16px' : '16px 16px 16px 4px'};
-          font-size:13px;line-height:1.4;
-          background:${isOwn ? 'linear-gradient(135deg,#667eea,#764ba2)' : '#f3f4f6'};
-          color:${isOwn ? 'white' : '#1f2937'}">
+      html += `<div style="margin-bottom:12px;display:flex;${isOwn?'flex-direction:row-reverse':'flex-direction:row'}">
+        <div style="max-width:72%;padding:10px 14px;border-radius:${isOwn?'16px 16px 4px 16px':'16px 16px 16px 4px'};
+          font-size:13px;line-height:1.4;background:${isOwn?'linear-gradient(135deg,#667eea,#764ba2)':'#f3f4f6'};color:${isOwn?'white':'#1f2937'}">
           <div>${msg.text}</div>
           <div style="font-size:10px;opacity:0.6;margin-top:3px;text-align:right">${timeStr}</div>
-        </div>
-      </div>`;
+        </div></div>`;
     }
   });
   messagesEl.innerHTML = html;
@@ -14948,9 +14959,10 @@ async function sendChatMessage(){
   const text = input.value.trim();
   if(!text || !currentChatId) return;
   try{
+    const me = window.currentUser.username;
     const messageData = {
-      from: window.currentUser.username,
-      fromName: window.currentUser.displayName || window.currentUser.username,
+      from: me,
+      fromName: window.currentUser.displayName || me,
       text: text,
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
       read: false
@@ -14959,541 +14971,58 @@ async function sendChatMessage(){
       await db.collection('chats').doc(GROUP_CHAT_ID).set({type:'group',lastMessage:text,lastTimestamp:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       await db.collection('chats').doc(GROUP_CHAT_ID).collection('messages').add(messageData);
     } else {
-      const recipient = currentChatId.split('_').find(u => u !== window.currentUser.username);
-      messageData.to = recipient;
       await db.collection('chats').doc(currentChatId).set({type:'private',participants:currentChatId.split('_'),lastMessage:text,lastTimestamp:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       await db.collection('chats').doc(currentChatId).collection('messages').add(messageData);
-      // ✅ Zapíš do inbox príjemcu
-      if(recipient){
-        try{
-          const inboxRef = db.collection('inbox').doc(recipient);
-          const inboxSnap = await inboxRef.get();
-          const cur = inboxSnap.exists ? (inboxSnap.data().unread || 0) : 0;
-          await inboxRef.set({
-            unread: cur + 1,
-            lastFrom: window.currentUser.displayName || window.currentUser.username,
-            lastText: text.substring(0,50),
-            ts: firebase.firestore.FieldValue.serverTimestamp()
-          }, {merge: true});
-          console.log('📬 Inbox zapísaný pre:', recipient, '| unread:', cur + 1);
-        } catch(inboxErr){ console.error('Inbox chyba:', inboxErr); }
-      }
     }
     input.value = '';
-  } catch(error){ console.error(error); alert('❌ ' + error.message); }
+    // Badge sa aktualizuje automaticky cez onSnapshot
+  } catch(err){ console.error(err); alert('Chyba: ' + err.message); }
+}
+
+async function markChatAsRead(chatId){
+  if(!db || !window.currentUser) return;
+  const me = window.currentUser.username;
+  try{
+    const snap = await db.collection('chats').doc(chatId).collection('messages')
+      .where('read','==',false).get();
+    const toMark = snap.docs.filter(d => d.data().from !== me);
+    if(toMark.length === 0) return;
+    const batch = db.batch();
+    toMark.forEach(d => batch.update(d.ref, {read: true}));
+    await batch.commit();
+    // Refresh badge a zoznam
+    refreshBadge();
+    renderUsersList();
+  } catch(e){ console.error('markChatAsRead:', e); }
 }
 
 function getChatId(user1, user2){
-  return user1 < user2 ? user1 + '_' + user2 : user2 + '_' + user1;
+  return user1 < user2 ? user1+'_'+user2 : user2+'_'+user1;
 }
 
 async function getUnreadCountForChat(chatId){
   try{
     if(!db || !window.currentUser) return 0;
-    // ✅ Bez != operátora (nevyžaduje composite index)
-    const snapshot = await db.collection('chats').doc(chatId).collection('messages')
-      .where('read', '==', false).get();
-    // Filtruj v JS - len správy od iných
-    const count = snapshot.docs.filter(d => d.data().from !== window.currentUser.username).length;
-    return count;
+    const me = window.currentUser.username;
+    const snap = await db.collection('chats').doc(chatId).collection('messages')
+      .where('read','==',false).get();
+    return snap.docs.filter(d => d.data().from !== me).length;
   } catch(e){ return 0; }
 }
 
-async function markChatAsRead(chatId){
-  try{
-    if(!db || !window.currentUser) return;
-    const me = window.currentUser.username;
-    const msgsSnap = await db.collection('chats').doc(chatId).collection('messages')
-      .where('read','==',false).get();
-    const toMark = msgsSnap.docs.filter(d => d.data().from !== me);
-    if(toMark.length > 0){
-      const batch = db.batch();
-      toMark.forEach(d => batch.update(d.ref, {read: true}));
-      await batch.commit();
-      // Nuluj inbox priamo na 0 - je to správne lebo práve si prečítal AKTÍVNY chat
-      await db.collection('inbox').doc(me).set({unread: 0}, {merge: true});
-      console.log('✅ Inbox vynulovaný, prečítané správy:', toMark.length);
-    } else {
-      // Aj keď nie sú nové správy, vynuluj inbox (bezpečnosť)
-      await db.collection('inbox').doc(me).set({unread: 0}, {merge: true});
-    }
-    // Refresh badge a zoznam používateľov
-    await refreshBadge();
-    renderUsersList();
-  } catch(e){ console.error(e); }
-}
+async function updateTotalUnreadBadge(){ await refreshBadge(); }
 
-async function updateTotalUnreadBadge(){
-  await refreshBadge();
-}
-
-// ✅ REALTIME badge - jednoduchý priamy systém
-let globalBadgeListener = null;
-let activeMessageListeners = {};
-
-function setBadge(count){
-  chatUnreadCount = count;
-  const badge = document.getElementById('chatUnreadBadge');
-  if(!badge) return;
-  // Zobraz badge vždy keď count > 0, aj keď je panel otvorený
-  // (panel môže byť otvorený na inej konverzácii)
-  if(count > 0){
-    badge.textContent = count > 99 ? '99+' : count;
-    badge.style.display = 'block';
-    console.log('🔴 Badge:', count);
-  } else {
-    badge.style.display = 'none';
-  }
-}
-
-function startGlobalBadgeListener(){
-  if(!db || !window.currentUser) return;
-  if(globalBadgeListener){ globalBadgeListener(); }
-  console.log('🎯 Badge listener štart pre:', window.currentUser.username);
-
-  const me = window.currentUser.username;
-  const unsubs = [];
-
-  // ✅ INBOX listener - okamžite svieti keď niekto napíše
-  // Zapisuje sa pri každej odoslanej súkromnej správe
-  const u1 = db.collection('inbox').doc(me)
-    .onSnapshot(doc => {
-      console.log('📬 Inbox:', doc.exists, doc.data());
-      const inboxUnread = doc.exists ? (doc.data().unread || 0) : 0;
-      // Spočítaj aj skupinový chat
-      refreshBadge(inboxUnread);
-    });
-  unsubs.push(u1);
-
-  // Skupinový chat
-  const u2 = db.collection('chats').doc(GROUP_CHAT_ID)
-    .collection('messages')
-    .onSnapshot(() => refreshBadge());
-  unsubs.push(u2);
-
-  globalBadgeListener = () => {
-    unsubs.forEach(u => u());
-    Object.values(activeMessageListeners).forEach(u => u());
-    activeMessageListeners = {};
-  };
-
-  refreshBadge();
-}
-
-async function refreshBadge(inboxUnread){
-  if(!db || !window.currentUser) return;
-  const me = window.currentUser.username;
-  try{
-    // Inbox unread (súkromné správy)
-    let privateUnread = inboxUnread;
-    if(privateUnread === undefined){
-      const inboxDoc = await db.collection('inbox').doc(me).get();
-      privateUnread = inboxDoc.exists ? (inboxDoc.data().unread || 0) : 0;
-    }
-    // Skupinový chat unread
-    const grpSnap = await db.collection('chats').doc(GROUP_CHAT_ID).collection('messages').get();
-    const groupUnread = grpSnap.docs.filter(d => !d.data().read && d.data().from !== me).length;
-    const total = privateUnread + groupUnread;
-    console.log('🔢 Total unread - inbox:', privateUnread, 'group:', groupUnread);
-    setBadge(total);
-  } catch(e){ console.error('refreshBadge:', e); }
-}
-
-async function updateBadgeDisplay(){
-  await refreshBadge();
-}
-
-// ✅ Počkaj kým je Firebase (db) ready, potom spusti listener
+// Spusti badge listener po načítaní Firebase
 function waitForDbAndStartBadge(){
-  console.log('⏳ waitForDbAndStartBadge - db:', !!db, 'user:', !!window.currentUser);
   if(db && window.currentUser){
-    console.log('✅ Spúšťam badge listener pre:', window.currentUser.username);
-    startGlobalBadgeListener();
-    updateTotalUnreadBadge();
+    startBadgeListener();
   } else {
     setTimeout(waitForDbAndStartBadge, 500);
   }
 }
-// Spusti ihneď aj po DOMContentLoaded aj po načítaní
 waitForDbAndStartBadge();
-window.addEventListener('load', function(){
-  setTimeout(waitForDbAndStartBadge, 1000);
-});
+window.addEventListener('load', () => setTimeout(waitForDbAndStartBadge, 1000));
 
-// ==========================================
-// MOBILNÁ NAVIGÁCIA - JEDNODUCHÉ FUNKCIE
-// ==========================================
-
-function toggleMobileMenu() {
-  var menu = document.getElementById('mobileMenu');
-  var overlay = document.querySelector('.mobile-overlay');
-  
-  if (menu.classList.contains('show')) {
-    menu.classList.remove('show');
-    overlay.classList.remove('show');
-  } else {
-    menu.classList.add('show');
-    overlay.classList.add('show');
-  }
-}
-
-function mobileMenuAction(action) {
-  toggleMobileMenu();
-  
-  setTimeout(function() {
-    switch(action) {
-      case 'library':
-        if (typeof openLibraryManagerReal === 'function') {
-          openLibraryManagerReal();
-        } else {
-          alert('Knižnica (Advanced) - funkcia zatiaľ nedostupná');
-        }
-        break;
-      case 'libraryOnline':
-        if (typeof openLibrary === 'function') {
-          openLibrary();
-        } else {
-          alert('Online Knižnica - funkcia zatiaľ nedostupná');
-        }
-        break;
-      case 'upload':
-        document.getElementById('f').click();
-        break;
-      case 'redpen':
-        // Prepnúť na Red Pen ribbon
-        var redpen = document.getElementById('ribbonRedpen');
-        if (redpen) {
-          var allRibbons = document.querySelectorAll('.ribbon-content');
-          for (var i = 0; i < allRibbons.length; i++) {
-            allRibbons[i].classList.remove('active');
-          }
-          redpen.classList.add('active');
-          alert('✏️ Red Pen aktivovaný\n\nPoužite nástroje v hornom menu na kreslenie.');
-        }
-        break;
-      case 'weldlogPanel':
-        // WELD LOG PANEL - zápis zvarov
-        if (typeof toggleWeldLog === 'function') {
-          toggleWeldLog();
-        } else {
-          alert('Weld Log panel - funkcia zatiaľ nedostupná');
-        }
-        break;
-      case 'weldbook':
-        // WELDBOOK - kontrola podľa izometrie
-        console.log('📗 Otváram WeldBook...');
-        console.log('   Projekt:', projectsData.currentProject || 'ŽIADNY');
-        console.log('   Časť:', projectsData.currentPart || 'ŽIADNA');
-        console.log('   WeldBook dáta:', weldBookData ? weldBookData.length : 0, 'zvarov');
-        
-        // Debug na mobile
-        if (window.innerWidth < 768) {
-          var debugMsg = 'WELDBOOK DEBUG:\n\n';
-          debugMsg += 'Projekt: ' + (projectsData.currentProject || 'ŽIADNY') + '\n';
-          debugMsg += 'Časť: ' + (projectsData.currentPart || 'ŽIADNA') + '\n';
-          debugMsg += 'Zvarov: ' + (weldBookData ? weldBookData.length : 0) + '\n';
-          debugMsg += '\nAk je to 0, vyberte najprv projekt v Knižnici!';
-          alert(debugMsg);
-        }
-        
-        if (typeof openWeldBook === 'function') {
-          openWeldBook();
-        } else {
-          alert('WeldBook - funkcia zatiaľ nedostupná');
-        }
-        break;
-      case 'prefab':
-        // Prepnúť na Prefabrikácia ribbon
-        var prefab = document.getElementById('ribbonPrefab');
-        if (prefab) {
-          var allRibbons = document.querySelectorAll('.ribbon-content');
-          for (var i = 0; i < allRibbons.length; i++) {
-            allRibbons[i].classList.remove('active');
-          }
-          prefab.classList.add('active');
-          alert('🏗️ Prefabrikácia aktivovaná');
-        }
-        break;
-      case 'vyroba':
-        var vyrobaRibbon = document.getElementById('ribbonVyroba');
-        if (vyrobaRibbon) {
-          var allRibbons = document.querySelectorAll('.ribbon-content');
-          for (var i = 0; i < allRibbons.length; i++) {
-            allRibbons[i].classList.remove('active');
-          }
-          vyrobaRibbon.classList.add('active');
-          alert('🏭 Výroba aktivovaná');
-        }
-        break;
-      case 'mto':
-        if (typeof openMTOGrid === 'function') {
-          openMTOGrid();
-        }
-        break;
-      case 'kontrola':
-        var kontrolaRibbon = document.getElementById('ribbonKontrola');
-        if (kontrolaRibbon) {
-          var allRibbons = document.querySelectorAll('.ribbon-content');
-          for (var i = 0; i < allRibbons.length; i++) {
-            allRibbons[i].classList.remove('active');
-          }
-          kontrolaRibbon.classList.add('active');
-          alert('🔍 Kontrola aktivovaná\n\nKliknite na zvar a vyberte farbu.');
-        }
-        break;
-      case 'montaz':
-        var montazRibbon = document.getElementById('ribbonMontaz');
-        if (montazRibbon) {
-          var allRibbons = document.querySelectorAll('.ribbon-content');
-          for (var i = 0; i < allRibbons.length; i++) {
-            allRibbons[i].classList.remove('active');
-          }
-          montazRibbon.classList.add('active');
-          alert('🔧 Montáž aktivovaná\n\nKliknite na zvar a vyberte 1, 2, 3, alebo Zmazať.');
-        }
-        break;
-      case 'progres':
-        var progresRibbon = document.getElementById('ribbonProgres');
-        if (progresRibbon) {
-          var allRibbons = document.querySelectorAll('.ribbon-content');
-          for (var i = 0; i < allRibbons.length; i++) {
-            allRibbons[i].classList.remove('active');
-          }
-          progresRibbon.classList.add('active');
-          alert('📊 Progres aktivovaný');
-        }
-        break;
-      case 'export':
-        var exportRibbon = document.getElementById('ribbonExport');
-        if (exportRibbon) {
-          var allRibbons = document.querySelectorAll('.ribbon-content');
-          for (var i = 0; i < allRibbons.length; i++) {
-            allRibbons[i].classList.remove('active');
-          }
-          exportRibbon.classList.add('active');
-          alert('📦 Export aktivovaný');
-        }
-        break;
-      case 'notifications':
-        if (typeof toggleNotificationsPanel === 'function') {
-          toggleNotificationsPanel();
-        }
-        break;
-    }
-  }, 300);
-}
-
-function bottomNavClick(section, btn) {
-  // Odstráň active zo všetkých
-  var items = document.querySelectorAll('.bottom-nav-item');
-  for (var i = 0; i < items.length; i++) {
-    items[i].classList.remove('active');
-  }
-  
-  // Pridaj active na kliknutý
-  btn.classList.add('active');
-  
-  // Vykonaj akciu
-  switch(section) {
-    case 'pdf':
-      var weldPanel = document.getElementById('weldLogPanel');
-      if (weldPanel) weldPanel.classList.remove('active');
-      window.scrollTo(0, 0);
-      break;
-    case 'welds':
-      if (typeof toggleWeldLog === 'function') {
-        toggleWeldLog();
-      }
-      break;
-    case 'mto':
-      if (typeof openMTOGrid === 'function') {
-        openMTOGrid();
-      }
-      break;
-    case 'kontrola':
-      if (typeof openKontrolaTab === 'function') {
-        openKontrolaTab();
-      }
-      break;
-    case 'more':
-      toggleMobileMenu();
-      break;
-  }
-}
-
-console.log('✅ Mobilná navigácia načítaná');
-
-// ==========================================
-// TOUCH PODPORA PRE MOBIL - UNIVERZÁLNA
-// ==========================================
-(function() {
-  console.log('📱 Inicializujem touch podporu...');
-  
-  // Vytvor feedback krúžok
-  var touchFeedback = document.createElement('div');
-  touchFeedback.id = 'touchFeedback';
-  touchFeedback.style.cssText = 'position:fixed;width:60px;height:60px;border:3px solid #0078D4;border-radius:50%;pointer-events:none;z-index:99999;display:none;background:rgba(0,120,212,0.1);transform:translate(-50%,-50%)';
-  document.body.appendChild(touchFeedback);
-  
-  function showTouchFeedback(x, y) {
-    touchFeedback.style.left = x + 'px';
-    touchFeedback.style.top = y + 'px';
-    touchFeedback.style.display = 'block';
-    touchFeedback.style.animation = 'touchPulse 0.3s ease';
-    setTimeout(function() {
-      touchFeedback.style.display = 'none';
-    }, 300);
-  }
-  
-  // Konvertuj touch na click pre canvas a overlay
-  function initTouchSupport() {
-    var canvas = document.getElementById('pdfCanvas');
-    var overlay = document.getElementById('overlay');
-    
-    // Prevent double-tap zoom na mobile (okrem PDF canvas kde chceme zoom)
-    document.addEventListener('touchstart', function(e) {
-      if (e.touches.length > 1) {
-        // Multi-touch OK (pinch zoom)
-        return;
-      }
-      
-      // Povoliť zoom len na PDF canvas
-      var target = e.target;
-      if (!target.closest('#pdfCanvas')) {
-        var t2 = e.timeStamp;
-        var t1 = target.dataset && target.dataset.lastTouch ? parseFloat(target.dataset.lastTouch) : 0;
-        var dt = t2 - t1;
-        
-        if (target.dataset) {
-          target.dataset.lastTouch = t2;
-        }
-        
-        // Prevent double-tap zoom
-        if (dt && dt < 500) {
-          e.preventDefault();
-        }
-      }
-    }, {passive: false});
-    
-    if (canvas) {
-      console.log('✅ Canvas nájdený, pridávam touch support');
-      
-      canvas.addEventListener('touchstart', function(e) {
-        // Povoliť pinch zoom
-        if (e.touches.length > 1) return;
-        
-        e.preventDefault();
-        var touch = e.touches[0];
-        var rect = canvas.getBoundingClientRect();
-        
-        console.log('👆 Touch na canvas - rect:', rect);
-        console.log('   clientX:', touch.clientX, 'clientY:', touch.clientY);
-        
-        showTouchFeedback(touch.clientX, touch.clientY);
-        
-        // PRIAMO ZAVOLAJ canvas.onclick ak existuje
-        if (typeof canvas.onclick === 'function') {
-          console.log('✅ Volám canvas.onclick priamo!');
-          
-          // Vytvor KOMPLETNÝ fake MouseEvent objekt
-          var fakeEvent = {
-            clientX: touch.clientX,
-            clientY: touch.clientY,
-            pageX: touch.pageX,
-            pageY: touch.pageY,
-            screenX: touch.screenX,
-            screenY: touch.screenY,
-            target: canvas,
-            currentTarget: canvas,
-            type: 'click',
-            bubbles: true,
-            cancelable: true,
-            preventDefault: function() {},
-            stopPropagation: function() {},
-            stopImmediatePropagation: function() {}
-          };
-          
-          console.log('📍 Volám ca.onclick s koordinátmi:', touch.clientX, touch.clientY);
-          canvas.onclick(fakeEvent);
-          console.log('✅ ca.onclick dokončený!');
-        } else {
-          console.warn('⚠️ canvas.onclick neexistuje!');
-          
-          // Fallback - skús dispatchEvent
-          var clickEvent = new MouseEvent('click', {
-            bubbles: true,
-            cancelable: true,
-            view: window,
-            clientX: touch.clientX,
-            clientY: touch.clientY
-          });
-          canvas.dispatchEvent(clickEvent);
-        }
-      }, {passive: false});
-      
-      console.log('✅ Canvas touch listener pridaný');
-    }
-    
-    if (overlay) {
-      console.log('✅ Overlay nájdený, pridávam touch support');
-      
-      overlay.addEventListener('touchstart', function(e) {
-        // Povoliť pinch zoom
-        if (e.touches.length > 1) return;
-        
-        e.preventDefault();
-        var touch = e.touches[0];
-        var rect = overlay.getBoundingClientRect();
-        var x = touch.clientX - rect.left;
-        var y = touch.clientY - rect.top;
-        
-        console.log('👆 Touch na overlay:', x, y);
-        showTouchFeedback(touch.clientX, touch.clientY);
-        
-        // Simuluj click event
-        var clickEvent = new MouseEvent('click', {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-          clientX: touch.clientX,
-          clientY: touch.clientY
-        });
-        overlay.dispatchEvent(clickEvent);
-      }, {passive: false});
-      
-      console.log('✅ Overlay touch listener pridaný');
-    }
-    
-    // Touch feedback pre všetky tlačidlá
-    var buttons = document.querySelectorAll('button');
-    console.log('🔘 Našiel som', buttons.length, 'tlačidiel');
-    buttons.forEach(function(btn) {
-      btn.addEventListener('touchstart', function() {
-        this.style.opacity = '0.7';
-      });
-      btn.addEventListener('touchend', function() {
-        this.style.opacity = '1';
-      });
-    });
-  }
-  
-  // Inicializuj hneď
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initTouchSupport);
-  } else {
-    initTouchSupport();
-  }
-  
-  // Re-inicializuj po 2 sekundách (pre istotu, ak sa elementy načítajú neskôr)
-  setTimeout(initTouchSupport, 2000);
-  
-  // Pridaj CSS animáciu pre touch feedback
-  var style = document.createElement('style');
-  style.textContent = '@keyframes touchPulse { 0% { transform: translate(-50%,-50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.2); opacity: 0; } }';
-  document.head.appendChild(style);
-  
-  console.log('✅ Touch support inicializovaný');
-})();
 </script>
 
 </body></html>
