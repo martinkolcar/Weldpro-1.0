@@ -7797,21 +7797,22 @@ var radiusY = 18 * sc_pdf * weldScale_pdf;
 // fontSize podľa dĺžky textu
 var displayText = String(w.displayNum);
 var numLen = displayText.length;
-var baseFontSize = 34;
-if(numLen >= 6) baseFontSize = 18;
-else if(numLen >= 5) baseFontSize = 20;
-else if(numLen >= 4) baseFontSize = 22;
-else if(numLen >= 3) baseFontSize = 26;
-else if(numLen >= 2) baseFontSize = 30;
+var baseFontSize;
+if(numLen >= 7) baseFontSize = 14;
+else if(numLen >= 5) baseFontSize = 16;
+else if(numLen >= 4) baseFontSize = 17;
+else if(numLen >= 3) baseFontSize = 18;
+else baseFontSize = 20;
 var fontSize = baseFontSize * sc_pdf * weldScale_pdf;
 
-// Zmeraj šírku textu pre výpočet radiusX
-tempCtx.font = 'bold ' + fontSize + 'px Arial';
-var textWidth = tempCtx.measureText(displayText).width;
+// Šírka textu - rovnako ako dw() cez charWidth
+tempCtx.font = fontSize + 'px Arial';
+var charWidth = baseFontSize * 0.6;
+var textWidth = numLen * charWidth * sc_pdf * weldScale_pdf;
 
 // radiusX - kruh pre krátky text, elipsa pre dlhší
 var radiusX;
-if(textWidth + 12 * sc_pdf * weldScale_pdf <= 2 * radiusY){
+if(numLen <= 2){
   radiusX = radiusY;
 } else {
   radiusX = Math.max(radiusY, (textWidth / 2) + (6 * sc_pdf * weldScale_pdf));
@@ -7861,7 +7862,7 @@ tempCtx.fill();
 
 // Text
 tempCtx.fillStyle='#FF0000';
-tempCtx.font='bold '+fontSize+'px Arial';
+tempCtx.font=fontSize+'px Arial';
 tempCtx.textAlign='center';
 tempCtx.textBaseline='middle';
 tempCtx.fillText(displayText,endX,endY);
