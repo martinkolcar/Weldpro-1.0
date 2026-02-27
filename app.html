@@ -7676,12 +7676,19 @@ if(startInput)startInput.value=startNum;
 if(projectData.pdfData){
 var img=new Image();
 img.onload=function(){
-ca.width=img.width;
-ca.height=img.height;
-ov.setAttribute('width',img.width);
-ov.setAttribute('height',img.height);
+// ✅ Nastav baseImage rozmery pred dw() aby zvary boli na správnom mieste
+baseImageWidth = img.naturalWidth || img.width;
+baseImageHeight = img.naturalHeight || img.height;
+loadedImage = img;
+pd = null; // Nie je PDF objekt, len obrázok
+sc = 1.0;  // Reset zoom na 100%
+ca.width=baseImageWidth;
+ca.height=baseImageHeight;
+ov.setAttribute('width',baseImageWidth);
+ov.setAttribute('height',baseImageHeight);
 ct.clearRect(0,0,ca.width,ca.height);
-ct.drawImage(img,0,0);
+ct.imageSmoothingEnabled=false;
+ct.drawImage(img,0,0,baseImageWidth,baseImageHeight);
 document.getElementById('up').style.display='none';
 document.getElementById('cw').style.display='block';
 document.getElementById('zoomInfo').style.display='block';
@@ -7751,7 +7758,7 @@ updateProgress(10);
 const tempCanvas=document.createElement('canvas');
 const tempCtx=tempCanvas.getContext('2d',{alpha:false,desynchronized:true});
 
-const dpi=600;
+const dpi=1200;
 const pdfWidth=420;
 const pdfHeight=297;
 tempCanvas.width=(pdfWidth*dpi)/25.4;
@@ -8081,8 +8088,8 @@ updateProgress(90);
 
 const{jsPDF}=window.jspdf;
 const pdf=new jsPDF('l','mm','a3');
-const imgData=tempCanvas.toDataURL('image/jpeg',1.0);
-pdf.addImage(imgData,'JPEG',0,0,pdfWidth,pdfHeight,undefined,'FAST');
+const imgData=tempCanvas.toDataURL('image/png');
+pdf.addImage(imgData,'PNG',0,0,pdfWidth,pdfHeight,undefined,'NONE');
 
 updateProgress(95);
 
