@@ -9174,70 +9174,73 @@ function exportWeldBookExcel() {
 
 // ============= IMPORT EXCELU DO WELDBOOK =============
 function importWeldBookExcel(){
-  // Presné mapovanie hlavičiek tvojho Excelu → WeldBook fields
-  const COLUMN_MAP = {
-    'isometric':             'isometric',
-    'sheets':                'sheets',
-    'ped':                   'ped',
-    'rev.':                  'rev',
-    'rev':                   'rev',
-    'pipe class':            'pipeClass',
-    'weld id':               'weldId',
-    'welded item 1':         'item1',
-    'heat nr. 1':            'heatNr1',
-    'certificate nr. 1':     'certNr1',
-    'dimension 1':           'dimension1',
-    'wall thickness 1':      'thickness1',
-    'material 1':            'material1',
-    'mat. group 1':          'matGroup1',
-    'welded item 2':         'item2',
-    'heat nr. 2':            'heatNr2',
-    'certificate nr. 2':     'certNr2',
-    'dimension 2':           'dimension2',
-    'wall thickness 2':      'thickness2',
-    'material 2':            'material2',
-    'mat. group 2':          'matGroup2',
-    'wps':                   'wps',
-    'wpqr':                  'wpqr',
-    'welding method':        'weldingMethod',
-    'type of joint':         'jointType',
-    'type of welding':       'weldingType',
-    'welding gas':           'weldingGas',
-    'heat nr.':              'heatNrWeld',
-    'heat nr':               'heatNrWeld',
-    'certificate nr.':       'certNrWeld',
-    'certificate nr':        'certNrWeld',
-    'welder id':             'welderId',
-    'date of welding':       'dateWelding',
-    'vt inspection %':       'vtPercent',
-    'vt report':             'vtReport',
-    'vt result':             'vtResult',
-    'vt defect lenght [mm]': 'vtDefect',
-    'vt additional information': 'vtInfo',
-    'vt repair date':        'vtRepairDate',
-    'vt repair result':      'vtRepairResult',
-    'pt inspection %':       'ptPercent',
-    'pt report':             'ptReport',
-    'pt result':             'ptResult',
-    'pt defect lenght [mm]': 'ptDefect',
-    'pt additional information': 'ptInfo',
-    'pt repair date':        'ptRepairDate',
-    'pt repair result':      'ptRepairResult',
-    'rt inspection %':       'rtPercent',
-    'rt report':             'rtReport',
-    'rt result':             'rtResult',
-    'rt defect lenght [mm]': 'rtDefect',
-    'rt additional information': 'rtInfo',
-    'rt repair date':        'rtRepairDate',
-    'rt repair result':      'rtRepairResult',
-    'inch/weld':             'inchWeld',
-    'prefab planned':        'prefabPlanned',
-    'prefab welded':         'prefabWelded',
-    'install planned':       'installPlanned',
-    'install welded':        'installWelded',
+
+  // ✅ POZIČNÉ mapovanie pre každý sheet zvlášť (overené zo skutočného súboru)
+  // Každý sheet má iné poradie stĺpcov!
+  const SHEET_COLUMN_MAP = {
+    'SUL': {
+      0:'isometric', 1:'sheets', 6:'ped', 7:'rev', 8:'pipeClass', 9:'weldId',
+      10:'item1', 11:'heatNr1', 12:'certNr1', 13:'dimension1', 14:'thickness1', 15:'material1', 16:'matGroup1',
+      17:'item2', 18:'heatNr2', 19:'certNr2', 20:'dimension2', 21:'thickness2', 22:'material2', 23:'matGroup2',
+      24:'wps', 25:'wpqr', 26:'weldingMethod', 27:'jointType', 28:'weldingType', 29:'weldingGas',
+      30:'heatNrWeld', 31:'certNrWeld', 32:'welderId', 33:'dateWelding',
+      34:'vtPercent', 35:'vtDate', 36:'vtReport', 37:'vtResult', 38:'vtDefect', 39:'vtInfo', 40:'vtRepairDate', 41:'vtRepairResult',
+      43:'ptPercent', 44:'ptDate', 45:'ptReport', 46:'ptResult', 47:'ptDefect', 48:'ptInfo', 49:'ptRepairDate', 50:'ptRepairResult',
+      52:'rtPercent', 53:'rtDate', 54:'rtReport', 55:'rtResult', 56:'rtDefect', 57:'rtInfo', 58:'rtRepairDate', 59:'rtRepairResult',
+      61:'inchWeld', 62:'prefabPlanned', 63:'prefabWelded', 64:'installPlanned', 65:'installWelded',
+    },
+    'LIG': {
+      0:'isometric', 1:'sheets', 2:'ped', 3:'rev', 4:'pipeClass', 5:'weldId',
+      6:'item1', 7:'heatNr1', 8:'certNr1', 9:'dimension1', 10:'thickness1', 11:'material1', 12:'matGroup1',
+      13:'item2', 14:'heatNr2', 15:'certNr2', 16:'dimension2', 17:'thickness2', 18:'material2', 19:'matGroup2',
+      20:'wps', 21:'wpqr', 22:'weldingMethod', 23:'jointType', 24:'weldingType', 25:'weldingGas',
+      26:'heatNrWeld', 27:'certNrWeld', 28:'welderId', 29:'dateWelding',
+      30:'vtPercent', 31:'vtDate', 32:'vtReport', 33:'vtResult', 34:'vtDefect', 35:'vtInfo', 36:'vtRepairDate', 37:'vtRepairResult',
+      39:'ptPercent', 40:'ptDate', 41:'ptReport', 42:'ptResult', 43:'ptDefect', 44:'ptInfo', 45:'ptRepairDate', 46:'ptRepairResult',
+      48:'rtPercent', 49:'rtDate', 50:'rtReport', 51:'rtResult', 52:'rtDefect', 53:'rtInfo', 54:'rtRepairDate', 55:'rtRepairResult',
+      57:'inchWeld', 58:'prefabPlanned', 59:'prefabWelded', 60:'installPlanned', 61:'installWelded',
+    },
+    'DRY': {
+      0:'isometric', 3:'sheets', 4:'ped', 5:'rev', 6:'pipeClass', 7:'weldId',
+      8:'item1', 9:'heatNr1', 10:'certNr1', 11:'dimension1', 12:'thickness1', 13:'material1', 14:'matGroup1',
+      15:'item2', 16:'heatNr2', 17:'certNr2', 18:'dimension2', 19:'thickness2', 20:'material2', 21:'matGroup2',
+      22:'wps', 23:'wpqr', 24:'weldingMethod', 25:'jointType', 26:'weldingType', 27:'weldingGas',
+      28:'heatNrWeld', 29:'certNrWeld', 30:'welderId', 31:'dateWelding',
+      32:'vtPercent', 33:'vtDate', 34:'vtReport', 35:'vtResult', 36:'vtDefect', 37:'vtInfo', 38:'vtRepairDate', 39:'vtRepairResult',
+      41:'ptPercent', 42:'ptDate', 43:'ptReport', 44:'ptResult', 45:'ptDefect', 46:'ptInfo', 47:'ptRepairDate', 48:'ptRepairResult',
+      50:'rtPercent', 51:'rtDate', 52:'rtReport', 53:'rtResult', 54:'rtDefect', 55:'rtInfo', 56:'rtRepairDate', 57:'rtRepairResult',
+      59:'inchWeld', 60:'prefabPlanned', 61:'prefabWelded', 62:'installPlanned', 63:'installWelded',
+    },
+  };
+  // FLA a LHT majú rovnakú štruktúru ako LIG
+  SHEET_COLUMN_MAP['FLA'] = SHEET_COLUMN_MAP['LIG'];
+  SHEET_COLUMN_MAP['LHT'] = SHEET_COLUMN_MAP['LIG'];
+
+  // Fallback - header-based mapovanie pre neznáme sheety
+  const HEADER_MAP = {
+    'isometric':'isometric','sheets':'sheets','ped':'ped','rev.':'rev','rev':'rev',
+    'pipe class':'pipeClass','weld id':'weldId',
+    'welded item 1':'item1','heat nr. 1':'heatNr1','certificate nr. 1':'certNr1',
+    'dimension 1':'dimension1','wall thickness 1':'thickness1','material 1':'material1','mat. group 1':'matGroup1',
+    'welded item 2':'item2','heat nr. 2':'heatNr2','certificate nr. 2':'certNr2',
+    'dimension 2':'dimension2','wall thickness 2':'thickness2','material 2':'material2','mat. group 2':'matGroup2',
+    'wps':'wps','wpqr':'wpqr','welding method':'weldingMethod','type of joint':'jointType',
+    'type of welding':'weldingType','welding gas':'weldingGas',
+    'heat nr.':'heatNrWeld','heat nr':'heatNrWeld','certificate nr.':'certNrWeld','certificate nr':'certNrWeld',
+    'welder id':'welderId','date of welding':'dateWelding',
+    'vt inspection %':'vtPercent','vt report':'vtReport','vt result':'vtResult',
+    'vt defect lenght [mm]':'vtDefect','vt additional information':'vtInfo',
+    'vt repair date':'vtRepairDate','vt repair result':'vtRepairResult',
+    'pt inspection %':'ptPercent','pt report':'ptReport','pt result':'ptResult',
+    'pt defect lenght [mm]':'ptDefect','pt additional information':'ptInfo',
+    'pt repair date':'ptRepairDate','pt repair result':'ptRepairResult',
+    'rt inspection %':'rtPercent','rt report':'rtReport','rt result':'rtResult',
+    'rt defect lenght [mm]':'rtDefect','rt additional information':'rtInfo',
+    'rt repair date':'rtRepairDate','rt repair result':'rtRepairResult',
+    'inch/weld':'inchWeld','prefab planned':'prefabPlanned','prefab welded':'prefabWelded',
+    'install planned':'installPlanned','install welded':'installWelded',
   };
 
-  // Zisti aktuálnu časť projektu (SUL, LIG, DRY...)
   const currentPart = projectsData && projectsData.currentPart
     ? projectsData.currentPart.toUpperCase().trim()
     : null;
@@ -9252,7 +9255,6 @@ function importWeldBookExcel(){
     const file = e.target.files[0];
     if(!file){ document.body.removeChild(input); return; }
 
-    // Zobraz loading
     const loadingDiv = document.createElement('div');
     loadingDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:30px 40px;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.3);z-index:99999;text-align:center;font-size:16px';
     loadingDiv.innerHTML = '<div style="font-size:40px;margin-bottom:10px">⏳</div><div>Načítavam Excel...<br><small style="color:#999">Toto môže chvíľu trvať</small></div>';
@@ -9264,12 +9266,11 @@ function importWeldBookExcel(){
         const data = new Uint8Array(ev.target.result);
         const workbook = XLSX.read(data, {type:'array', cellDates:true, raw:false});
 
-        // Nájdi správny sheet - zodpovedajúci aktuálnej časti
+        // Nájdi správny sheet
         let targetSheet = null;
         let targetSheetName = '';
 
         if(currentPart){
-          // Hľadaj sheet ktorý sa zhoduje s aktuálnou časťou
           for(const sName of workbook.SheetNames){
             if(sName.toUpperCase().trim() === currentPart){
               targetSheet = workbook.Sheets[sName];
@@ -9278,7 +9279,6 @@ function importWeldBookExcel(){
             }
           }
           if(!targetSheet){
-            // Skús čiastočnú zhodu
             for(const sName of workbook.SheetNames){
               if(currentPart.includes(sName.toUpperCase()) || sName.toUpperCase().includes(currentPart)){
                 targetSheet = workbook.Sheets[sName];
@@ -9293,22 +9293,20 @@ function importWeldBookExcel(){
           document.body.removeChild(loadingDiv);
           document.body.removeChild(input);
           const available = workbook.SheetNames.join(', ');
-          const chosen = prompt('Sheet pre cast ' + (currentPart||'?') + ' nenajdeny. Dostupne: ' + available + '. Zadaj nazov:');
+          const chosen = prompt('Sheet pre časť ' + (currentPart||'?') + ' nenájdený.\nDostupné: ' + available + '\n\nZadaj názov:');
           if(!chosen) return;
           targetSheet = workbook.Sheets[chosen];
           targetSheetName = chosen;
           if(!targetSheet){ alert('Sheet "' + chosen + '" neexistuje.'); return; }
-          // Reopen loading
           document.body.appendChild(loadingDiv);
         }
 
         loadingDiv.innerHTML = '<div style="font-size:40px;margin-bottom:10px">⚙️</div><div>Spracovávam sheet <strong>' + targetSheetName + '</strong>...<br><small style="color:#999">Čakaj prosím</small></div>';
 
-        // Načítaj sheet - header je na riadku 3 (index 2)
         const rows = XLSX.utils.sheet_to_json(targetSheet, {header:1, defval:'', raw:false});
 
-        // Nájdi header riadok - hľadaj riadok kde je "Weld ID"
-        let headerRowIdx = 2; // default riadok 3
+        // Nájdi header riadok (hľadaj "Weld ID")
+        let headerRowIdx = 2;
         for(let i = 0; i < Math.min(8, rows.length); i++){
           const rowStr = rows[i].join('|').toLowerCase();
           if(rowStr.includes('weld id') || rowStr.includes('weldid')){
@@ -9317,46 +9315,52 @@ function importWeldBookExcel(){
           }
         }
 
-        const headers = rows[headerRowIdx].map(h => String(h).toLowerCase().trim());
+        // ✅ Zvol mapovanie: pozičné (ak poznáme sheet) alebo header-based
+        const sheetKey = targetSheetName.toUpperCase().trim();
+        let colMapping = {}; // index → field
 
-        // Mapuj stĺpce - pozor na duplicitné hlavičky (Date of testing sa opakuje 3x)
-        const colMapping = {}; // index → field
-        const usedFields = new Set();
-        // Pre duplicitné "Date of testing" - prvý je VT, druhý PT, tretí RT
-        const dateTestingFields = ['vtDate','ptDate','rtDate'];
-        let dateTestingCount = 0;
-
-        headers.forEach((h, idx) => {
-          if(h === 'date of testing'){
-            if(dateTestingCount < dateTestingFields.length){
-              colMapping[idx] = dateTestingFields[dateTestingCount++];
+        if(SHEET_COLUMN_MAP[sheetKey]){
+          // Pozičné mapovanie - presné, nezávisí od duplicitných názvov
+          colMapping = SHEET_COLUMN_MAP[sheetKey];
+          console.log('✅ Pozičné mapovanie pre sheet:', sheetKey);
+        } else {
+          // Fallback: header-based mapovanie pre neznáme sheety
+          console.log('⚠️ Fallback header mapovanie pre sheet:', sheetKey);
+          const headers = rows[headerRowIdx].map(h => String(h).toLowerCase().trim());
+          const dateTestingFields = ['vtDate','ptDate','rtDate'];
+          let dateTestingCount = 0;
+          const usedFields = new Set();
+          headers.forEach((h, idx) => {
+            if(h === 'date of testing'){
+              if(dateTestingCount < dateTestingFields.length){
+                colMapping[idx] = dateTestingFields[dateTestingCount++];
+              }
+              return;
             }
-            return;
-          }
-          const field = COLUMN_MAP[h];
-          if(field && !usedFields.has(field)){
-            colMapping[idx] = field;
-            usedFields.add(field);
-          }
-        });
+            const field = HEADER_MAP[h];
+            if(field && !usedFields.has(field)){
+              colMapping[idx] = field;
+              usedFields.add(field);
+            }
+          });
+        }
 
-        // Spracuj dáta od riadku po headerRowIdx
+        // Spracuj dáta
         let updated = 0, added = 0, skipped = 0;
         const dataRows = rows.slice(headerRowIdx + 1);
 
         dataRows.forEach(row => {
-          if(!row || row.every(c => c === '' || c === null)) return;
+          if(!row || row.every(c => c === '' || c === null || c === undefined)) return;
 
           const obj = {part: targetSheetName};
           Object.entries(colMapping).forEach(([idx, field]) => {
-            const val = row[idx];
+            const val = row[parseInt(idx)];
             if(val !== '' && val !== null && val !== undefined){
               let strVal = String(val).trim();
-              // Vyčisti formuly
               if(strVal.startsWith('=')) return;
-              // Formátuj dátumy
+              if(strVal === '0' && (field.includes('heatNr') || field.includes('certNr'))) return; // preskočiť nulové heat/cert
               if((field.includes('date') || field.includes('Date')) && strVal.includes('T')){
-                strVal = strVal.split('T')[0]; // 2026-02-19
+                strVal = strVal.split('T')[0];
               }
               obj[field] = strVal;
             }
@@ -9364,14 +9368,12 @@ function importWeldBookExcel(){
 
           if(!obj.weldId || obj.weldId === '' || obj.weldId === '0') { skipped++; return; }
 
-          // Hľadaj existujúci zvar podľa isometric + weldId (kombinácia je unikátna)
           const existingIdx = weldBookData.findIndex(r =>
             String(r.weldId).trim() === String(obj.weldId).trim() &&
             String(r.isometric||'').trim() === String(obj.isometric||'').trim()
           );
 
           if(existingIdx >= 0){
-            // Aktualizuj len neprázdne polia
             Object.entries(obj).forEach(([field, val]) => {
               if(val && val !== '') weldBookData[existingIdx][field] = val;
             });
@@ -9382,13 +9384,12 @@ function importWeldBookExcel(){
           }
         });
 
-        // Refresh grid
-        if(weldBookGridApi) weldBookGridApi.setRowData(weldBookData);
+        if(weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
         saveWeldBookToStorage();
         document.body.removeChild(loadingDiv);
         document.body.removeChild(input);
 
-        alert('Import: ' + targetSheetName + ' | Aktualizovanych: ' + updated + ' | Pridanych: ' + added + ' | Preskocenych: ' + skipped + ' | Celkom: ' + weldBookData.length);
+        alert('✅ Import dokončený!\n\nSheet: ' + targetSheetName + '\nPridaných: ' + added + '\nAktualizovaných: ' + updated + '\nPreskočených (bez Weld ID): ' + skipped + '\n\nCelkom v WeldBook: ' + weldBookData.length);
 
       } catch(err){
         console.error('Import chyba:', err);
