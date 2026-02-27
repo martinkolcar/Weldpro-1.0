@@ -8397,6 +8397,20 @@ function openWeldBook() {
   content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button>';
   content += '<button onclick="closeWeldBook()" style="padding:10px 20px;background:#6b7280;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✕ Zavrieť</button>';
   content += '</div></div>';
+  // ✅ FILTER BAR - search + dropdowny
+  content += '<div id="wbFilterBar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;background:#f8fafc;padding:10px 12px;border-radius:8px;border:1px solid #e2e8f0">';
+  content += '<span style="font-weight:700;color:#374151;font-size:13px;white-space:nowrap">🔍 Filter:</span>';
+  content += '<input id="wbSearch" type="text" placeholder="Hľadaj kdekoľvek..." oninput="debouncedWbFilter()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:180px;flex:1">';
+  content += '<select id="wbFilterPart" onchange="applyWeldBookFilters()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:100px"><option value="">Všetky časti</option></select>';
+  content += '<select id="wbFilterIsometric" onchange="applyWeldBookFilters()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:180px"><option value="">Všetky izometrie</option></select>';
+  content += '<select id="wbFilterItem1" onchange="applyWeldBookFilters()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:140px"><option value="">Welded Item 1</option></select>';
+  content += '<select id="wbFilterItem2" onchange="applyWeldBookFilters()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:140px"><option value="">Welded Item 2</option></select>';
+  content += '<select id="wbFilterMaterial" onchange="applyWeldBookFilters()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:130px"><option value="">Material 1</option></select>';
+  content += '<select id="wbFilterWeldingType" onchange="applyWeldBookFilters()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:130px"><option value="">Type of welding</option></select>';
+  content += '<button onclick="clearWeldBookFilters()" style="padding:6px 12px;background:#6b7280;color:white;border:none;border-radius:6px;font-size:13px;cursor:pointer;white-space:nowrap">✕ Zrušiť filtre</button>';
+  content += '<span id="wbFilterCount" style="font-size:12px;color:#6b7280;white-space:nowrap"></span>';
+  content += '</div>';
+  
   content += '<div id="weldBookGrid" class="ag-theme-alpine" style="flex:1;width:100%;height:100%"></div>';
   content += '</div>';
   
@@ -8405,6 +8419,109 @@ function openWeldBook() {
   
   // Inicializácia AG-Grid
   initializeWeldBookGrid();
+  
+  // Naplň dropdowny po inicializácii (malé oneskorenie kým sa načítajú dáta)
+  setTimeout(populateWeldBookFilterDropdowns, 300);
+}
+
+// ============= WELDBOOK FILTER FUNKCIE =============
+function populateWeldBookFilterDropdowns() {
+  var selects = {
+    'wbFilterPart':        'part',
+    'wbFilterIsometric':   'isometric',
+    'wbFilterItem1':       'item1',
+    'wbFilterItem2':       'item2',
+    'wbFilterMaterial':    'material1',
+    'wbFilterWeldingType': 'weldingType',
+  };
+  var labels = {
+    'wbFilterPart':        'Všetky časti',
+    'wbFilterIsometric':   'Všetky izometrie',
+    'wbFilterItem1':       'Welded Item 1',
+    'wbFilterItem2':       'Welded Item 2',
+    'wbFilterMaterial':    'Material 1',
+    'wbFilterWeldingType': 'Type of welding',
+  };
+
+  Object.entries(selects).forEach(function(entry) {
+    var selId = entry[0], field = entry[1];
+    var sel = document.getElementById(selId);
+    if (!sel) return;
+    // Zbier unikátne hodnoty
+    var vals = [];
+    weldBookData.forEach(function(row) {
+      var v = row[field];
+      if (v && String(v).trim() !== '' && vals.indexOf(String(v).trim()) === -1) {
+        vals.push(String(v).trim());
+      }
+    });
+    vals.sort();
+    sel.innerHTML = '<option value="">' + labels[selId] + ' (' + vals.length + ')</option>';
+    vals.forEach(function(v) {
+      sel.innerHTML += '<option value="' + v.replace(/"/g,'&quot;') + '">' + v + '</option>';
+    });
+  });
+  updateWeldBookFilterCount();
+}
+
+var _wbFilterTimer = null;
+function debouncedWbFilter() {
+  clearTimeout(_wbFilterTimer);
+  _wbFilterTimer = setTimeout(applyWeldBookFilters, 200);
+}
+
+function applyWeldBookFilters() {
+  if (!weldBookGrid || !weldBookGrid.api) return;
+
+  var search   = (document.getElementById('wbSearch')           ? document.getElementById('wbSearch').value.toLowerCase().trim() : '');
+  var fPart    = (document.getElementById('wbFilterPart')       ? document.getElementById('wbFilterPart').value : '');
+  var fIso     = (document.getElementById('wbFilterIsometric')  ? document.getElementById('wbFilterIsometric').value : '');
+  var fItem1   = (document.getElementById('wbFilterItem1')      ? document.getElementById('wbFilterItem1').value : '');
+  var fItem2   = (document.getElementById('wbFilterItem2')      ? document.getElementById('wbFilterItem2').value : '');
+  var fMat     = (document.getElementById('wbFilterMaterial')   ? document.getElementById('wbFilterMaterial').value : '');
+  var fWType   = (document.getElementById('wbFilterWeldingType')? document.getElementById('wbFilterWeldingType').value : '');
+
+  var filtered = weldBookData.filter(function(row) {
+    if (fPart   && String(row.part         ||'').trim() !== fPart)   return false;
+    if (fIso    && String(row.isometric    ||'').trim() !== fIso)    return false;
+    if (fItem1  && String(row.item1        ||'').trim() !== fItem1)  return false;
+    if (fItem2  && String(row.item2        ||'').trim() !== fItem2)  return false;
+    if (fMat    && String(row.material1    ||'').trim() !== fMat)    return false;
+    if (fWType  && String(row.weldingType  ||'').trim() !== fWType)  return false;
+
+    if (search) {
+      var rowStr = Object.values(row).join(' ').toLowerCase();
+      if (rowStr.indexOf(search) === -1) return false;
+    }
+    return true;
+  });
+
+  weldBookGrid.api.setGridOption('rowData', filtered);
+  updateWeldBookFilterCount(filtered.length);
+}
+
+function updateWeldBookFilterCount(shown) {
+  var el = document.getElementById('wbFilterCount');
+  if (!el) return;
+  var total = weldBookData.length;
+  if (shown === undefined || shown === total) {
+    el.textContent = total + ' zvarov';
+    el.style.color = '#6b7280';
+  } else {
+    el.textContent = shown + ' / ' + total + ' zvarov';
+    el.style.color = shown === 0 ? '#ef4444' : '#059669';
+  }
+}
+
+function clearWeldBookFilters() {
+  ['wbSearch','wbFilterPart','wbFilterIsometric','wbFilterItem1','wbFilterItem2','wbFilterMaterial','wbFilterWeldingType'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  if (weldBookGrid && weldBookGrid.api) {
+    weldBookGrid.api.setGridOption('rowData', weldBookData);
+  }
+  updateWeldBookFilterCount();
 }
 
 // ============= DETEKCIA DUPLICÍT =============
@@ -8514,8 +8631,7 @@ function initializeWeldBookGrid() {
     enableCellTextSelection: true,
     animateRows: true,
     rowSelection: 'multiple',
-    pagination: true,
-    paginationPageSize: 50,
+    pagination: false,
     onGridReady: function(params) {
       weldBookGrid = params;
       console.log('✅ WeldBook AG-Grid initialized!');
@@ -9386,6 +9502,7 @@ function importWeldBookExcel(){
 
         if(weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
         saveWeldBookToStorage();
+        populateWeldBookFilterDropdowns(); // Refresh dropdowny
         document.body.removeChild(loadingDiv);
         document.body.removeChild(input);
 
