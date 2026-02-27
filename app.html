@@ -7477,26 +7477,12 @@ a.click();
 
 function saveProject(){
 var pdfDataUrl='';
-if(pd){
-  // Ulož PDF v PLNOM rozlíšení (nie škálované!)
-  var canvas=document.createElement('canvas');
-  var ctx=canvas.getContext('2d');
-  
-  // Použij ORIGINÁLNU veľkosť PDF, nie zoom
-  pd.getPage(1).then(function(pg){
-    var viewport = pg.getViewport({scale: 1.0}); // ✅ scale 1.0 = zvary sa zhodujú s canvasom
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    ctx.imageSmoothingEnabled = false;
-    
-    pg.render({canvasContext: ctx, viewport: viewport}).promise.then(function(){
-      pdfDataUrl = canvas.toDataURL('image/png', 0.95); // Vysoká kvalita
-      savePDFData();
-    });
-  });
-  return; // Async operácia
-} else if(loadedImage && baseImageWidth > 0){
-  // Ak je načítané z knižnice, použij originálnu veľkosť
+// ✅ SPRÁVNA PRIORITA:
+// 1. loadedImage - projekt načítaný z JSON (pdfData bolo PNG obrázok)
+// 2. pd - PDF nahraný priamo cez file picker (je to live PDF objekt)
+// DÔLEŽITÉ: ak je loadedImage nastavený, pd môže byť starý/nesprávny z iného projektu!
+if(loadedImage && baseImageWidth > 0){
+  // Načítaný z JSON alebo Firebase knižnice - použij uložený obrázok
   var canvas=document.createElement('canvas');
   var ctx=canvas.getContext('2d');
   canvas.width = baseImageWidth;
@@ -7504,8 +7490,35 @@ if(pd){
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(loadedImage, 0, 0, baseImageWidth, baseImageHeight);
   pdfDataUrl = canvas.toDataURL('image/png', 0.95);
+} else if(pd){
+  // PDF nahraný priamo - renderuj z pdf.js
+  var canvas=document.createElement('canvas');
+  var ctx=canvas.getContext('2d');
+  pd.getPage(1).then(function(pg){
+    var viewport = pg.getViewport({scale: 1.0});
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    ctx.imageSmoothingEnabled = false;
+    pg.render({canvasContext: ctx, viewport: viewport}).promise.then(function(){
+      pdfDataUrl = canvas.toDataURL('image/png', 0.95);
+      savePDFData();
+    });
+  });
+  return; // Async
 } else if(ca.width>0){
-  pdfDataUrl=ca.toDataURL('image/png', 0.95);
+  // Fallback - použi aktuálny canvas (môže byť zoom-ovaný)
+  // Ale najprv skús vykresliť v pôvodnej veľkosti
+  if(baseImageWidth > 0 && baseImageHeight > 0){
+    var tmpC = document.createElement('canvas');
+    var tmpX = tmpC.getContext('2d');
+    tmpC.width = baseImageWidth;
+    tmpC.height = baseImageHeight;
+    // Skúsi nakresliť ct obsah v pôvodnej veľkosti
+    tmpX.drawImage(ca, 0, 0, ca.width, ca.height, 0, 0, baseImageWidth, baseImageHeight);
+    pdfDataUrl = tmpC.toDataURL('image/png', 0.95);
+  } else {
+    pdfDataUrl = ca.toDataURL('image/png', 0.95);
+  }
 }
 
 savePDFData();
@@ -7633,13 +7646,21 @@ if(!fi)return;
 var rd=new FileReader();
 rd.onload=function(){
 try{
-var projectData=JSON.parse(this.result);
+// Použi TextDecoder pre správne UTF-8 dekódovanie veľkých súborov
+var text = typeof this.result === 'string' ? this.result : new TextDecoder('utf-8').decode(this.result);
+var projectData=JSON.parse(text);
 if(!projectData.welds){
 alert('❌ Neplatný projekt súbor!');
 return;
 }
 // VYČISTIŤ VŠETKO PRED NAČÍTANÍM NOVÉHO PROJEKTU!
 console.log('🧹 Čistenie starých dát pred načítaním...');
+// ✅ KRITICKÉ: Zmaž pd IHNEĎ - nie až v img.onload!
+// Inak saveProject použije starý pd a uloží zlý výkres
+pd = null;
+loadedImage = null;
+baseImageWidth = 0;
+baseImageHeight = 0;
 ws=[];
 spools=[];
 crosses=[];
@@ -7674,14 +7695,19 @@ if(fileNameSpan)fileNameSpan.textContent=originalFileName+'.json';
 var startInput=document.getElementById('startNumInput');
 if(startInput)startInput.value=startNum;
 if(projectData.pdfData){
+console.log('📄 pdfData existuje, dĺžka:', projectData.pdfData.length, 'začiatok:', projectData.pdfData.substring(0,30));
 var img=new Image();
+img.onerror=function(){
+  console.error('❌ img.onerror - pdfData sa nedá načítať!');
+  alert('❌ Chyba: PDF obrázok sa nedá načítať. Nahrajte PDF manuálne.');
+};
 img.onload=function(){
-// ✅ Nastav baseImage rozmery pred dw() aby zvary boli na správnom mieste
+console.log('✅ img.onload - rozmery:', img.naturalWidth, 'x', img.naturalHeight);
 baseImageWidth = img.naturalWidth || img.width;
 baseImageHeight = img.naturalHeight || img.height;
 loadedImage = img;
-pd = null; // Nie je PDF objekt, len obrázok
-sc = 1.0;  // Reset zoom na 100%
+pd = null;
+sc = 1.0;
 ca.width=baseImageWidth;
 ca.height=baseImageHeight;
 ov.setAttribute('width',baseImageWidth);
@@ -7719,16 +7745,29 @@ alert('✅ Projekt načítaný!\n\nSúbor: '+originalFileName+'\nZvarov: '+ws.le
 };
 img.src=projectData.pdfData;
 }else{
-up();
+// pdfData chýba - vyčisti canvas a automaticky opýtaj na PDF
+pd = null;
+loadedImage = null;
+baseImageWidth = 0;
+baseImageHeight = 0;
+ct.clearRect(0,0,ca.width||800,ca.height||600);
+document.getElementById('up').style.display='none';
+document.getElementById('cw').style.display='block';
 dw();
 if(document.getElementById('savetolibrary'))document.getElementById('savetolibrary').disabled=false;
-alert('✅ Projekt načítaný!\n\nZvarov: '+ws.length+'\n⚠️ PDF obrázok chýba - nahrajte PDF manuálne.');
+// Automaticky otvori file picker pre PDF
+setTimeout(function(){
+  var wantPdf = confirm('✅ Projekt načítaný: '+ws.length+' zvarov\n\n⚠️ PDF výkres nie je v tomto súbore.\n\nChcete teraz nahrať PDF výkres?');
+  if(wantPdf){
+    document.getElementById('f').click();
+  }
+}, 200);
 }
 }catch(err){
 alert('❌ Chyba pri načítavaní projektu:\n'+err.message);
 }
 };
-rd.readAsText(fi);
+rd.readAsArrayBuffer(fi);
 this.value='';
 };
 
