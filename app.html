@@ -7787,57 +7787,84 @@ var endY=w.end.y*ca.height;
 var dx=endX-startX;
 var dy=endY-startY;
 var len=Math.sqrt(dx*dx+dy*dy);
-var numLen=String(w.displayNum).length;
-// ✅ Radius nezávislý na zoom
-var baseRadius=22;
-if(numLen>=4)baseRadius=30;
-else if(numLen>=3)baseRadius=26;
-else if(numLen>=2)baseRadius=24;
-// Normalizuj radius na pôvodný canvas A aplikuj weldScale!
-var radius = baseImageWidth > 0 ? baseRadius * (baseImageWidth / ca.width) * weldScale : baseRadius * weldScale;
-var ratio=(len-radius)/len;
-var lineEndX=startX+dx*ratio;
-var lineEndY=startY+dy*ratio;
+// ✅ ROVNAKÁ LOGIKA AKO dw() - elipsa podľa dĺžky textu
+var weldScale_pdf = weldScale;
+var sc_pdf = baseImageWidth > 0 ? (baseImageWidth / ca.width) : 1;
 
+// radiusY - základný vertikálny polomer
+var radiusY = 18 * sc_pdf * weldScale_pdf;
+
+// fontSize podľa dĺžky textu
+var displayText = String(w.displayNum);
+var numLen = displayText.length;
+var baseFontSize = 34;
+if(numLen >= 6) baseFontSize = 18;
+else if(numLen >= 5) baseFontSize = 20;
+else if(numLen >= 4) baseFontSize = 22;
+else if(numLen >= 3) baseFontSize = 26;
+else if(numLen >= 2) baseFontSize = 30;
+var fontSize = baseFontSize * sc_pdf * weldScale_pdf;
+
+// Zmeraj šírku textu pre výpočet radiusX
+tempCtx.font = 'bold ' + fontSize + 'px Arial';
+var textWidth = tempCtx.measureText(displayText).width;
+
+// radiusX - kruh pre krátky text, elipsa pre dlhší
+var radiusX;
+if(textWidth + 12 * sc_pdf * weldScale_pdf <= 2 * radiusY){
+  radiusX = radiusY;
+} else {
+  radiusX = Math.max(radiusY, (textWidth / 2) + (6 * sc_pdf * weldScale_pdf));
+}
+
+// Priesečník línie s elipsou (parametrická rovnica)
+var ndx = dx / len;
+var ndy = dy / len;
+var t_intersect = 1 / Math.sqrt((ndx/radiusX)*(ndx/radiusX) + (ndy/radiusY)*(ndy/radiusY));
+var lineEndX = endX - ndx * t_intersect;
+var lineEndY = endY - ndy * t_intersect;
+
+// Čiara
 tempCtx.strokeStyle='#FF0000';
-tempCtx.lineWidth=2.5*weldScale;
+tempCtx.lineWidth=2.5*weldScale_pdf;
 tempCtx.beginPath();
 tempCtx.moveTo(startX,startY);
 tempCtx.lineTo(lineEndX,lineEndY);
 tempCtx.stroke();
 
+// Krížik ak je označený
 var hasCross=crosses.some(function(c){return c.weldId===w.id;});
 if(hasCross){
-var crossSize=8*weldScale;
-tempCtx.strokeStyle='#FF0000';
-tempCtx.lineWidth=3*weldScale;
-tempCtx.beginPath();
-tempCtx.moveTo(startX-crossSize,startY-crossSize);
-tempCtx.lineTo(startX+crossSize,startY+crossSize);
-tempCtx.moveTo(startX-crossSize,startY+crossSize);
-tempCtx.lineTo(startX+crossSize,startY-crossSize);
-tempCtx.stroke();
+  var crossSize=8*weldScale_pdf;
+  tempCtx.strokeStyle='#FF0000';
+  tempCtx.lineWidth=3*weldScale_pdf;
+  tempCtx.beginPath();
+  tempCtx.moveTo(startX-crossSize,startY-crossSize);
+  tempCtx.lineTo(startX+crossSize,startY+crossSize);
+  tempCtx.moveTo(startX-crossSize,startY+crossSize);
+  tempCtx.lineTo(startX+crossSize,startY-crossSize);
+  tempCtx.stroke();
 }
 
+// ✅ Elipsa - rovnaký kód ako SVG overlay v dw()
 tempCtx.strokeStyle='#FF0000';
-tempCtx.lineWidth=2*weldScale;
+tempCtx.lineWidth=2*weldScale_pdf;
 tempCtx.beginPath();
-tempCtx.arc(endX,endY,radius,0,Math.PI*2);
+tempCtx.ellipse(endX, endY, radiusX, radiusY, 0, 0, Math.PI*2);
 tempCtx.stroke();
 
-// ✅ Font-size nezávislý na zoom A aplikuj weldScale!
-var baseFontSize=34;
-if(numLen>=4)baseFontSize=24;
-else if(numLen>=3)baseFontSize=28;
-else if(numLen>=2)baseFontSize=30;
-// Normalizuj font-size na pôvodný canvas A aplikuj weldScale!
-var fontSize = baseImageWidth > 0 ? baseFontSize * (baseImageWidth / ca.width) * weldScale : baseFontSize * weldScale;
+// Biely fill aby text bol čitateľný
+tempCtx.fillStyle='white';
+tempCtx.beginPath();
+tempCtx.ellipse(endX, endY, radiusX, radiusY, 0, 0, Math.PI*2);
+tempCtx.fill();
 
+// Text
 tempCtx.fillStyle='#FF0000';
-tempCtx.font=fontSize+'px Arial';
+tempCtx.font='bold '+fontSize+'px Arial';
 tempCtx.textAlign='center';
 tempCtx.textBaseline='middle';
-tempCtx.fillText(w.displayNum,endX,endY);
+tempCtx.fillText(displayText,endX,endY);
 });
 
 dimensions.forEach(function(dim){
