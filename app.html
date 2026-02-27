@@ -8504,6 +8504,46 @@ function parseWeldId(weldId) {
   return baseNum + letterPart;
 }
 
+// ✅ Rozdeľ kombinované Weld ID na jednotlivé riadky
+// "1A,B" → ["1A","1B"]
+// "16C,D" → ["16C","16D"]  
+// "5" → ["5"]
+// "3A" → ["3A"]
+function expandWeldId(rawId) {
+  rawId = String(rawId).trim();
+  if(!rawId) return [rawId];
+  
+  // Ak neobsahuje čiarku, vráť tak ako je
+  if(!rawId.includes(',')) return [rawId];
+  
+  // Rozdeľ podľa čiarky
+  var parts = rawId.split(',').map(function(p){ return p.trim(); });
+  
+  // Zisti číselný prefix z prvej časti (napr. "1A" → prefix="1", suffix="A")
+  var firstPart = parts[0];
+  var match = firstPart.match(/^(\d+)([A-Za-z]*)$/);
+  if(!match) return [rawId]; // Nerozpoznaný formát - vráť celé
+  
+  var numPrefix = match[1];  // "1" alebo "16"
+  var firstSuffix = match[2]; // "A" alebo "C"
+  
+  var result = [firstPart]; // Prvý je celý (napr. "1A")
+  
+  // Ďalšie časti - ak je len písmeno, pridaj číselný prefix
+  for(var i = 1; i < parts.length; i++) {
+    var p = parts[i];
+    if(p.match(/^[A-Za-z]+$/)) {
+      // Len písmeno - pridaj prefix čísla
+      result.push(numPrefix + p);
+    } else {
+      // Má vlastné číslo (napr. "16D")
+      result.push(p);
+    }
+  }
+  
+  return result;
+}
+
 function addWeldToWeldBook(weldData) {
   console.log('➕ Pridávam zvar do WeldBook:', weldData);
   
@@ -8669,30 +8709,30 @@ async function processJSONProjectAsync(fileName, project) {
     var splitName = splitIsometricName(isometric);
     
     project.welds.forEach(function(weld) {
-      var weldRow = {
-        part: splitName.part,
-        isometric: splitName.isometric,
-        sheets: sheets,
-        weldId: String(weld.displayNum || ''),
-        
-        // Item 1/2 - zatiaľ prázdne
-        item1: '',
-        item2: '',
-        
-        // Všetky ostatné stĺpce prázdne
-        ped: '', rev: '', pipeClass: '',
-        heatNr1: '', certNr1: '', dimension1: '', thickness1: '', material1: '', matGroup1: '',
-        heatNr2: '', certNr2: '', dimension2: '', thickness2: '', material2: '', matGroup2: '',
-        wps: '', wpqr: '', weldingMethod: '', jointType: '', weldingType: '', weldingGas: '',
-        heatNrWeld: '', certNrWeld: '', welderId: '', dateWelding: '',
-        vtPercent: '', vtDate: '', vtReport: '', vtResult: '',
-        ptPercent: '', ptDate: '', ptReport: '', ptResult: '',
-        rtPercent: '', rtDate: '', rtReport: '', rtResult: '',
-        pmpInch: '', andritzInch: '', pressureGroup: '', note: ''
-      };
+      // ✅ Rozdeľ kombinované ID ako "1A,B" → ["1A","1B"] alebo "16C,D" → ["16C","16D"]
+      var rawId = String(weld.displayNum || '');
+      var weldIds = expandWeldId(rawId);
       
-      addWeldToWeldBook(weldRow);
-      weldCount++;
+      weldIds.forEach(function(weldId) {
+        var weldRow = {
+          part: splitName.part,
+          isometric: splitName.isometric,
+          sheets: sheets,
+          weldId: weldId,
+          item1: '', item2: '',
+          ped: '', rev: '', pipeClass: '',
+          heatNr1: '', certNr1: '', dimension1: '', thickness1: '', material1: '', matGroup1: '',
+          heatNr2: '', certNr2: '', dimension2: '', thickness2: '', material2: '', matGroup2: '',
+          wps: '', wpqr: '', weldingMethod: '', jointType: '', weldingType: '', weldingGas: '',
+          heatNrWeld: '', certNrWeld: '', welderId: '', dateWelding: '',
+          vtPercent: '', vtDate: '', vtReport: '', vtResult: '',
+          ptPercent: '', ptDate: '', ptReport: '', ptResult: '',
+          rtPercent: '', rtDate: '', rtReport: '', rtResult: '',
+          pmpInch: '', andritzInch: '', pressureGroup: '', note: ''
+        };
+        addWeldToWeldBook(weldRow);
+        weldCount++;
+      });
     });
   }
   
