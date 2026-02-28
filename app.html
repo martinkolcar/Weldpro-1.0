@@ -8413,6 +8413,7 @@ function openWeldBook() {
   content += '<button onclick="importJSONProjects()" style="padding:10px 20px;background:#667eea;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z JSON</button>';
   content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu (1 časť)</button>';
   content += '<button onclick="importAllPartsExcel()" style="padding:10px 20px;background:#0d9488;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import VŠETKY časti</button>';
+  content += '<button onclick="fixWbParts()" style="padding:10px 20px;background:#7c3aed;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600" title="Opraví SUL/LIG/DRY na uppercase a uloží do Firebase">🔧 Opraviť časti</button>';
   content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button>';
   content += '<button onclick="closeWeldBook()" style="padding:10px 20px;background:#6b7280;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✕ Zavrieť</button>';
   content += '</div></div>';
@@ -8676,21 +8677,26 @@ function initializeWeldBookGrid() {
 // ============= HELPER: Rozdelenie názvu izometrie =============
 function splitIsometricName(fullName){
 // fullName = "SUL_PIPE ISOMETRIC,KF-712-20002-4-25-10H1A"
-// Výsledok: {part: "SUL_PIPE ISOMETRIC", isometric: "KF-712-20002-4-25-10H1A"}
+// Výsledok: {part: "SUL", isometric: "KF-712-20002-4-25-10H1A"}
 
 if(!fullName || fullName.trim()==='')return {part:'',isometric:''};
 
-var parts=fullName.split(',');
-if(parts.length>=2){
-// Všetko pred poslednou čiarkou = časť
-var lastIndex=fullName.lastIndexOf(',');
-var part=fullName.substring(0,lastIndex).trim();
-var isometric=fullName.substring(lastIndex+1).trim();
-return {part:part,isometric:isometric};
-}else{
-// Žiadna čiarka - celý názov je izometria
-return {part:'',isometric:fullName.trim()};
+var isometric = '';
+var part = '';
+
+if(fullName.includes(',')){
+  var lastIndex = fullName.lastIndexOf(',');
+  var rawPart = fullName.substring(0, lastIndex).trim();
+  isometric = fullName.substring(lastIndex+1).trim();
+  // Extrahuj len prvé slovo pred _ ako part (SUL_PIPE ISOMETRIC → SUL)
+  var partMatch = rawPart.match(/^([A-Z]{2,6})/);
+  part = partMatch ? partMatch[1] : rawPart;
+} else {
+  isometric = fullName.trim();
+  part = '';
 }
+
+return {part: part, isometric: isometric};
 }
 
 // Helper funkcia: parsuje weld ID na numerickú hodnotu pre sortovanie
@@ -9533,6 +9539,54 @@ function exportWeldBookExcel() {
 }
 
 // ============= IMPORT EXCELU DO WELDBOOK =============
+function fixWbParts() {
+  var VALID_PARTS = ['SUL','LIG','DRY','FLA','LHT'];
+  var fixedPart = 0, fixedIso = 0, removed = 0;
+
+  weldBookData.forEach(function(row) {
+    // 1. Oprav isometric - ak obsahuje čiarku (starý formát "SUL_PIPE ISOMETRIC,KF-712-...")
+    if (row.isometric && row.isometric.includes(',')) {
+      var parsed = splitIsometricName(row.isometric);
+      row.isometric = parsed.isometric;
+      if (!row.part && parsed.part) row.part = parsed.part;
+      fixedIso++;
+    }
+
+    // 2. Normalizuj part - "SUL_PIPE ISOMETRIC" → "SUL", "LiG" → "LIG"
+    if (row.part) {
+      // Extrahuj prvé veľké písmená pred _ alebo medzerou
+      var partMatch = row.part.match(/^([A-Za-z]{2,6})/);
+      var cleaned = partMatch ? partMatch[1].toUpperCase() : row.part.toUpperCase().trim();
+      if (VALID_PARTS.includes(cleaned) && row.part !== cleaned) {
+        row.part = cleaned;
+        fixedPart++;
+      }
+    }
+  });
+
+  // 3. Odstraň duplikáty (rovnaký isometric + weldId)
+  var seen = {};
+  var clean = [];
+  weldBookData.forEach(function(row) {
+    var key = (row.isometric||'') + '|' + (row.weldId||'');
+    if (!seen[key]) { seen[key] = true; clean.push(row); }
+    else removed++;
+  });
+  weldBookData = clean;
+
+  // Refresh grid + dropdowny
+  if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
+  populateWeldBookFilterDropdowns();
+  wbLocalBackup();
+
+  // Ulož do Firebase
+  var isos = {};
+  weldBookData.forEach(function(r) { isos[r.isometric||'_'] = true; });
+  Object.keys(isos).forEach(function(iso) { saveWbIsometric(iso); });
+
+  alert('✅ Opravené!\nOpravených izometrií (s čiarkou): ' + fixedIso + '\nOpravených part hodnôt: ' + fixedPart + '\nOdstránených duplicít: ' + removed + '\nCelkom zvarov: ' + weldBookData.length);
+}
+
 function importAllPartsExcel() {
   // Importuj všetky časti (SUL, LIG, DRY, FLA, LHT) z jedného Excel súboru naraz
 
@@ -10197,22 +10251,33 @@ function clearAllWeldBook() {
   } catch(err) {
     console.error('❌ Chyba pri mazaní LocalStorage:', err);
   }
-  
-  // Vymaž aj z aktuálneho Firebase projektu
-  if (projectsData.currentProject && projectsData.currentPart) {
-    var currentProj = projectsData.projects[projectsData.currentProject];
-    var currentPart = currentProj.parts[projectsData.currentPart];
-    currentPart.weldBookData = [];
-    saveProjectsToStorage();
-    console.log('✅ WeldBook vymazaný aj z Firebase projektu!');
+
+  // 🔥 Vymaž aj z Firebase weldbook kolekcie
+  if (db) {
+    (async function() {
+      try {
+        var snap = await db.collection('weldbook').get();
+        var deleted = 0;
+        for (var docSnap of snap.docs) {
+          // Vymaž aj subcollection data
+          var subSnap = await docSnap.ref.collection('data').get();
+          for (var sub of subSnap.docs) await sub.ref.delete();
+          await docSnap.ref.delete();
+          deleted++;
+        }
+        console.log('✅ Firebase weldbook kolekcia vymazaná (' + deleted + ' dokumentov)');
+      } catch(e) {
+        console.error('❌ Chyba pri mazaní Firebase:', e);
+      }
+    })();
   }
-  
+
   console.log('✅ WeldBook kompletne VYMAZANÝ!');
-  
+
   alert('✅ HOTOVO!\n\n' +
-        'Všetky dáta (' + totalRows + ' zvarov) boli vymazané!\n\n' +
+        'Všetky dáta (' + totalRows + ' zvarov) boli vymazané z localStorage aj Firebase!\n\n' +
         'WeldBook je teraz prázdny.\n\n' +
-        '💡 Teraz môžeš naimportovať nové JSON súbory.');
+        '💡 Teraz môžeš naimportovať nové dáta pomocou "Import VŠETKY časti".');
 }
 
 // ============= ZATVORENIE WELDBOOK =============
