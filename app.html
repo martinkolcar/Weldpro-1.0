@@ -8764,54 +8764,46 @@ function expandWeldId(rawId) {
 }
 
 function addWeldToWeldBook(weldData) {
-  console.log('➕ Pridávam zvar do WeldBook:', weldData);
-  
-  // ⚠️ KRITICKÝ DEBUG - kde vznikajú "site" záznamy?
-  if(weldData.source === 'site') {
-    console.error('🚨🚨🚨 SITE ZÁZNAM VYTVORENÝ! 🚨🚨🚨');
-    console.error('   weldId:', weldData.weldId);
-    console.error('   isometric:', weldData.isometric);
-    console.error('📞 FULL STACK TRACE:');
-    console.trace();
-  }
-  
-  // Parse weld number pre sorted insert
-  var newWeldNum = parseWeldId(weldData.weldId);
   var newIso = weldData.isometric || '';
-  
-  // Nájdi správne miesto v poli (sorted insert v rámci tej istej izometrie)
-  var insertIndex = weldBookData.length; // Default: na koniec
-  
-  for (var i = 0; i < weldBookData.length; i++) {
-    var existingIso = weldBookData[i].isometric || '';
-    
-    // Ak je to tá istá izometria, porovnaj čísla
-    if (existingIso === newIso) {
-      var existingNum = parseWeldId(weldBookData[i].weldId);
-      if (newWeldNum < existingNum) {
-        insertIndex = i;
-        break;
+  var newId = String(weldData.weldId || '').trim();
+
+  // ✅ SKONTROLUJ DUPLIKÁT - ak zvar existuje, len aktualizuj neprázdne polia
+  var existingIdx = weldBookData.findIndex(function(r) {
+    return String(r.weldId||'').trim() === newId &&
+           (r.isometric||'').trim() === newIso.trim();
+  });
+
+  if (existingIdx >= 0) {
+    // Zvar už existuje - aktualizuj len neprázdne polia z projektu
+    Object.entries(weldData).forEach(function(entry) {
+      var field = entry[0], val = entry[1];
+      if (val && val !== '' && field !== 'isometric' && field !== 'weldId') {
+        weldBookData[existingIdx][field] = val;
       }
+    });
+    console.log('🔄 WeldBook update (existuje):', newIso, newId);
+  } else {
+    // Nový zvar - vlož na správné miesto (sorted)
+    var newWeldNum = parseWeldId(weldData.weldId);
+    var insertIndex = weldBookData.length;
+    for (var i = 0; i < weldBookData.length; i++) {
+      var existingIso = weldBookData[i].isometric || '';
+      if (existingIso === newIso) {
+        if (newWeldNum < parseWeldId(weldBookData[i].weldId)) { insertIndex = i; break; }
+      } else if (newIso < existingIso) { insertIndex = i; break; }
     }
-    // Ak je existujúca izometria "väčšia" (abecedne), vlož pred ňu
-    else if (newIso < existingIso) {
-      insertIndex = i;
-      break;
-    }
+    weldBookData.splice(insertIndex, 0, weldData);
+    console.log('✅ WeldBook nový zvar:', newIso, newId);
   }
-  
-  // Vlož na správne miesto
-  weldBookData.splice(insertIndex, 0, weldData);
-  console.log('✅ Zvar vložený na index:', insertIndex, '(iso:', newIso, ', weldId:', weldData.weldId, '→', newWeldNum + ')');
-  
-  // Ak je grid otvorený, RELOAD celý dataset (aby sa zobrazil v správnom poradí)
+
+  // Refresh grid
   if (weldBookGrid && weldBookGrid.api) {
     weldBookGrid.api.setGridOption('rowData', weldBookData);
-    console.log('✅ WeldBook tabuľka aktualizovaná');
   }
-  
-  // Ulož do aktívnej časti projektu
-  saveCurrentPartWeldBook();
+
+  // 🔥 Ulož len túto izometriu do Firebase weldbook
+  wbLocalBackup();
+  saveWbIsometric(newIso);
 }
 
 // ============= IMPORT Z JSON PROJEKTOV =============
@@ -10967,13 +10959,8 @@ function loadCurrentPartWeldBook() {
 }
 
 function saveCurrentPartWeldBook() {
-  console.log('💾 saveCurrentPartWeldBook() volané');
-  console.log('   Projekt:', projectsData.currentProject);
-  console.log('   Časť:', projectsData.currentPart);
-  console.log('   Zvarov v weldBookData:', weldBookData.length);
-  
-  // Vždy ulož do localStorage (pre všetky režimy)
-  saveWeldBookToStorage();
+  // WeldBook je samostatný - ukladá sa do Firebase weldbook kolekcie
+  saveWeldBookToStorage(); // localStorage + Firebase (všetky izometrie)
   
   // Ak máme načítaný OFFLINE projekt, ulož tam WeldBook
   if (currentOfflineProjectId) {
@@ -10984,8 +10971,7 @@ function saveCurrentPartWeldBook() {
         const projectData = wrappedData.data || wrappedData;
         
         // Aktualizuj weldBookData v projekte
-        projectData.weldBookData = weldBookData;
-        
+        // WeldBook je samostatný v Firebase weldbook kolekcii - neukladáme do projektu
         // Ulož späť do offline storage
         wrappedData.data = projectData;
         saveOfflineProject(currentOfflineProjectId, wrappedData.data);
@@ -11005,7 +10991,7 @@ function saveCurrentPartWeldBook() {
         var currentPart = currentProj.parts[projectsData.currentPart];
         if (currentPart) {
           console.log('   Pred uložením - currentPart.weldBookData.length:', currentPart.weldBookData ? currentPart.weldBookData.length : 0);
-          currentPart.weldBookData = weldBookData;
+          // WeldBook je samostatný v Firebase weldbook kolekcii
           console.log('   Po uložení - currentPart.weldBookData.length:', currentPart.weldBookData.length);
           currentPart.lastModified = new Date().toISOString().slice(0,10);
           saveProjectsToStorage();
@@ -12143,12 +12129,7 @@ async function loadFromLibraryFirebase(projectName) {
     arrows = projectData.arrows || [];
     texts = projectData.texts || [];
     curves = projectData.curves || [];
-    // ✅ ZMENENÉ: WeldBook sa teraz načítava z projektu (zdieľaný cez Firebase)!
-    if (projectData.weldBookData && projectData.weldBookData.length > 0) {
-      weldBookData = projectData.weldBookData;
-      saveWeldBookToStorage(); // Ulož aj do localStorage pre offline prístup
-      console.log('📥 WeldBook načítaný z projektu:', weldBookData.length, 'zvarov');
-    }
+    // ✅ WeldBook je teraz SAMOSTATNÝ - načítava sa z Firebase weldbook kolekcie (nie z projektu)
     // ✅ kontrolaData zostáva globálny!
     spoolData = projectData.spoolData || {};
     cn = projectData.currentNumber || 1;
@@ -13971,7 +13952,7 @@ function autoSaveCurrentProject() {
       spools: spools || [],
       dimensions: dimensions || [],
       spoolData: spoolData || {},
-      weldBookData: weldBookData || [],
+      weldBookData: [], // WeldBook je samostatný v Firebase weldbook kolekcii
       kontrolaData: kontrolaData || {},
       currentNumber: cn,
       startNumber: startNum,
@@ -14125,12 +14106,7 @@ function loadOfflineProject(projectId) {
     startNum = projectData.startNumber || 1;
     originalFileName = projectData.projectName || projectId;
     
-    // ✅ Načítaj weldBookData z offline projektu
-    if (projectData.weldBookData && projectData.weldBookData.length > 0) {
-      weldBookData = projectData.weldBookData;
-      saveWeldBookToStorage(); // Ulož aj do localStorage
-      console.log('📱 WeldBook načítaný z offline projektu:', weldBookData.length, 'zvarov');
-    }
+    // ✅ WeldBook je teraz SAMOSTATNÝ - načítava sa z Firebase weldbook kolekcie (nie z projektu)
     
     console.log('📱 Data loaded, welds:', ws.length, 'weldBook:', weldBookData.length);
     
@@ -14726,12 +14702,7 @@ async function loadAndDisplayProject(projectName, part) {
     arrows = projectData.arrows || [];
     texts = projectData.texts || [];
     curves = projectData.curves || [];
-    // ✅ ZMENENÉ: WeldBook sa teraz načítava z projektu (zdieľaný cez Firebase)!
-    if (projectData.weldBookData && projectData.weldBookData.length > 0) {
-      weldBookData = projectData.weldBookData;
-      saveWeldBookToStorage(); // Ulož aj do localStorage pre offline prístup
-      console.log('📥 WeldBook načítaný z projektu:', weldBookData.length, 'zvarov');
-    }
+    // ✅ WeldBook je teraz SAMOSTATNÝ - načítava sa z Firebase weldbook kolekcie (nie z projektu)
     // ✅ kontrolaData zostáva globálny!
     spoolData = projectData.spoolData || {};
     cn = projectData.currentNumber || 1;
