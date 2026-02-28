@@ -8414,6 +8414,7 @@ function openWeldBook() {
   content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu (1 časť)</button>';
   content += '<button onclick="importAllPartsExcel()" style="padding:10px 20px;background:#0d9488;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import VŠETKY časti</button>';
   content += '<button onclick="nukeWeldBook()" style="padding:10px 20px;background:#7f1d1d;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #ef4444" title="Vymaže VŠETKO z Firebase aj localStorage">💣 RESET Firebase</button>';
+  content += '<button onclick="clearLocalStorageWeldBook()" style="padding:10px 20px;background:#92400e;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600" title="Vymaže len lokálnu cache prehliadača">🧹 Vymazať cache</button>';
   content += '<button onclick="fixWbParts()" style="padding:10px 20px;background:#7c3aed;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600" title="Opraví SUL/LIG/DRY na uppercase a uloží do Firebase">🔧 Opraviť časti</button>';
   content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button>';
   content += '<button onclick="closeWeldBook()" style="padding:10px 20px;background:#6b7280;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✕ Zavrieť</button>';
@@ -9532,12 +9533,47 @@ function exportWeldBookExcel() {
 }
 
 // ============= IMPORT EXCELU DO WELDBOOK =============
+function clearLocalStorageWeldBook() {
+  // Vymaž všetky weldbook dáta z localStorage prehliadača
+  var removed = [];
+  var keys = [];
+  for (var i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+  keys.forEach(function(k) {
+    if (k && (k.toLowerCase().includes('weld') || k.toLowerCase().includes('wbook'))) {
+      localStorage.removeItem(k);
+      removed.push(k);
+    }
+  });
+  localStorage.removeItem('weldBookData'); // istota
+
+  // Vymaž aj z pamäte
+  weldBookData = [];
+  if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', []);
+  populateWeldBookFilterDropdowns();
+
+  alert('✅ Cache vymazaná!\nVymazaných kľúčov: ' + removed.length + '\n\nStránka sa teraz znovu načíta dáta z Firebase.');
+
+  // Znovu načítaj z Firebase
+  loadWeldBookFromStorage().then(function() {
+    if (weldBookGrid && weldBookGrid.api) {
+      weldBookGrid.api.setGridOption('rowData', weldBookData);
+      populateWeldBookFilterDropdowns();
+    }
+  });
+}
+
 async function nukeWeldBook() {
   if (!confirm('💣 VYMAZAŤ CELÝ WELDBOOK z Firebase aj localStorage?\nToto je nevratné!')) return;
 
-  // 1. Lokálne
+  // 1. Lokálne - vymaž VŠETKY weldbook kľúče z localStorage
   weldBookData = [];
-  localStorage.removeItem('weldBookData');
+  var keysToDelete = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && (k.toLowerCase().includes('weld') || k.toLowerCase().includes('wbook'))) keysToDelete.push(k);
+  }
+  keysToDelete.forEach(function(k) { localStorage.removeItem(k); console.log('🗑️ localStorage removed:', k); });
+  localStorage.removeItem('weldBookData'); // istota
   if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', []);
 
   if (!db) { alert('Firebase nie je dostupný - len localStorage vymazaný.'); return; }
@@ -10973,36 +11009,10 @@ function switchToPart(partName) {
 }
 
 function loadCurrentPartWeldBook() {
-  if (!projectsData.currentProject || !projectsData.currentPart) {
-    console.log('⚠️ Žiadny aktívny projekt/časť');
-    weldBookData = [];
-    return;
-  }
-  
-  var currentProj = projectsData.projects[projectsData.currentProject];
-  var currentPart = currentProj.parts[projectsData.currentPart];
-  
-  // ✅ KRITICKÁ OPRAVA - Vytvor KÓPIU array, nie referenciu!
-  weldBookData = currentPart.weldBookData ? JSON.parse(JSON.stringify(currentPart.weldBookData)) : [];
-  
-  // MIGRÁCIA: Rozdeliť staré dáta ak nemajú stĺpec "part"
-  var needsMigration = false;
-  weldBookData.forEach(function(row) {
-    if (!row.hasOwnProperty('part') && row.isometric) {
-      needsMigration = true;
-      var splitName = splitIsometricName(row.isometric);
-      row.part = splitName.part;
-      row.isometric = splitName.isometric;
-    }
-  });
-  
-  if (needsMigration) {
-    console.log('🔄 Migrácia: Rozdelené názvy v', weldBookData.length, 'riadkoch');
-    saveCurrentPartWeldBook();
-  }
-  
-  console.log('📂 Načítaný WeldBook pre:', projectsData.currentProject, '/', projectsData.currentPart);
-  console.log('   Zvarov:', weldBookData.length);
+  // WeldBook je GLOBÁLNY - načítava sa z Firebase weldbook kolekcie pri štarte
+  // Neprepísujeme ho pri prepnutí časti projektu
+  // weldBookData zostáva ako je - obsahuje všetky zvary zo všetkých častí
+  console.log('📂 WeldBook globálny - aktuálne zvarov:', weldBookData.length);
 }
 
 function saveCurrentPartWeldBook() {
