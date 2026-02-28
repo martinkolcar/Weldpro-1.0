@@ -8424,7 +8424,7 @@ function openWeldBook() {
   content += '<div id="wbFilterBar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;background:#f8fafc;padding:10px 12px;border-radius:8px;border:1px solid #e2e8f0">';
   content += '<span style="font-weight:700;color:#374151;font-size:13px;white-space:nowrap">🔍 Filter:</span>';
   content += '<input id="wbSearch" type="text" placeholder="Hľadaj kdekoľvek..." oninput="debouncedWbFilter()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:180px;flex:1">';
-  content += '<select id="wbFilterPart" onchange="applyWeldBookFilters()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:100px"><option value="">Všetky časti</option></select>';
+  content += '<select id="wbFilterPart" onchange="onWbPartChange()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:100px"><option value="">Všetky časti</option></select>';
   content += '<select id="wbFilterIsometric" onchange="applyWeldBookFilters()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:180px"><option value="">Všetky izometrie</option></select>';
   content += '<select id="wbFilterItem1" onchange="applyWeldBookFilters()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:140px"><option value="">Welded Item 1</option></select>';
   content += '<select id="wbFilterItem2" onchange="applyWeldBookFilters()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:140px"><option value="">Welded Item 2</option></select>';
@@ -8472,6 +8472,32 @@ function openWeldBook() {
 }
 
 // ============= WELDBOOK FILTER FUNKCIE =============
+function onWbPartChange() {
+  // Keď sa zmení časť - prefiltruj izometrie podľa vybranej časti
+  var fPart = document.getElementById('wbFilterPart') ? document.getElementById('wbFilterPart').value : '';
+  var isoSel = document.getElementById('wbFilterIsometric');
+  if (!isoSel) { applyWeldBookFilters(); return; }
+
+  // Zozbieraj izometrie len pre vybranú časť
+  var isoVals = [];
+  weldBookData.forEach(function(row) {
+    if (fPart && String(row.part||'').trim() !== fPart) return; // len pre vybranú časť
+    var v = row.isometric;
+    if (v && String(v).trim() !== '' && isoVals.indexOf(String(v).trim()) === -1) {
+      isoVals.push(String(v).trim());
+    }
+  });
+  isoVals.sort();
+
+  // Reset izometric dropdown s novými možnosťami
+  isoSel.innerHTML = '<option value="">Všetky izometrie (' + isoVals.length + ')</option>';
+  isoVals.forEach(function(v) {
+    isoSel.innerHTML += '<option value="' + v.replace(/"/g,'&quot;') + '">' + v + '</option>';
+  });
+
+  applyWeldBookFilters();
+}
+
 function populateWeldBookFilterDropdowns() {
   var selects = {
     'wbFilterPart':        'part',
