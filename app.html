@@ -657,6 +657,17 @@ async function initFirebase() {
     await auth.signInAnonymously();
     console.log('✅ Firebase ready!');
     firebaseReady = true;
+
+    // ✅ Načítaj WeldBook z Firebase po úspešnej inicializácii
+    if (typeof loadWeldBookFromStorage === 'function') {
+      loadWeldBookFromStorage();
+    } else {
+      // Funkcia ešte nie je definovaná - počkaj
+      setTimeout(function() {
+        if (typeof loadWeldBookFromStorage === 'function') loadWeldBookFromStorage();
+      }, 1500);
+    }
+
   } catch(err) {
     console.error('❌ Firebase init chyba:', err);
     firebaseReady = false;
@@ -8400,7 +8411,8 @@ function openWeldBook() {
   content += '<button onclick="cleanWeldBook()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🧹 Vyčistiť orphaned</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
   content += '<button onclick="importJSONProjects()" style="padding:10px 20px;background:#667eea;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z JSON</button>';
-  content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu</button>';
+  content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu (1 časť)</button>';
+  content += '<button onclick="importAllPartsExcel()" style="padding:10px 20px;background:#0d9488;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import VŠETKY časti</button>';
   content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button>';
   content += '<button onclick="closeWeldBook()" style="padding:10px 20px;background:#6b7280;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✕ Zavrieť</button>';
   content += '</div></div>';
@@ -8714,7 +8726,7 @@ function expandWeldId(rawId) {
   rawId = String(rawId).trim();
   if(!rawId) return [rawId];
   
-  // Ak neobsahuje čiarku, vráť tak ako je
+          alert('Excel neobsahuje rozpoznane sheety (SUL, LIG, DRY, FLA, LHT). Dostupne: ' + workbook.SheetNames.join(', '));
   if(!rawId.includes(',')) return [rawId];
   
   // Rozdeľ podľa čiarky
@@ -9126,6 +9138,34 @@ function saveWeldBookToStorage() {
   Object.keys(isos).forEach(function(iso) { saveWbIsometric(iso); });
 }
 
+// Async verzia pre sekvenčné ukladanie (import)
+async function saveWbIsometricAsync(isometric) {
+  if (!db) return;
+  var rows = weldBookData.filter(function(r) { return (r.isometric || '') === isometric; });
+  var docId = wbSafeDocId(isometric);
+  var jsonString = JSON.stringify({ isometric: isometric, welds: rows });
+  var CHUNK_SIZE = 800 * 1024;
+  var chunks = [];
+  for (var i = 0; i < jsonString.length; i += CHUNK_SIZE) chunks.push(jsonString.slice(i, i + CHUNK_SIZE));
+  try {
+    var oldChunks = await db.collection('weldbook').doc(docId).collection('data').get();
+    for (var oc of oldChunks.docs) await oc.ref.delete();
+    await db.collection('weldbook').doc(docId).set({
+      isometric: isometric,
+      chunks: chunks.length,
+      count: rows.length,
+      modifiedBy: window.currentUser ? window.currentUser.username : 'unknown',
+      date: new Date().toISOString()
+    });
+    for (var ci = 0; ci < chunks.length; ci++) {
+      await db.collection('weldbook').doc(docId).collection('data').doc('c' + ci).set({ d: chunks[ci] });
+    }
+    console.log('🔥 Uložené:', isometric, '(' + rows.length + ' zvarov)');
+  } catch(err) {
+    console.error('❌ Firebase chyba pre', isometric, ':', err);
+  }
+}
+
 // Ulož len konkrétne izometrie (po editácii bunky - rýchlejšie)
 function saveWbRows(iso) {
   wbLocalBackup();
@@ -9493,6 +9533,168 @@ function exportWeldBookExcel() {
 }
 
 // ============= IMPORT EXCELU DO WELDBOOK =============
+function importAllPartsExcel() {
+  // Importuj všetky časti (SUL, LIG, DRY, FLA, LHT) z jedného Excel súboru naraz
+
+  const ALL_SHEET_MAPS = {
+    'SUL': {
+      0:'isometric', 1:'sheets', 6:'ped', 7:'rev', 8:'pipeClass', 9:'weldId',
+      10:'item1', 11:'heatNr1', 12:'certNr1', 13:'dimension1', 14:'thickness1', 15:'material1', 16:'matGroup1',
+      17:'item2', 18:'heatNr2', 19:'certNr2', 20:'dimension2', 21:'thickness2', 22:'material2', 23:'matGroup2',
+      24:'wps', 25:'wpqr', 26:'weldingMethod', 27:'jointType', 28:'weldingType', 29:'weldingGas',
+      30:'heatNrWeld', 31:'certNrWeld', 32:'welderId', 33:'dateWelding',
+      34:'vtPercent', 35:'vtDate', 36:'vtReport', 37:'vtResult', 38:'vtDefect', 39:'vtInfo', 40:'vtRepairDate', 41:'vtRepairResult',
+      43:'ptPercent', 44:'ptDate', 45:'ptReport', 46:'ptResult', 47:'ptDefect', 48:'ptInfo', 49:'ptRepairDate', 50:'ptRepairResult',
+      52:'rtPercent', 53:'rtDate', 54:'rtReport', 55:'rtResult', 56:'rtDefect', 57:'rtInfo', 58:'rtRepairDate', 59:'rtRepairResult',
+      61:'inchWeld', 62:'prefabPlanned', 63:'prefabWelded', 64:'installPlanned', 65:'installWelded',
+    },
+    'LIG': {
+      0:'isometric', 1:'sheets', 2:'ped', 3:'rev', 4:'pipeClass', 5:'weldId',
+      6:'item1', 7:'heatNr1', 8:'certNr1', 9:'dimension1', 10:'thickness1', 11:'material1', 12:'matGroup1',
+      13:'item2', 14:'heatNr2', 15:'certNr2', 16:'dimension2', 17:'thickness2', 18:'material2', 19:'matGroup2',
+      20:'wps', 21:'wpqr', 22:'weldingMethod', 23:'jointType', 24:'weldingType', 25:'weldingGas',
+      26:'heatNrWeld', 27:'certNrWeld', 28:'welderId', 29:'dateWelding',
+      30:'vtPercent', 31:'vtDate', 32:'vtReport', 33:'vtResult', 34:'vtDefect', 35:'vtInfo', 36:'vtRepairDate', 37:'vtRepairResult',
+      39:'ptPercent', 40:'ptDate', 41:'ptReport', 42:'ptResult', 43:'ptDefect', 44:'ptInfo', 45:'ptRepairDate', 46:'ptRepairResult',
+      48:'rtPercent', 49:'rtDate', 50:'rtReport', 51:'rtResult', 52:'rtDefect', 53:'rtInfo', 54:'rtRepairDate', 55:'rtRepairResult',
+      57:'inchWeld', 58:'prefabPlanned', 59:'prefabWelded', 60:'installPlanned', 61:'installWelded',
+    },
+    'DRY': {
+      0:'isometric', 3:'sheets', 4:'ped', 5:'rev', 6:'pipeClass', 7:'weldId',
+      8:'item1', 9:'heatNr1', 10:'certNr1', 11:'dimension1', 12:'thickness1', 13:'material1', 14:'matGroup1',
+      15:'item2', 16:'heatNr2', 17:'certNr2', 18:'dimension2', 19:'thickness2', 20:'material2', 21:'matGroup2',
+      22:'wps', 23:'wpqr', 24:'weldingMethod', 25:'jointType', 26:'weldingType', 27:'weldingGas',
+      28:'heatNrWeld', 29:'certNrWeld', 30:'welderId', 31:'dateWelding',
+      32:'vtPercent', 33:'vtDate', 34:'vtReport', 35:'vtResult', 36:'vtDefect', 37:'vtInfo', 38:'vtRepairDate', 39:'vtRepairResult',
+      41:'ptPercent', 42:'ptDate', 43:'ptReport', 44:'ptResult', 45:'ptDefect', 46:'ptInfo', 47:'ptRepairDate', 48:'ptRepairResult',
+      50:'rtPercent', 51:'rtDate', 52:'rtReport', 53:'rtResult', 54:'rtDefect', 55:'rtInfo', 56:'rtRepairDate', 57:'rtRepairResult',
+      59:'inchWeld', 60:'prefabPlanned', 61:'prefabWelded', 62:'installPlanned', 63:'installWelded',
+    },
+  };
+  // FLA a LHT = rovnaká štruktúra ako LIG
+  ALL_SHEET_MAPS['FLA'] = ALL_SHEET_MAPS['LIG'];
+  ALL_SHEET_MAPS['LHT'] = ALL_SHEET_MAPS['LIG'];
+
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.xlsx,.xls';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+
+  input.onchange = function(e) {
+    const file = e.target.files[0];
+    if (!file) { document.body.removeChild(input); return; }
+
+    const loadingDiv = document.createElement('div');
+    loadingDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:30px 40px;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.3);z-index:99999;text-align:center;font-size:16px;min-width:320px';
+    loadingDiv.innerHTML = '<div style="font-size:40px;margin-bottom:10px">⏳</div><div id="wbAllStatus">Načítavam Excel...</div>';
+    document.body.appendChild(loadingDiv);
+
+    const reader = new FileReader();
+    reader.onload = async function(ev) {
+      try {
+        const data = new Uint8Array(ev.target.result);
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true, raw: false });
+
+        const availableSheets = Object.keys(ALL_SHEET_MAPS).filter(s => workbook.SheetNames.includes(s));
+        if (availableSheets.length === 0) {
+          document.body.removeChild(loadingDiv);
+          document.body.removeChild(input);
+          alert('Excel neobsahuje rozpoznane sheety. Dostupne: ' + workbook.SheetNames.join(', '));
+          return;
+        }
+
+        const statusEl = document.getElementById('wbAllStatus');
+        let totalAdded = 0, totalUpdated = 0, totalSkipped = 0;
+        const sheetResults = [];
+
+        for (const sheetName of availableSheets) {
+          statusEl.innerHTML = '⚙️ Spracovávam <strong>' + sheetName + '</strong>...<br><small style="color:#999">' + sheetResults.length + ' / ' + availableSheets.length + ' hotových</small>';
+
+          const ws = workbook.Sheets[sheetName];
+          const colMapping = ALL_SHEET_MAPS[sheetName];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+
+          // Nájdi header riadok
+          let headerRowIdx = 2;
+          for (let i = 0; i < Math.min(8, rows.length); i++) {
+            if (rows[i].join('|').toLowerCase().includes('weld id')) { headerRowIdx = i; break; }
+          }
+
+          let added = 0, updated = 0, skipped = 0;
+          const dataRows = rows.slice(headerRowIdx + 1);
+
+          dataRows.forEach(function(row) {
+            if (!row || row.every(c => c === '' || c === null || c === undefined)) return;
+            const obj = { part: sheetName };
+            Object.entries(colMapping).forEach(function([idx, field]) {
+              const val = row[parseInt(idx)];
+              if (val !== '' && val !== null && val !== undefined) {
+                let strVal = String(val).trim();
+                if (strVal.startsWith('=')) return;
+                if (strVal === '0' && (field.includes('heatNr') || field.includes('certNr'))) return;
+                if ((field.includes('date') || field.includes('Date')) && strVal.includes('T')) strVal = strVal.split('T')[0];
+                obj[field] = strVal;
+              }
+            });
+            if (!obj.weldId || obj.weldId === '' || obj.weldId === '0') { skipped++; return; }
+
+            const existingIdx = weldBookData.findIndex(r =>
+              String(r.weldId).trim() === String(obj.weldId).trim() &&
+              String(r.isometric || '').trim() === String(obj.isometric || '').trim()
+            );
+            if (existingIdx >= 0) {
+              Object.entries(obj).forEach(([f, v]) => { if (v && v !== '') weldBookData[existingIdx][f] = v; });
+              updated++;
+            } else {
+              weldBookData.push(obj);
+              added++;
+            }
+          });
+
+          totalAdded += added;
+          totalUpdated += updated;
+          totalSkipped += skipped;
+          sheetResults.push({ name: sheetName, added, updated, skipped });
+        }
+
+        // Refresh grid
+        if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
+        populateWeldBookFilterDropdowns();
+        wbLocalBackup();
+
+        // Uloženie do Firebase sekvenčne
+        statusEl.innerHTML = '🔥 Ukladám do Firebase...<br><small style="color:#999">0 izometrií</small>';
+        const isos = {};
+        weldBookData.forEach(function(r) { isos[r.isometric || '_unknown_'] = true; });
+        const isoList = Object.keys(isos);
+        let savedCount = 0;
+        for (const iso of isoList) {
+          await saveWbIsometricAsync(iso);
+          savedCount++;
+          if (loadingDiv.parentNode) {
+            document.getElementById('wbAllStatus').innerHTML = '🔥 Ukladám do Firebase...<br><small style="color:#999">' + savedCount + ' / ' + isoList.length + ' izometrií</small>';
+          }
+        }
+
+        document.body.removeChild(loadingDiv);
+        document.body.removeChild(input);
+
+        const summary = sheetResults.map(r => r.name + ': +' + r.added + ' nových, ~' + r.updated + ' aktualizovaných').join('\n');
+        alert('✅ Import VŠETKÝCH častí dokončený!\n\n' + summary + '\n\nSpolu pridaných: ' + totalAdded + '\nSpolu aktualizovaných: ' + totalUpdated + '\nPreskočených: ' + totalSkipped + '\n\nCelkom v WeldBook: ' + weldBookData.length + '\n🔥 Firebase: ' + savedCount + ' izometrií uložených');
+
+      } catch (err) {
+        console.error('Import all parts error:', err);
+        if (document.body.contains(loadingDiv)) document.body.removeChild(loadingDiv);
+        if (document.body.contains(input)) document.body.removeChild(input);
+        alert('❌ Chyba: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  input.click();
+}
+
 function importWeldBookExcel(){
 
   // ✅ POZIČNÉ mapovanie pre každý sheet zvlášť (overené zo skutočného súboru)
@@ -9705,12 +9907,31 @@ function importWeldBookExcel(){
         });
 
         if(weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
-        saveWeldBookToStorage();
         populateWeldBookFilterDropdowns(); // Refresh dropdowny
-        document.body.removeChild(loadingDiv);
-        document.body.removeChild(input);
 
-        alert('✅ Import dokončený!\n\nSheet: ' + targetSheetName + '\nPridaných: ' + added + '\nAktualizovaných: ' + updated + '\nPreskočených (bez Weld ID): ' + skipped + '\n\nCelkom v WeldBook: ' + weldBookData.length);
+        // 🔥 Ulož do Firebase - každá izometria zvlášť
+        wbLocalBackup(); // okamžitý lokálny backup
+        var isos = {};
+        weldBookData.forEach(function(r) { isos[r.isometric || '_unknown_'] = true; });
+        var isoList = Object.keys(isos);
+
+        loadingDiv.innerHTML = '<div style="font-size:40px;margin-bottom:10px">🔥</div><div>Ukladám do Firebase...<br><small style="color:#999">0 / ' + isoList.length + ' izometrií</small></div>';
+
+        // Uloženie sekvenčne aby sme nepretažili Firebase
+        (async function() {
+          var savedCount = 0;
+          for (var iso of isoList) {
+            await saveWbIsometricAsync(iso);
+            savedCount++;
+            if (loadingDiv.parentNode) {
+              loadingDiv.querySelector('small').textContent = savedCount + ' / ' + isoList.length + ' izometrií';
+            }
+          }
+          if(document.body.contains(loadingDiv)) document.body.removeChild(loadingDiv);
+          if(document.body.contains(input)) document.body.removeChild(input);
+          alert('✅ Import dokončený!\n\nSheet: ' + targetSheetName + '\nPridaných: ' + added + '\nAktualizovaných: ' + updated + '\nPreskočených (bez Weld ID): ' + skipped + '\n\nCelkom v WeldBook: ' + weldBookData.length + '\n🔥 Uložené do Firebase: ' + savedCount + ' izometrií');
+        })();
+        return; // async blok dokončí zvyšok
 
       } catch(err){
         console.error('Import chyba:', err);
