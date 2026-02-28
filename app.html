@@ -9266,45 +9266,78 @@ function startWbRealtimeSync() {
   wbRealtimeListeners.forEach(function(u) { try { u(); } catch(e) {} });
   wbRealtimeListeners = [];
 
-  var unsub = db.collection('weldbook').onSnapshot(function(snapshot) {
-    snapshot.docChanges().forEach(function(change) {
-      if (change.type !== 'modified' && change.type !== 'added') return;
-      var meta = change.doc.data();
-      var modifier = meta.modifiedBy || '';
-      var myUser = window.currentUser ? window.currentUser.username : '';
-      if (modifier === myUser) return; // ignoruj vlastné zmeny
+  var myUser = window.currentUser ? window.currentUser.username : '';
+  var initialLoad = true; // ignoruj prvý snapshot (sú to naše vlastné dáta)
 
-      // Načítaj chunky pre zmenený dokument
-      var docRef = change.doc.ref;
-      (async function() {
-        try {
-          var chunks = [];
-          for (var ci = 0; ci < (meta.chunks || 1); ci++) {
-            var c = await docRef.collection('data').doc('c' + ci).get();
-            if (c.exists) chunks.push(c.data().d);
-          }
-          if (!chunks.length) return;
-          var parsed = JSON.parse(chunks.join(''));
-          if (!parsed.welds) return;
+  // 1. Listener na "weldbook_signal" - keď niekto urobí full import
+  var unsubSignal = db.collection('weldbook_signal').doc('latest').onSnapshot(function(doc) {
+    if (!doc.exists) return;
+    if (initialLoad) return; // ignoruj pri štarte
+    var data = doc.data();
+    if (data.by === myUser) return; // ignoruj vlastné signály
 
-          var iso = meta.isometric;
-          // Aktualizuj lokálne dáta
-          weldBookData = weldBookData.filter(function(r) { return (r.isometric || '') !== iso; });
-          weldBookData = weldBookData.concat(parsed.welds);
-          wbLocalBackup();
+    // Niekto iný nahral nový WeldBook - načítaj všetko znova
+    console.log('📡 WeldBook signal od:', data.by, '- reloading...');
+    showWbSyncNotification('🔄 ' + data.by + ' nahral nový WeldBook - načítavam...');
 
-          // Refresh grid
-          if (weldBookGrid && weldBookGrid.api) {
-            weldBookGrid.api.setGridOption('rowData', weldBookData);
-            populateWeldBookFilterDropdowns();
-          }
-          showWbSyncNotification(modifier + ' upravil: ' + iso);
-        } catch(e) { console.error('WB sync error:', e); }
-      })();
+    loadWeldBookFromStorage().then(function() {
+      if (weldBookGrid && weldBookGrid.api) {
+        weldBookGrid.api.setGridOption('rowData', weldBookData);
+        populateWeldBookFilterDropdowns();
+      }
+      showWbSyncNotification('✅ WeldBook aktualizovaný (' + weldBookData.length + ' zvarov)');
     });
   });
-  wbRealtimeListeners.push(unsub);
-  console.log('🔴 WeldBook realtime sync aktívny');
+  wbRealtimeListeners.push(unsubSignal);
+
+  // 2. Listener na jednotlivé zmeny (editácia buniek)
+  var unsubChanges = db.collection('weldbook').onSnapshot(function(snapshot) {
+    if (initialLoad) { initialLoad = false; return; } // prvý snapshot ignoruj
+
+    var changes = snapshot.docChanges().filter(function(ch) {
+      if (ch.type !== 'modified' && ch.type !== 'added') return false;
+      var modifier = ch.doc.data().modifiedBy || '';
+      return modifier !== myUser; // len cudzie zmeny
+    });
+
+    if (!changes.length) return;
+
+    // Načítaj zmenené izometrie paralelne
+    Promise.all(changes.map(async function(change) {
+      var meta = change.doc.data();
+      var docRef = change.doc.ref;
+      try {
+        var chunkPromises = [];
+        for (var ci = 0; ci < (meta.chunks||1); ci++) {
+          chunkPromises.push(docRef.collection('data').doc('c'+ci).get());
+        }
+        var chunkDocs = await Promise.all(chunkPromises);
+        var chunks = chunkDocs.filter(function(c) { return c.exists; }).map(function(c) { return c.data().d; });
+        if (!chunks.length) return null;
+        var parsed = JSON.parse(chunks.join(''));
+        return { iso: meta.isometric, welds: parsed.welds || [], modifier: meta.modifiedBy || '' };
+      } catch(e) { return null; }
+    })).then(function(results) {
+      var updated = false;
+      var modifiers = new Set();
+      results.filter(Boolean).forEach(function(r) {
+        weldBookData = weldBookData.filter(function(row) { return (row.isometric||'') !== r.iso; });
+        weldBookData = weldBookData.concat(r.welds);
+        modifiers.add(r.modifier);
+        updated = true;
+      });
+      if (updated) {
+        wbLocalBackup();
+        if (weldBookGrid && weldBookGrid.api) {
+          weldBookGrid.api.setGridOption('rowData', weldBookData);
+          populateWeldBookFilterDropdowns();
+        }
+        showWbSyncNotification(Array.from(modifiers).join(', ') + ' upravil WeldBook');
+      }
+    });
+  });
+  wbRealtimeListeners.push(unsubChanges);
+  console.log('🔴 WeldBook realtime sync aktívny (signal + changes)');
 }
 
 function stopWbRealtimeSync() {
@@ -9850,6 +9883,15 @@ function importAllPartsExcel() {
 
         document.body.removeChild(loadingDiv);
         document.body.removeChild(input);
+
+        // 📡 Pošli signal všetkým používateľom - načítajte znova WeldBook
+        if (db) {
+          db.collection('weldbook_signal').doc('latest').set({
+            by: window.currentUser ? window.currentUser.username : 'unknown',
+            at: new Date().toISOString(),
+            count: weldBookData.length
+          }).catch(function(){});
+        }
 
         const summary = sheetResults.map(r => r.name + ': +' + r.added + ' nových, ~' + r.updated + ' aktualizovaných').join('\n');
         alert('✅ Import VŠETKÝCH častí dokončený!\n\n' + summary + '\n\nSpolu pridaných: ' + totalAdded + '\nSpolu aktualizovaných: ' + totalUpdated + '\nPreskočených: ' + totalSkipped + '\n\nCelkom v WeldBook: ' + weldBookData.length + '\n🔥 Firebase: ' + savedCount + ' izometrií uložených');
