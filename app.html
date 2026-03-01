@@ -2797,8 +2797,8 @@ showNotification('✅ Číslo zvaru zmenené: '+oldNum+' → '+newNum.trim());
 };
 
 // ============= TOUCH SUPPORT PRE CANVAS =============
-// Logika: pohyb prstom = natívny scroll (#cw) = pan
-//         krátky tap = click = montáž modal / výber
+// Pan = natívny scroll cez #cw (touch-action: pan-x pan-y)
+// Tap = simulovaný click pre montáž modal
 var _tStartX = 0, _tStartY = 0, _tTime = 0, _tMoved = false;
 
 ca.addEventListener('touchstart', function(e) {
@@ -2808,23 +2808,30 @@ ca.addEventListener('touchstart', function(e) {
   _tStartY = t.clientY;
   _tTime = Date.now();
   _tMoved = false;
-  // Bez preventDefault - natívny scroll funguje pre pan
+  // BEZ mousedown dispatch - nechceme spustiť isPanning/isDragging
 }, { passive: true });
 
 ca.addEventListener('touchmove', function(e) {
+  if (e.touches.length < 1) return;
   var t = e.touches[0];
   if (Math.abs(t.clientX - _tStartX) > 8 || Math.abs(t.clientY - _tStartY) > 8) {
     _tMoved = true;
   }
-  // Bez preventDefault - nech #cw scrolluje = pan
 }, { passive: true });
 
 ca.addEventListener('touchend', function(e) {
-  if (_tMoved || Date.now() - _tTime > 400) return; // pohyb alebo dlhý hold = nie tap
+  // Pohyb alebo príliš dlhý hold = nie tap = pan/scroll
+  if (_tMoved || Date.now() - _tTime > 500) return;
   if (e.changedTouches.length !== 1) return;
   var t = e.changedTouches[0];
-  // Krátky tap - simuluj click pre montáž/výber
-  e.preventDefault();
+
+  e.preventDefault(); // Zabráň ghost click od prehliadača
+  // Resetuj drag state pred clickom aby justFinishedDrag nebolo true
+  justFinishedDrag = false;
+  isDragging = false;
+  isPanning = false;
+
+  // Simuluj čistý click
   var mc = new MouseEvent('click', {
     clientX: t.clientX, clientY: t.clientY,
     button: 0, bubbles: true, cancelable: true
