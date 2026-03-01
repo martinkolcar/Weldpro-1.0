@@ -9700,14 +9700,45 @@ async function _runComparison(selectedPart) {
         if (!chunks.length) continue;
         var parsed = JSON.parse(chunks.join(''));
 
-        // Zisti part z projectName
+        // Zisti part a izometriu z projectName
+        // Formáty: "DRY_PIPE ISOMETRIC,GN2-721-20064-1-15-25H1A" alebo "DRY_GN2-721-20064"
         var rawName = parsed.projectName || parsed.originalFileName || projDoc.id;
-        var split = splitIsometricName(rawName);
-        var partName = (split.part || '').toUpperCase().replace(/[^A-Z]/g,'').substring(0,5);
-        // Extrahuj číslo sheetu z názvu (napr. _Sheet2 → sheetNum=2)
-        var sheetMatch = (split.isometric || rawName).match(/_[Ss]heet(\d+)$/);
+
+        var partName = '';
+        var isoRaw = '';
+
+        if (rawName.includes(',')) {
+          // Formát s čiarkou: "DRY_PIPE ISOMETRIC,GN2-721-20064-1-15-25H1A_Sheet1"
+          var lastComma = rawName.lastIndexOf(',');
+          var beforeComma = rawName.substring(0, lastComma);
+          isoRaw = rawName.substring(lastComma + 1).trim();
+          // Part je prvé slovo pred _ alebo medzerou
+          var pm = beforeComma.match(/^([A-Za-z]{2,6})/);
+          partName = pm ? pm[1].toUpperCase() : '';
+        } else if (rawName.includes('_')) {
+          // Formát bez čiarky: "DRY_GN2-721-20064-1-15-25H1A_Sheet1"
+          var parts2 = rawName.split('_');
+          var pm2 = parts2[0].match(/^([A-Za-z]{2,6})$/);
+          if (pm2) {
+            partName = pm2[1].toUpperCase();
+            isoRaw = parts2.slice(1).join('_');
+          } else {
+            isoRaw = rawName;
+          }
+        } else {
+          isoRaw = rawName;
+        }
+
+        // Orez _Sheet1, _Sheet2 a zisti číslo sheetu
+        var sheetMatch = isoRaw.match(/_[Ss]heet(\d+)$/);
         var sheetNum = sheetMatch ? parseInt(sheetMatch[1]) : 1;
-        isoClean = (split.isometric || rawName).trim().replace(/_[Ss]heet\d+$/, '').trim();
+        isoClean = isoRaw.replace(/_[Ss]heet\d+$/, '').trim();
+
+        // Ak partName stále prázdny - skús zistiť z Doc ID
+        if (!partName) {
+          var docPm = projDoc.id.match(/^([A-Za-z]{2,6})_/);
+          if (docPm) partName = docPm[1].toUpperCase();
+        }
 
         // Len zvary patriace do selectedPart
         if (partName !== selectedPart) continue;
@@ -9738,29 +9769,26 @@ async function _runComparison(selectedPart) {
 
     setStatus('Porovnávam...');
 
-    // 4. Porovnaj
+    // 4. Porovnaj izometrie (nie jednotlivé zvary)
     // A) Izometrie v JSON ale NIE vo WeldBook
     var missingInWb = [];
     Object.entries(jsonIsos).forEach(function(e) {
       var iso = e[0], info = e[1];
       if (!wbIsos[iso]) {
-        missingInWb.push({ iso: iso, reason: 'Celá izometria chýba vo WeldBook', count: info.weldIds.size });
-        return;
-      }
-      var missingWelds = Array.from(info.weldIds).filter(function(id) { return !wbIsos[iso].has(id); });
-      if (missingWelds.length > 0) {
-        var displayIds = missingWelds.map(function(id) { return id.replace(/^\d+_/, ''); });
-        missingInWb.push({ iso: iso, reason: 'Chyba ' + missingWelds.length + ' zvarov: ' + displayIds.slice(0,8).join(', ') + (missingWelds.length > 8 ? '...' : ''), count: missingWelds.length });
+        missingInWb.push({ iso: iso, jsonWelds: info.weldIds.size, wbWelds: 0 });
       }
     });
 
-    // B) Izometrie vo WeldBook ale NIE v JSON (len pre info)
+    // B) Izometrie vo WeldBook ale NIE v JSON
     var missingJson = [];
     Object.keys(wbIsos).forEach(function(iso) {
       if (!jsonIsos[iso]) {
         missingJson.push({ iso: iso, count: wbIsos[iso].size });
       }
     });
+
+    // C) Izometrie ktoré sú v oboch - len pre info
+    var matched = Object.keys(jsonIsos).filter(function(iso) { return !!wbIsos[iso]; }).length;
 
     // Zavrieť loading
     document.body.removeChild(overlay);
@@ -9773,11 +9801,10 @@ async function _runComparison(selectedPart) {
     var jsonIsoCount = Object.keys(jsonIsos).length;
     var wbIsoCount = Object.keys(wbIsos).length;
 
-    var rowsA = missingInWb.sort(function(a,b){ return b.count-a.count; }).map(function(r) {
+    var rowsA = missingInWb.sort(function(a,b){ return a.iso.localeCompare(b.iso); }).map(function(r) {
       return '<tr style="border-bottom:1px solid #fee2e2;background:#fff5f5">'
         + '<td style="padding:7px 12px;font-size:13px;color:#111">' + r.iso + '</td>'
-        + '<td style="padding:7px 12px;font-size:12px;color:#dc2626;font-weight:700;text-align:center">' + r.count + '</td>'
-        + '<td style="padding:7px 12px;font-size:11px;color:#9ca3af">' + r.reason + '</td>'
+        + '<td style="padding:7px 12px;font-size:12px;color:#dc2626;font-weight:700;text-align:center">' + r.jsonWelds + '</td>'
         + '</tr>';
     }).join('');
 
@@ -9792,14 +9819,14 @@ async function _runComparison(selectedPart) {
     modal.innerHTML = '<div style="background:white;border-radius:14px;width:800px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4)">'
       + '<div style="padding:20px 24px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">'
       + '<div><h3 style="margin:0;font-size:18px">🔍 ' + selectedPart + ' - JSON vs WeldBook</h3>'
-      + '<div style="font-size:13px;color:#6b7280;margin-top:4px">JSON: <b>' + jsonIsoCount + '</b> izometrií &nbsp;|&nbsp; WeldBook: <b>' + wbIsoCount + '</b> izometrií</div></div>'
+      + '<div style="font-size:13px;color:#6b7280;margin-top:4px">JSON: <b>' + jsonIsoCount + '</b> izometrií &nbsp;|&nbsp; WeldBook: <b>' + wbIsoCount + '</b> izometrií &nbsp;|&nbsp; Zhoduje sa: <b>' + matched + '</b> &nbsp;|&nbsp; Chýba vo WB: <b style="color:#dc2626">' + missingInWb.length + '</b></div></div>'
       + '<button onclick="this.closest(\'div[style*=inset]\').remove()" style="padding:8px 16px;background:#6b7280;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px">✕ Zavrieť</button>'
       + '</div>'
       + '<div style="overflow-y:auto;padding:16px 24px">'
       + (missingInWb.length > 0
           ? '<h4 style="color:#dc2626;margin:0 0 8px">❌ V JSON ale NIE vo WeldBook (' + missingInWb.length + ' izometrií)</h4>'
           + '<p style="font-size:13px;color:#6b7280;margin:0 0 12px">Tieto izometrie/zvary máš v JSON výkrese ale chýbajú v Excel WeldBook. Treba doplniť Excel.</p>'
-          + '<table style="width:100%;border-collapse:collapse;margin-bottom:20px"><thead><tr style="background:#fef2f2"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#6b7280">Izometria</th><th style="padding:8px 12px;font-size:12px;color:#6b7280">Chýba</th><th style="padding:8px 12px;text-align:left;font-size:12px;color:#6b7280">Detail</th></tr></thead><tbody>' + rowsA + '</tbody></table>'
+          + '<table style="width:100%;border-collapse:collapse;margin-bottom:20px"><thead><tr style="background:#fef2f2"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#6b7280">Izometria (chýba vo WeldBook)</th><th style="padding:8px 12px;font-size:12px;color:#6b7280">Zvarov v JSON</th></tr></thead><tbody>' + rowsA + '</tbody></table>'
           : '<div style="padding:16px;background:#f0fdf4;border-radius:8px;color:#16a34a;font-weight:600;margin-bottom:20px">✅ Všetky JSON izometrie sú vo WeldBook</div>')
       + (missingJson.length > 0
           ? '<h4 style="color:#f59e0b;margin:0 0 8px">⚠️ Vo WeldBook ale BEZ JSON výkresu (' + missingJson.length + ' izometrií)</h4>'
