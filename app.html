@@ -56,7 +56,7 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 .btn-small{padding:8px 14px;font-size:12px;border-radius:6px}
 .upload-zone{border:3px dashed #cbd5e1;border-radius:4px;padding:80px 40px;text-align:center;background:#f8fafc;min-height:400px;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:all 0.3s}
 .upload-zone:hover{border-color:#667eea;background:#f0f4ff}
-.canvas-wrapper{position:relative;border:1px solid #e2e8f0;border-radius:4px;height:calc(100vh - 200px);background:#ffffff;overflow:auto;box-shadow:0 4px 20px rgba(0,0,0,0.05)}
+.canvas-wrapper{position:relative;border:1px solid #e2e8f0;border-radius:4px;height:calc(100vh - 200px);background:#ffffff;overflow:auto;box-shadow:0 4px 20px rgba(0,0,0,0.05);touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 #pdfCanvas{display:block;background:white;position:relative}
 #overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
 .canvas-inner{position:relative;display:inline-block}
@@ -2797,46 +2797,39 @@ showNotification('✅ Číslo zvaru zmenené: '+oldNum+' → '+newNum.trim());
 };
 
 // ============= TOUCH SUPPORT PRE CANVAS =============
-// Na mobile/tablete - mapuj touch eventy na mouse eventy
-var _touchStartX = 0, _touchStartY = 0, _touchMoved = false;
+// Logika: pohyb prstom = natívny scroll (#cw) = pan
+//         krátky tap = click = montáž modal / výber
+var _tStartX = 0, _tStartY = 0, _tTime = 0, _tMoved = false;
 
 ca.addEventListener('touchstart', function(e) {
   if (e.touches.length !== 1) return;
   var t = e.touches[0];
-  var rc = ca.getBoundingClientRect();
-  _touchStartX = t.clientX;
-  _touchStartY = t.clientY;
-  _touchMoved = false;
-  // Simuluj mousedown
-  var me = new MouseEvent('mousedown', { clientX: t.clientX, clientY: t.clientY, button: 0, bubbles: true });
-  ca.dispatchEvent(me);
-  e.preventDefault();
-}, { passive: false });
+  _tStartX = t.clientX;
+  _tStartY = t.clientY;
+  _tTime = Date.now();
+  _tMoved = false;
+  // Bez preventDefault - natívny scroll funguje pre pan
+}, { passive: true });
 
 ca.addEventListener('touchmove', function(e) {
-  if (e.touches.length !== 1) return;
   var t = e.touches[0];
-  var dx = Math.abs(t.clientX - _touchStartX);
-  var dy = Math.abs(t.clientY - _touchStartY);
-  if (dx > 5 || dy > 5) _touchMoved = true;
-  // Simuluj mousemove
-  var me = new MouseEvent('mousemove', { clientX: t.clientX, clientY: t.clientY, bubbles: true });
-  ca.dispatchEvent(me);
-  e.preventDefault();
-}, { passive: false });
+  if (Math.abs(t.clientX - _tStartX) > 8 || Math.abs(t.clientY - _tStartY) > 8) {
+    _tMoved = true;
+  }
+  // Bez preventDefault - nech #cw scrolluje = pan
+}, { passive: true });
 
 ca.addEventListener('touchend', function(e) {
+  if (_tMoved || Date.now() - _tTime > 400) return; // pohyb alebo dlhý hold = nie tap
   if (e.changedTouches.length !== 1) return;
   var t = e.changedTouches[0];
-  // Simuluj mouseup
-  var mu = new MouseEvent('mouseup', { clientX: t.clientX, clientY: t.clientY, button: 0, bubbles: true });
-  ca.dispatchEvent(mu);
-  // Simuluj click len ak sa neposúvalo (nie scroll)
-  if (!_touchMoved) {
-    var mc = new MouseEvent('click', { clientX: t.clientX, clientY: t.clientY, button: 0, bubbles: true });
-    ca.dispatchEvent(mc);
-  }
+  // Krátky tap - simuluj click pre montáž/výber
   e.preventDefault();
+  var mc = new MouseEvent('click', {
+    clientX: t.clientX, clientY: t.clientY,
+    button: 0, bubbles: true, cancelable: true
+  });
+  ca.dispatchEvent(mc);
 }, { passive: false });
 
 ca.oncontextmenu=function(e){
