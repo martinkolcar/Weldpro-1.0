@@ -80,6 +80,15 @@ body {
 
 
 /* ===== KNIZNICA ===== */
+.part-tab {
+  padding: 6px 14px; border: 1.5px solid #d1d5db; border-radius: 20px;
+  background: white; font-size: 13px; font-weight: 600; cursor: pointer;
+  white-space: nowrap; touch-action: manipulation; color: #374151;
+  flex-shrink: 0;
+}
+.part-tab.active { background: var(--blue); border-color: var(--blue); color: white; }
+
+/* ===== KNIZNICA ===== */
 .search-bar {
   padding: 12px 16px;
   background: white;
@@ -289,6 +298,15 @@ canvas#mca { display: block; }
 <div class="page active" id="kniznicaPage">
   <div class="search-bar">
     <input class="search-input" id="kSearch" placeholder="🔍 Hľadaj výkres..." oninput="filterProjects()">
+    <div style="display:flex;gap:6px;margin-top:8px;overflow-x:auto;padding-bottom:2px">
+      <button class="part-tab" onclick="selectPart('')" id="ptAll">Všetky</button>
+      <button class="part-tab active" onclick="selectPart('SUL')" id="ptSUL">SUL</button>
+      <button class="part-tab" onclick="selectPart('LIG')" id="ptLIG">LIG</button>
+      <button class="part-tab" onclick="selectPart('DRY')" id="ptDRY">DRY</button>
+      <button class="part-tab" onclick="selectPart('FLA')" id="ptFLA">FLA</button>
+      <button class="part-tab" onclick="selectPart('LHT')" id="ptLHT">LHT</button>
+    </div>
+    <div id="kCount" style="font-size:12px;color:#6b7280;margin-top:4px"></div>
   </div>
   <div id="kList"><div class="empty"><div class="empty-icon">📚</div><div class="empty-text">Načítavam projekty...</div></div></div>
 </div>
@@ -413,46 +431,10 @@ canvas#mca { display: block; }
 <div class="toast" id="toast"></div>
 <div class="loading" id="loading"><div class="spinner"></div><div class="loading-text" id="loadingText">Načítavam...</div></div>
 
-<!-- FIREBASE - načíta sa dynamicky s fallback CDN -->
-<script>
-(function() {
-  var cdns = [
-    'https://www.gstatic.com/firebasejs/9.22.0/',
-    'https://unpkg.com/firebase@9.22.0/',
-    'https://cdn.jsdelivr.net/npm/firebase@9.22.0/'
-  ];
-  var libs = [
-    'firebase-app-compat.js',
-    'firebase-firestore-compat.js', 
-    'firebase-auth-compat.js'
-  ];
-  var cdnIdx = 0;
-  
-  function tryLoadAll(cdn) {
-    var loaded = 0;
-    var failed = false;
-    libs.forEach(function(lib) {
-      var s = document.createElement('script');
-      s.src = cdn + lib;
-      s.onerror = function() {
-        if (failed) return;
-        failed = true;
-        cdnIdx++;
-        if (cdnIdx < cdns.length) {
-          console.log('CDN failed, trying:', cdns[cdnIdx]);
-          tryLoadAll(cdns[cdnIdx]);
-        }
-      };
-      s.onload = function() {
-        loaded++;
-        if (loaded === libs.length) console.log('Firebase SDK loaded from:', cdn);
-      };
-      document.head.appendChild(s);
-    });
-  }
-  tryLoadAll(cdns[cdnIdx]);
-})();
-</script>
+<!-- FIREBASE - sekvenčné načítanie (app → firestore → auth) -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 
 <script>
 // ===== FIREBASE =====
@@ -479,19 +461,9 @@ function showError(msg) {
 }
 
 async function initFirebase() {
-  // Čakaj až 15 sekúnd na Firebase SDK
-  let attempts = 0;
-  while (typeof firebase === 'undefined' && attempts < 150) {
-    await new Promise(r => setTimeout(r, 100));
-    attempts++;
-  }
   if (typeof firebase === 'undefined') {
-    // Skús dynamicky načítať Firebase
-    try {
-      await loadScript('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
-      await loadScript('https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js');
-      await loadScript('https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js');
-    } catch(e) { console.error('Firebase SDK failed to load!'); showError('Chyba: Firebase sa nenačítal. Skontroluj internet.'); return false; }
+    showError('Firebase SDK sa nenačítal. Skontroluj pripojenie na internet a obnov stránku.');
+    return false;
   }
   try {
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
@@ -607,52 +579,84 @@ function switchPage(page) {
 }
 
 // ===== KNIZNICA =====
+let selectedPart = 'SUL'; // Default - načítaj len SUL
+
 async function loadProjects() {
-  showLoading('Načítavam projekty...');
+  const el = document.getElementById('kList');
+  el.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><div class="empty-text">Načítavam ' + (selectedPart||'všetky') + '...</div></div>';
   try {
-    const snap = await db.collection('projects').get();
+    let query = db.collection('projects');
+    // Filtruj podľa časti ak je vybraná - Firebase query namiesto load all
+    if (selectedPart) {
+      query = query.where('part', '==', selectedPart);
+    }
+    const snap = await query.get();
     allProjects = [];
     for (const doc of snap.docs) {
       if (doc.id === 'weldbook_main' || doc.id.startsWith('_')) continue;
       const meta = doc.data();
-      allProjects.push({ id: doc.id, meta, _docRef: doc.ref });
+      // Ak part nie je v metadatach, zisti z ID
+      if (!meta.part) meta.part = getPart(doc.id);
+      allProjects.push({ id: doc.id, meta });
     }
-    renderProjects(allProjects);
-  } catch(e) { showToast('❌ Chyba: ' + e.message); }
-  hideLoading();
+    allProjects.sort((a,b) => a.id.localeCompare(b.id));
+    filterProjects();
+  } catch(e) { 
+    showToast('❌ Chyba: ' + e.message); 
+    el.innerHTML = '<div class="empty"><div class="empty-icon">❌</div><div class="empty-text">'+e.message+'</div></div>';
+  }
 }
 
 function getPart(name) {
   if (!name) return 'other';
   const m = name.match(/^([A-Z]{2,6})[_,]/);
   if (m) return m[1];
-  return 'other';
+  // Skús aj bez oddelovača
+  const m2 = name.match(/^(SUL|LIG|DRY|FLA|LHT)/);
+  return m2 ? m2[1] : 'other';
 }
 
-function renderProjects(list) {
-  const el = document.getElementById('kList');
-  if (!list.length) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">Žiadne projekty</div></div>';
-    return;
-  }
-  el.innerHTML = list.map(p => {
-    const part = getPart(p.id);
-    const weldCount = p.meta.count || '?';
-    return `<div class="project-card" onclick="openProject('${p.id}')">
-      <div class="project-icon">📐</div>
-      <div class="project-info">
-        <div class="project-name">${p.id.replace(/_/g,' ')}</div>
-        <div class="project-meta">${weldCount} zvarov · ${p.meta.date ? p.meta.date.substring(0,10) : ''}</div>
-      </div>
-      <span class="project-part part-${part}">${part}</span>
-    </div>`;
-  }).join('');
+function selectPart(part) {
+  selectedPart = part;
+  document.querySelectorAll('.part-tab').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('pt' + (part || 'All'));
+  if (btn) btn.classList.add('active');
+  allProjects = []; // Reset - načítaj z Firebase pre túto časť
+  loadProjects();
 }
 
 function filterProjects() {
-  const q = document.getElementById('kSearch').value.toLowerCase();
-  const filtered = allProjects.filter(p => p.id.toLowerCase().includes(q));
-  renderProjects(filtered);
+  const q = document.getElementById('kSearch').value.toLowerCase().trim();
+  let filtered = allProjects.filter(p => {
+    if (selectedPart && getPart(p.id) !== selectedPart) return false;
+    if (q && !p.id.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const el = document.getElementById('kList');
+  const countEl = document.getElementById('kCount');
+  if (countEl) countEl.textContent = filtered.length + ' výkresov' + (selectedPart ? ' (' + selectedPart + ')' : '');
+
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">Žiadne výkresy</div><div class="empty-sub">' + (selectedPart ? 'Pre časť ' + selectedPart : '') + '</div></div>';
+    return;
+  }
+
+  // Render po 50 naraz pre rýchlosť
+  el.innerHTML = filtered.slice(0, 50).map(p => {
+    const part = getPart(p.id);
+    const weldCount = p.meta.count || '?';
+    // Skráť dlhý názov
+    const shortName = p.id.replace(/^(SUL|LIG|DRY|FLA|LHT)[_,]?/,'').replace(/_/g,' ').replace(/PIPE ISOMETRIC,?/i,'');
+    return `<div class="project-card" onclick="openProject('${p.id}')">
+      <div class="project-icon">📐</div>
+      <div class="project-info">
+        <div class="project-name">${shortName}</div>
+        <div class="project-meta">${weldCount} zvarov</div>
+      </div>
+      <span class="project-part part-${part}">${part}</span>
+    </div>`;
+  }).join('') + (filtered.length > 50 ? `<div style="text-align:center;padding:16px;color:#6b7280;font-size:13px">+ ${filtered.length-50} ďalších... Použite filter</div>` : '');
 }
 
 async function openProject(projId) {
