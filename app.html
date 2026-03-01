@@ -9379,13 +9379,17 @@ function startWbRealtimeSync() {
   wbRealtimeListeners = [];
 
   var myUser = window.currentUser ? window.currentUser.username : '';
-  var initialLoad = true; // ignoruj prvý snapshot (sú to naše vlastné dáta)
+  var initialLoad = true;
+  // Po 3 sekundách vždy zruš initialLoad - aby signal fungoval aj keď weldbook_main nedal snapshot
+  setTimeout(function() { initialLoad = false; }, 3000);
 
   // 1. Listener na "weldbook_signal" - keď niekto urobí full import
   var unsubSignal = db.collection('weldbook_signal').doc('latest').onSnapshot(function(doc) {
     if (!doc.exists) return;
     if (initialLoad) return; // ignoruj pri štarte
     var data = doc.data();
+    var signalAge = Date.now() - (data.at ? new Date(data.at).getTime() : 0);
+    if (signalAge > 60000) return; // ignoruj staré signály (>1 min)
     if (data.by === myUser) return; // ignoruj vlastné signály
 
     // Niekto iný nahral nový WeldBook - načítaj všetko znova
