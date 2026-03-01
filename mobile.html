@@ -676,7 +676,7 @@ async function openProject(projId) {
       name: projId,
       originalFileName: parsed.projectName || projId,
       welds: parsed.welds || [],
-      image: parsed.image || null
+      image: parsed.pdfData || null
     };
     // Max weld counter
     weldCounter = Math.max(1, ...currentProject.welds.map(w => parseInt(w.displayNum)||0)) + 1;
@@ -716,17 +716,22 @@ function mGetWbEntry(weld) {
 function mDraw() {
   if (!mca) return;
   const wrap = document.getElementById('mCanvasWrap');
-  mca.width = wrap.clientWidth || window.innerWidth;
-  mca.height = wrap.clientHeight || (window.innerHeight - 56 - 64 - 38 - 40);
+
+  // Canvas = veľkosť obrázka (rovnako ako v app.html)
+  // Scrollovanie zabezpečí #mCanvasWrap
+  const imgW = mImg ? mImg.naturalWidth : (wrap.clientWidth || window.innerWidth);
+  const imgH = mImg ? mImg.naturalHeight : (wrap.clientHeight || 600);
+  mca.width = Math.round(imgW * mScale);
+  mca.height = Math.round(imgH * mScale);
 
   mctx.clearRect(0, 0, mca.width, mca.height);
   mctx.save();
-  mctx.translate(mOffX, mOffY);
   mctx.scale(mScale, mScale);
 
   // Background image
   if (mImg) {
-    mctx.drawImage(mImg, 0, 0, mca.width / mScale, mca.height / mScale);
+    // Nakresli obrázok v jeho skutočnej veľkosti (zvary sú normalizované voči nej)
+    mctx.drawImage(mImg, 0, 0, mImg.naturalWidth, mImg.naturalHeight);
   } else {
     mctx.fillStyle = '#f8fafc';
     mctx.fillRect(0, 0, mca.width / mScale, mca.height / mScale);
@@ -740,8 +745,8 @@ function mDraw() {
 
   // Draw welds
   if (currentProject) {
-    const W = mca.width / mScale;
-    const H = mca.height / mScale;
+    const W = mImg ? mImg.naturalWidth : mca.width / mScale;
+    const H = mImg ? mImg.naturalHeight : mca.height / mScale;
     currentProject.welds.forEach(w => {
       const ex = w.end.x * W;
       const ey = w.end.y * H;
@@ -777,8 +782,10 @@ function mDraw() {
 
     // New weld pt1 indicator
     if (newWeldPt1 && montazMode === 'new') {
-      const px = newWeldPt1.x * W;
-      const py = newWeldPt1.y * H;
+      const W2 = mImg ? mImg.naturalWidth : mca.width / mScale;
+      const H2 = mImg ? mImg.naturalHeight : mca.height / mScale;
+      const px = newWeldPt1.x * W2;
+      const py = newWeldPt1.y * H2;
       mctx.beginPath();
       mctx.arc(px, py, 8, 0, Math.PI * 2);
       mctx.fillStyle = '#3b82f6';
@@ -791,8 +798,17 @@ function mDraw() {
 function mZoomIn() { mScale = Math.min(mScale * 1.3, 8); mDraw(); }
 function mZoomOut() { mScale = Math.max(mScale / 1.3, 0.3); mDraw(); }
 function mZoomFit() {
-  mScale = 1; mOffX = 0; mOffY = 0;
+  if (mImg) {
+    const wrap = document.getElementById('mCanvasWrap');
+    const scaleX = wrap.clientWidth / mImg.naturalWidth;
+    mScale = Math.min(scaleX, 1.5); // Fit width, max 1.5x
+  } else {
+    mScale = 1;
+  }
   mDraw();
+  // Scroll to top
+  const wrap = document.getElementById('mCanvasWrap');
+  wrap.scrollTop = 0; wrap.scrollLeft = 0;
 }
 
 function setMontazMode(mode) {
@@ -883,11 +899,11 @@ function handleCanvasTap(clientX, clientY) {
   const rect = mca.getBoundingClientRect();
   const rawX = clientX - rect.left;
   const rawY = clientY - rect.top;
-  // Transform to canvas coords
-  const canvasX = (rawX - mOffX) / mScale;
-  const canvasY = (rawY - mOffY) / mScale;
-  const W = mca.width / mScale;
-  const H = mca.height / mScale;
+  // Canvas coords (canvas je už mScale-ovaný takže delíme mScale)
+  const canvasX = rawX / mScale;
+  const canvasY = rawY / mScale;
+  const W = mImg ? mImg.naturalWidth : mca.width / mScale;
+  const H = mImg ? mImg.naturalHeight : mca.height / mScale;
 
   if (montazMode === 'select') {
     // Find tapped weld (radius 40px in screen coords = 40/mScale in canvas coords)
