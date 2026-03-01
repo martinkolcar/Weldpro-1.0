@@ -303,17 +303,20 @@ background: #dc2626;
   position: fixed;
   top: 15px;
   left: 15px;
-  width: 50px;
-  height: 50px;
+  width: 54px;
+  height: 54px;
   background: #0078D4;
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 24px;
+  border-radius: 10px;
+  font-size: 26px;
   z-index: 10001;
   cursor: pointer;
   align-items: center;
   justify-content: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(0,0,0,0.2);
+  box-shadow: 0 4px 12px rgba(0,120,212,0.4);
 }
 
 /* Hamburger menu panel */
@@ -368,6 +371,9 @@ background: #dc2626;
 }
 
 .mobile-menu-item:active {
+  background: #dbeafe;
+}
+.mobile-menu-item:hover {
   background: #f3f4f6;
 }
 
@@ -676,6 +682,54 @@ async function initFirebase() {
 
 // Spusti inicializáciu hneď
 initFirebase();
+
+// ============= MOBILE MENU =============
+function toggleMobileMenu() {
+  var menu = document.getElementById('mobileMenu');
+  var overlay = document.querySelector('.mobile-overlay');
+  if (!menu) return;
+  var isOpen = menu.classList.contains('show');
+  if (isOpen) {
+    menu.classList.remove('show');
+    if (overlay) overlay.classList.remove('show');
+  } else {
+    menu.classList.add('show');
+    if (overlay) overlay.classList.add('show');
+  }
+}
+
+function mobileMenuAction(action) {
+  toggleMobileMenu(); // Zavrieť menu
+  // Krátky delay aby sa menu zavrel pred akciou
+  setTimeout(function() {
+    switch(action) {
+      case 'library':       openLibraryManagerReal(); break;
+      case 'libraryOnline': openLibrary(); break;
+      case 'upload':
+        var inp = document.createElement('input');
+        inp.type = 'file'; inp.accept = '.pdf,.json';
+        inp.onchange = function(e) {
+          var file = e.target.files[0];
+          if (!file) return;
+          if (file.name.endsWith('.json')) loadFromJSON({target: {files: [file]}});
+          else handlePDFUpload(e);
+        };
+        inp.click();
+        break;
+      case 'redpen':        switchRibbonTab('redpen'); break;
+      case 'weldlogPanel':  toggleWeldLog(); break;
+      case 'weldbook':      openWeldBook(); break;
+      case 'prefab':        switchRibbonTab('prefab'); break;
+      case 'vyroba':        switchRibbonTab('vyroba'); break;
+      case 'kontrola':      switchRibbonTab('kontrola'); break;
+      case 'montaz':        switchRibbonTab('montaz'); break;
+      case 'mto':           openMTO(); break;
+      case 'progres':       switchRibbonTab('progres'); break;
+      case 'export':        switchRibbonTab('export'); break;
+      case 'notifications': document.getElementById('notifPanel') && document.getElementById('notifPanel').click(); break;
+    }
+  }, 150);
+}
 
 async function uploadProjectToFirebase(projectData) {
   if (!db) throw new Error('Firebase not ready');
