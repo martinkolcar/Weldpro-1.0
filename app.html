@@ -9620,22 +9620,77 @@ function clearLocalStorageWeldBook() {
 }
 
 async function compareJsonVsWeldBook() {
-  if (!db) { alert('Firebase nie je dostupný'); return; }
+  if (!db) { alert('Firebase nie je dostupny'); return; }
 
-  var loadingDiv = document.createElement('div');
-  loadingDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:30px 40px;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.4);z-index:99999;text-align:center;font-size:15px;min-width:340px';
-  loadingDiv.innerHTML = '<div style="font-size:32px">🔍</div><div id="cmpStatus">Načítavam projekty z Firebase...</div>';
-  document.body.appendChild(loadingDiv);
+  // Dialóg pre výber časti
+  var partDialog = document.createElement('div');
+  partDialog.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;justify-content:center';
+  partDialog.innerHTML = `
+    <div style="background:white;border-radius:14px;padding:32px 40px;min-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.4)">
+      <h3 style="margin:0 0 8px;color:#111827;font-size:20px">🔍 JSON vs WeldBook</h3>
+      <p style="color:#6b7280;font-size:14px;margin:0 0 24px">Vyber časť ktorú chceš porovnať</p>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px">
+        ${['SUL','LIG','DRY','FLA','LHT'].map(p =>
+          `<label style="display:flex;align-items:center;gap:12px;padding:12px 16px;border:2px solid #e5e7eb;border-radius:8px;cursor:pointer;font-weight:600;font-size:15px;transition:border-color 0.2s" onclick="this.style.borderColor='#3b82f6';this.querySelector('input').checked=true;document.querySelectorAll('.partRadio').forEach(function(r){if(r!==this.querySelector('input'))r.closest('label').style.borderColor='#e5e7eb';})">
+            <input type="radio" name="cmpPart" class="partRadio" value="${p}" style="width:18px;height:18px"> ${p}
+          </label>`
+        ).join('')}
+      </div>
+      <div style="display:flex;gap:10px">
+        <button onclick="document.body.removeChild(this.closest('div[style*=fixed]'))" style="flex:1;padding:12px;background:#f3f4f6;border:none;border-radius:8px;cursor:pointer;font-size:15px">Zrušiť</button>
+        <button id="btnStartCmp" style="flex:2;padding:12px;background:#1d4ed8;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:15px">Porovnať →</button>
+      </div>
+    </div>`;
+  document.body.appendChild(partDialog);
+
+  // Po kliknutí Porovnať
+  document.getElementById('btnStartCmp').onclick = async function() {
+    var checked = partDialog.querySelector('input[name="cmpPart"]:checked');
+    if (!checked) { alert('Vyber časť!'); return; }
+    var selectedPart = checked.value;
+    document.body.removeChild(partDialog);
+    await _runComparison(selectedPart);
+  };
+}
+
+async function _runComparison(selectedPart) {
+  // Loading overlay
+  var overlay = document.createElement('div');
+  overlay.id = 'cmpOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99998';
+  var box = document.createElement('div');
+  box.id = 'cmpBox';
+  box.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:32px 40px;border-radius:12px;z-index:99999;text-align:center;font-size:15px;min-width:380px';
+  box.innerHTML = '<div style="font-size:36px;margin-bottom:12px">🔍</div><div id="cmpStatus" style="color:#374151;font-weight:600">Načítavam...</div><div id="cmpProg" style="margin-top:8px;color:#9ca3af;font-size:12px"></div>';
+  document.body.appendChild(overlay);
+  document.body.appendChild(box);
+
+  function setStatus(msg, sub) {
+    var el = document.getElementById('cmpStatus');
+    var el2 = document.getElementById('cmpProg');
+    if (el) el.textContent = msg;
+    if (el2 && sub !== undefined) el2.textContent = sub;
+  }
 
   try {
-    // Zozbieraj všetky zvary z JSON projektov
+    // 1. Načítaj VŠETKY projekty z Firebase
+    setStatus('Načítavam projekty z Firebase...');
     var projSnap = await db.collection('projects').get();
-    var jsonWelds = {}; // key: isometric|weldId → true
+    var allDocs = projSnap.docs.filter(function(d) {
+      return d.id !== 'weldbook_main' && !d.id.startsWith('_');
+    });
 
+    // 2. Pre každý projekt zisti či patrí do selectedPart
+    //    projektName = "SUL_PIPE ISOMETRIC,ÅF-712-20019-22-150-10C1B"
+    //    → part = "SUL", isometric = "ÅF-712-20019-22-150-10C1B"
+    var jsonIsos = {}; // iso → { weldIds: Set }
     var processed = 0;
-    for (var projDoc of projSnap.docs) {
+
+    for (var projDoc of allDocs) {
       var meta = projDoc.data();
-      document.getElementById('cmpStatus').textContent = 'Načítavam projekt ' + (++processed) + ' / ' + projSnap.docs.length;
+      processed++;
+      setStatus('Projekt ' + processed + ' / ' + allDocs.length, projDoc.id.substring(0,50));
+
       try {
         var chunks = [];
         for (var ci = 0; ci < (meta.chunks||1); ci++) {
@@ -9644,82 +9699,115 @@ async function compareJsonVsWeldBook() {
         }
         if (!chunks.length) continue;
         var parsed = JSON.parse(chunks.join(''));
-        // Zvary sú v parsed.welds array
+
+        // Zisti part z projectName
+        var rawName = parsed.projectName || parsed.originalFileName || projDoc.id;
+        var split = splitIsometricName(rawName);
+        var partName = (split.part || '').toUpperCase().replace(/[^A-Z]/g,'').substring(0,5);
+        var isoClean = (split.isometric || rawName).trim();
+
+        // Len zvary patriace do selectedPart
+        if (partName !== selectedPart) continue;
+        if (!isoClean) continue;
+
+        if (!jsonIsos[isoClean]) jsonIsos[isoClean] = { weldIds: new Set() };
         if (parsed.welds && Array.isArray(parsed.welds)) {
           parsed.welds.forEach(function(w) {
-            var iso = parsed.projectName || '';
-            // Parsuj isometric z projectName (napr. "SUL_PIPE ISOMETRIC,KF-712-20002-4-25-10H1A")
-            var splitResult = splitIsometricName(iso);
-            var isoClean = splitResult.isometric || iso;
-            var key = isoClean + '|' + String(w.displayNum || w.weldId || '');
-            if (key !== '|') jsonWelds[key] = { iso: isoClean, weldId: w.displayNum || w.weldId, project: projDoc.id };
+            var wid = String(w.displayNum || w.num || w.weldId || '').trim();
+            if (wid) jsonIsos[isoClean].weldIds.add(wid);
           });
         }
-      } catch(e) {}
+      } catch(e) { /* skip */ }
     }
 
-    document.getElementById('cmpStatus').textContent = 'Porovnávam...';
-
-    // Zozbieraj všetky zvary z WeldBook
-    var wbWelds = {};
+    // 3. WeldBook pre selectedPart
+    var wbIsos = {};
     weldBookData.forEach(function(row) {
-      var key = (row.isometric||'') + '|' + String(row.weldId||'');
-      wbWelds[key] = true;
+      if ((row.part||'').toUpperCase() !== selectedPart) return;
+      var iso = (row.isometric||'').trim();
+      var wid = String(row.weldId||'').trim();
+      if (!iso) return;
+      if (!wbIsos[iso]) wbIsos[iso] = new Set();
+      if (wid) wbIsos[iso].add(wid);
     });
 
-    // Nájdi chýbajúce vo WeldBook
-    var missing = [];
-    Object.entries(jsonWelds).forEach(function(entry) {
-      var key = entry[0], info = entry[1];
-      if (!wbWelds[key]) {
-        missing.push(info);
+    setStatus('Porovnávam...');
+
+    // 4. Porovnaj
+    // A) Izometrie v JSON ale NIE vo WeldBook
+    var missingInWb = [];
+    Object.entries(jsonIsos).forEach(function(e) {
+      var iso = e[0], info = e[1];
+      if (!wbIsos[iso]) {
+        missingInWb.push({ iso: iso, reason: 'Celá izometria chýba vo WeldBook', count: info.weldIds.size });
+        return;
+      }
+      var missingWelds = Array.from(info.weldIds).filter(function(id) { return !wbIsos[iso].has(id); });
+      if (missingWelds.length > 0) {
+        missingInWb.push({ iso: iso, reason: 'Chýba ' + missingWelds.length + ' zvarov: ' + missingWelds.slice(0,8).join(', ') + (missingWelds.length > 8 ? '...' : ''), count: missingWelds.length });
       }
     });
 
-    document.body.removeChild(loadingDiv);
-
-    if (missing.length === 0) {
-      alert('Vsetky zvary z JSON projektov su vo WeldBooku! JSON: ' + Object.keys(jsonWelds).length + ' zvarov, WeldBook: ' + weldBookData.length + ' zvarov');
-
-      return;
-    }
-
-    // Zobraz výsledky v modálnom okne
-    var resultModal = document.createElement('div');
-    resultModal.id = 'cmpModal';
-    resultModal.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.4);z-index:99999;width:700px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;overflow:hidden';
-
-    // Zosumarizuj po izometriách
-    var byIso = {};
-    missing.forEach(function(m) {
-      if (!byIso[m.iso]) byIso[m.iso] = { welds: [], project: m.project };
-      byIso[m.iso].welds.push(m.weldId);
+    // B) Izometrie vo WeldBook ale NIE v JSON (len pre info)
+    var missingJson = [];
+    Object.keys(wbIsos).forEach(function(iso) {
+      if (!jsonIsos[iso]) {
+        missingJson.push({ iso: iso, count: wbIsos[iso].size });
+      }
     });
 
-    var rows = Object.entries(byIso).map(function(e) {
-      return '<tr style="border-bottom:1px solid #e5e7eb">'
-        + '<td style="padding:8px 12px;font-size:13px;color:#374151">' + e[0] + '</td>'
-        + '<td style="padding:8px 12px;font-size:13px;text-align:center;color:#dc2626;font-weight:700">' + e[1].welds.length + '</td>'
-        + '<td style="padding:8px 12px;font-size:12px;color:#6b7280">' + e[1].welds.slice(0,10).join(', ') + (e[1].welds.length > 10 ? '...' : '') + '</td>'
+    // Zavrieť loading
+    document.body.removeChild(overlay);
+    document.body.removeChild(box);
+
+    // 5. Zobraz výsledky
+    var modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center';
+
+    var jsonIsoCount = Object.keys(jsonIsos).length;
+    var wbIsoCount = Object.keys(wbIsos).length;
+
+    var rowsA = missingInWb.sort(function(a,b){ return b.count-a.count; }).map(function(r) {
+      return '<tr style="border-bottom:1px solid #fee2e2;background:#fff5f5">'
+        + '<td style="padding:7px 12px;font-size:13px;color:#111">' + r.iso + '</td>'
+        + '<td style="padding:7px 12px;font-size:12px;color:#dc2626;font-weight:700;text-align:center">' + r.count + '</td>'
+        + '<td style="padding:7px 12px;font-size:11px;color:#9ca3af">' + r.reason + '</td>'
         + '</tr>';
     }).join('');
 
-    resultModal.innerHTML = '<div style="padding:20px 24px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">'
-      + '<h3 style="margin:0;color:#dc2626">⚠️ Chýba vo WeldBook: ' + missing.length + ' zvarov</h3>'
-      + '<button onclick="document.getElementById(\'cmpModal\').remove()" style="padding:6px 14px;background:#6b7280;color:white;border:none;border-radius:5px;cursor:pointer">&#x2715; Zavriet</button>'
+    var rowsB = missingJson.sort(function(a,b){ return b.count-a.count; }).map(function(r) {
+      return '<tr style="border-bottom:1px solid #e5e7eb">'
+        + '<td style="padding:7px 12px;font-size:13px;color:#111">' + r.iso + '</td>'
+        + '<td style="padding:7px 12px;font-size:12px;color:#f59e0b;font-weight:700;text-align:center">' + r.count + '</td>'
+        + '<td style="padding:7px 12px;font-size:11px;color:#9ca3af">Má Excel, nemá JSON výkres</td>'
+        + '</tr>';
+    }).join('');
+
+    modal.innerHTML = '<div style="background:white;border-radius:14px;width:800px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4)">'
+      + '<div style="padding:20px 24px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">'
+      + '<div><h3 style="margin:0;font-size:18px">🔍 ' + selectedPart + ' - JSON vs WeldBook</h3>'
+      + '<div style="font-size:13px;color:#6b7280;margin-top:4px">JSON: <b>' + jsonIsoCount + '</b> izometrií &nbsp;|&nbsp; WeldBook: <b>' + wbIsoCount + '</b> izometrií</div></div>'
+      + '<button onclick="this.closest(\'div[style*=inset]\').remove()" style="padding:8px 16px;background:#6b7280;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px">✕ Zavrieť</button>'
       + '</div>'
-      + '<div style="padding:16px 24px;overflow-y:auto;flex:1">'
-      + '<p style="color:#6b7280;font-size:13px;margin-bottom:12px">Tieto zvary sú v JSON projektoch ale NIE sú vo WeldBooku. Treba ich doplniť cez Excel import.</p>'
-      + '<table style="width:100%;border-collapse:collapse">'
-      + '<thead><tr style="background:#f9fafb"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#6b7280">Izometria</th><th style="padding:8px 12px;font-size:12px;color:#6b7280">Chýba zvarov</th><th style="padding:8px 12px;text-align:left;font-size:12px;color:#6b7280">Weld ID</th></tr></thead>'
-      + '<tbody>' + rows + '</tbody>'
-      + '</table>'
-      + '</div>';
-    document.body.appendChild(resultModal);
+      + '<div style="overflow-y:auto;padding:16px 24px">'
+      + (missingInWb.length > 0
+          ? '<h4 style="color:#dc2626;margin:0 0 8px">❌ V JSON ale NIE vo WeldBook (' + missingInWb.length + ' izometrií)</h4>'
+          + '<p style="font-size:13px;color:#6b7280;margin:0 0 12px">Tieto izometrie/zvary máš v JSON výkrese ale chýbajú v Excel WeldBook. Treba doplniť Excel.</p>'
+          + '<table style="width:100%;border-collapse:collapse;margin-bottom:20px"><thead><tr style="background:#fef2f2"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#6b7280">Izometria</th><th style="padding:8px 12px;font-size:12px;color:#6b7280">Chýba</th><th style="padding:8px 12px;text-align:left;font-size:12px;color:#6b7280">Detail</th></tr></thead><tbody>' + rowsA + '</tbody></table>'
+          : '<div style="padding:16px;background:#f0fdf4;border-radius:8px;color:#16a34a;font-weight:600;margin-bottom:20px">✅ Všetky JSON izometrie sú vo WeldBook</div>')
+      + (missingJson.length > 0
+          ? '<h4 style="color:#f59e0b;margin:0 0 8px">⚠️ Vo WeldBook ale BEZ JSON výkresu (' + missingJson.length + ' izometrií)</h4>'
+          + '<p style="font-size:13px;color:#6b7280;margin:0 0 12px">Tieto izometrie máš v Exceli ale nemáš k nim JSON výkres (napr. LIG, LHT).</p>'
+          + '<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#fffbeb"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#6b7280">Izometria</th><th style="padding:8px 12px;font-size:12px;color:#6b7280">Zvarov</th><th style="padding:8px 12px;text-align:left;font-size:12px;color:#6b7280">Info</th></tr></thead><tbody>' + rowsB + '</tbody></table>'
+          : '<div style="padding:16px;background:#f0fdf4;border-radius:8px;color:#16a34a;font-weight:600">✅ Ku všetkým WeldBook izometriám máš JSON výkres</div>')
+      + '</div></div>';
+    document.body.appendChild(modal);
 
   } catch(err) {
-    if (document.body.contains(loadingDiv)) document.body.removeChild(loadingDiv);
-    alert('❌ Chyba: ' + err.message);
+    if (document.getElementById('cmpOverlay')) document.body.removeChild(document.getElementById('cmpOverlay'));
+    if (document.getElementById('cmpBox')) document.body.removeChild(document.getElementById('cmpBox'));
+    alert('Chyba: ' + err.message);
+    console.error(err);
   }
 }
 
