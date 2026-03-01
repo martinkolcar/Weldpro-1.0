@@ -1529,7 +1529,18 @@ function switchRibbonTab(tabName) {
   });
   
   // Aktivuj vybranú záložku a obsah
-  event.target.classList.add('active');
+  // event.target môže byť null ak sa volá programaticky (napr. z mobile menu)
+  if (typeof event !== 'undefined' && event && event.target && event.target.classList) {
+    event.target.classList.add('active');
+  } else {
+    // Nájdi správnu záložku podľa tabName
+    tabs.forEach(function(tab) {
+      if (tab.textContent.toLowerCase().includes(tabName) || 
+          tab.getAttribute('onclick') && tab.getAttribute('onclick').includes("'" + tabName + "'")) {
+        tab.classList.add('active');
+      }
+    });
+  }
   document.getElementById('ribbon' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.add('active');
   
   // Ulož aktívnu záložku
@@ -2324,6 +2335,7 @@ var clickedWeld=null;
 var clickType='';
 
 // MONTÁŽ MODE - klik na kruh zvaru pre označenie/odznačenie
+var _touchRadius = ('ontouchstart' in window) ? 40 : 25; // Väčšia zóna pre mobil
 if(displayFilter.enabled && !montazWeldMode){
 if(window.montazDeleteMode){
 for(var i=0;i<ws.length;i++){
@@ -2356,7 +2368,7 @@ var wEndY=w.end.y*ca.height;
 var distEnd=Math.sqrt(Math.pow(x-wEndX,2)+Math.pow(y-wEndY,2));
 
 // Klik na KRUH (nie na palička)
-if(distEnd<25){ // Rovnaký radius ako v editMode
+if(distEnd<_touchRadius){
 clickedWeld=w;
 
 // Check či má vyplneného zvarača v WeldBook
