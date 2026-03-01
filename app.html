@@ -2796,6 +2796,49 @@ showNotification('✅ Číslo zvaru zmenené: '+oldNum+' → '+newNum.trim());
 }
 };
 
+// ============= TOUCH SUPPORT PRE CANVAS =============
+// Na mobile/tablete - mapuj touch eventy na mouse eventy
+var _touchStartX = 0, _touchStartY = 0, _touchMoved = false;
+
+ca.addEventListener('touchstart', function(e) {
+  if (e.touches.length !== 1) return;
+  var t = e.touches[0];
+  var rc = ca.getBoundingClientRect();
+  _touchStartX = t.clientX;
+  _touchStartY = t.clientY;
+  _touchMoved = false;
+  // Simuluj mousedown
+  var me = new MouseEvent('mousedown', { clientX: t.clientX, clientY: t.clientY, button: 0, bubbles: true });
+  ca.dispatchEvent(me);
+  e.preventDefault();
+}, { passive: false });
+
+ca.addEventListener('touchmove', function(e) {
+  if (e.touches.length !== 1) return;
+  var t = e.touches[0];
+  var dx = Math.abs(t.clientX - _touchStartX);
+  var dy = Math.abs(t.clientY - _touchStartY);
+  if (dx > 5 || dy > 5) _touchMoved = true;
+  // Simuluj mousemove
+  var me = new MouseEvent('mousemove', { clientX: t.clientX, clientY: t.clientY, bubbles: true });
+  ca.dispatchEvent(me);
+  e.preventDefault();
+}, { passive: false });
+
+ca.addEventListener('touchend', function(e) {
+  if (e.changedTouches.length !== 1) return;
+  var t = e.changedTouches[0];
+  // Simuluj mouseup
+  var mu = new MouseEvent('mouseup', { clientX: t.clientX, clientY: t.clientY, button: 0, bubbles: true });
+  ca.dispatchEvent(mu);
+  // Simuluj click len ak sa neposúvalo (nie scroll)
+  if (!_touchMoved) {
+    var mc = new MouseEvent('click', { clientX: t.clientX, clientY: t.clientY, button: 0, bubbles: true });
+    ca.dispatchEvent(mc);
+  }
+  e.preventDefault();
+}, { passive: false });
+
 ca.oncontextmenu=function(e){
 e.preventDefault();
 var rc=ca.getBoundingClientRect();
