@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<title>WeldPro Mobile</title>
+<style>
+:root {
+  --blue: #0078D4;
+  --blue-dark: #005a9e;
+  --green: #10b981;
+  --red: #ef4444;
+  --orange: #f59e0b;
+  --gray: #6b7280;
+  --bg: #f3f4f6;
+  --white: #ffffff;
+  --nav-h: 64px;
+  --header-h: 56px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ===== HEADER ===== */
+.header {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: var(--header-h);
+  background: var(--blue);
+  color: white;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.header-title { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+.header-sub { font-size: 11px; opacity: 0.8; margin-top: 1px; }
+.header-user {
+  font-size: 13px; background: rgba(255,255,255,0.2);
+  padding: 6px 12px; border-radius: 20px; cursor: pointer;
+  border: none; color: white;
+}
+
+/* ===== BOTTOM NAV ===== */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: var(--nav-h);
+  background: white;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  z-index: 1000;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.1);
+}
+.nav-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: none; background: transparent; cursor: pointer;
+  font-size: 10px; color: var(--gray); gap: 3px;
+  transition: background 0.15s;
+  touch-action: manipulation;
+}
+.nav-btn .icon { font-size: 24px; }
+.nav-btn.active { color: var(--blue); background: #eff6ff; }
+.nav-btn.active .icon { transform: scale(1.1); }
+
+/* ===== PAGES ===== */
+.page {
+  position: fixed; top: var(--header-h); bottom: var(--nav-h); left: 0; right: 0;
+  overflow-y: auto; overflow-x: hidden;
+  display: none;
+  -webkit-overflow-scrolling: touch;
+}
+.page.active { display: block; }
+
+
+
+/* ===== KNIZNICA ===== */
+.search-bar {
+  padding: 12px 16px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky; top: 0; z-index: 10;
+}
+.search-input {
+  width: 100%; padding: 10px 14px; border: 1.5px solid #d1d5db;
+  border-radius: 10px; font-size: 15px; outline: none;
+  background: var(--bg);
+}
+.search-input:focus { border-color: var(--blue); background: white; }
+
+.project-card {
+  margin: 8px 12px; background: white; border-radius: 12px;
+  padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  cursor: pointer; touch-action: manipulation;
+  border: 2px solid transparent; transition: border-color 0.15s;
+  display: flex; align-items: center; gap: 14px;
+}
+.project-card:active { border-color: var(--blue); background: #eff6ff; }
+.project-icon { font-size: 32px; flex-shrink: 0; }
+.project-info { flex: 1; min-width: 0; }
+.project-name { font-size: 14px; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.project-meta { font-size: 12px; color: var(--gray); margin-top: 2px; }
+.project-part { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; color: white; }
+.part-SUL { background: #3b82f6; }
+.part-LIG { background: #10b981; }
+.part-DRY { background: #f59e0b; }
+.part-FLA { background: #8b5cf6; }
+.part-LHT { background: #ef4444; }
+.part-other { background: #6b7280; }
+
+.section-header {
+  padding: 10px 16px 4px;
+  font-size: 11px; font-weight: 700; color: var(--gray);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+/* ===== MONTAZ ===== */
+#montazPage { overflow: hidden; display: none; flex-direction: column; }
+#montazPage.active { display: flex; }
+
+.montaz-toolbar {
+  background: #1e293b; padding: 8px 12px;
+  display: flex; gap: 8px; align-items: center;
+  overflow-x: auto; flex-shrink: 0;
+  scrollbar-width: none;
+}
+.montaz-toolbar::-webkit-scrollbar { display: none; }
+
+.tool-btn {
+  padding: 8px 14px; border: none; border-radius: 8px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  white-space: nowrap; touch-action: manipulation;
+  background: #334155; color: #94a3b8;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.tool-btn.active { background: var(--blue); color: white; }
+.tool-btn.green { background: #064e3b; color: #34d399; }
+.tool-btn.green.active { background: var(--green); color: white; }
+.tool-btn.red { background: #450a0a; color: #f87171; }
+
+.canvas-container {
+  flex: 1; overflow: auto; background: #f8fafc;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+canvas#mca { display: block; }
+
+.montaz-info {
+  background: #1e293b; color: #94a3b8;
+  padding: 6px 12px; font-size: 11px;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-shrink: 0;
+}
+.montaz-info span { color: white; font-weight: 600; }
+
+/* ===== WELDBOOK ===== */
+.wb-filters {
+  background: white; padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky; top: 0; z-index: 10;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.wb-filters-row { display: flex; gap: 8px; }
+.wb-select {
+  flex: 1; padding: 8px 10px; border: 1.5px solid #d1d5db;
+  border-radius: 8px; font-size: 13px; outline: none;
+  background: var(--bg); min-width: 0;
+}
+.wb-select:focus { border-color: var(--blue); }
+.wb-search {
+  width: 100%; padding: 8px 12px; border: 1.5px solid #d1d5db;
+  border-radius: 8px; font-size: 13px; outline: none; background: var(--bg);
+}
+.wb-count { font-size: 12px; color: var(--gray); text-align: right; padding: 0 2px; }
+
+.wb-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.wb-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+  min-width: 500px;
+}
+.wb-table thead { background: #1e293b; color: white; position: sticky; top: 0; z-index: 5; }
+.wb-table th { padding: 10px 8px; text-align: left; font-weight: 600; white-space: nowrap; font-size: 11px; }
+.wb-table td { padding: 10px 8px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+.wb-table tr:active td { background: #eff6ff; }
+.wb-table tr { cursor: pointer; }
+.weld-status {
+  width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+}
+.status-done { background: var(--green); }
+.status-todo { background: #d1d5db; }
+
+/* ===== MODALS ===== */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000;
+  display: none; align-items: flex-end; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal-sheet {
+  background: white; border-radius: 20px 20px 0 0; width: 100%; max-width: 480px;
+  padding: 0; max-height: 90vh; overflow-y: auto;
+  animation: slideUp 0.25s ease;
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-handle {
+  width: 40px; height: 4px; background: #d1d5db; border-radius: 2px;
+  margin: 12px auto 0;
+}
+.modal-title { padding: 16px 20px 12px; font-size: 18px; font-weight: 700; }
+.modal-body { padding: 0 20px 20px; }
+.modal-label { font-size: 12px; font-weight: 600; color: var(--gray); margin-bottom: 4px; display: block; text-transform: uppercase; letter-spacing: 0.4px; }
+.modal-input {
+  width: 100%; padding: 12px 14px; border: 2px solid #e5e7eb;
+  border-radius: 10px; font-size: 16px; outline: none; margin-bottom: 12px;
+}
+.modal-input:focus { border-color: var(--blue); }
+.modal-row { display: flex; gap: 10px; margin-top: 16px; }
+.btn-primary {
+  flex: 2; padding: 14px; background: var(--green); color: white;
+  border: none; border-radius: 10px; font-size: 16px; font-weight: 700;
+  cursor: pointer; touch-action: manipulation;
+}
+.btn-secondary {
+  flex: 1; padding: 14px; background: #f3f4f6; color: #374151;
+  border: none; border-radius: 10px; font-size: 15px;
+  cursor: pointer; touch-action: manipulation;
+}
+.btn-danger {
+  width: 100%; padding: 12px; background: #fef2f2; color: var(--red);
+  border: 1.5px solid #fecaca; border-radius: 10px; font-size: 14px; font-weight: 600;
+  cursor: pointer; touch-action: manipulation; margin-top: 8px;
+}
+.weld-info-box {
+  background: #f8fafc; border-radius: 10px; padding: 12px 14px;
+  margin-bottom: 16px; border: 1px solid #e5e7eb;
+}
+.weld-info-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+.weld-info-label { color: var(--gray); }
+.weld-info-val { font-weight: 600; color: #111; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: calc(var(--nav-h) + 16px); left: 50%; transform: translateX(-50%);
+  background: #1e293b; color: white; padding: 10px 20px; border-radius: 20px;
+  font-size: 14px; font-weight: 500; z-index: 3000;
+  opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+
+/* Loading */
+.loading {
+  position: fixed; inset: 0; background: rgba(255,255,255,0.9);
+  display: none; align-items: center; justify-content: center; flex-direction: column;
+  z-index: 5000; gap: 12px;
+}
+.loading.show { display: flex; }
+.spinner {
+  width: 40px; height: 40px; border: 3px solid #e5e7eb;
+  border-top-color: var(--blue); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 14px; color: var(--gray); font-weight: 500; }
+
+/* Empty state */
+.empty { text-align: center; padding: 60px 20px; color: var(--gray); }
+.empty-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-text { font-size: 15px; font-weight: 500; }
+.empty-sub { font-size: 13px; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header" id="mainHeader">
+  <div>
+    <div class="header-title">🔧 WeldPro</div>
+    <div class="header-sub" id="headerSub">Mobile</div>
+  </div>
+  <span style="font-size:13px;color:rgba(255,255,255,0.8)">Mobile</span>
+</div>
+
+<!-- PAGES -->
+<div class="page active" id="kniznicaPage">
+  <div class="search-bar">
+    <input class="search-input" id="kSearch" placeholder="🔍 Hľadaj výkres..." oninput="filterProjects()">
+  </div>
+  <div id="kList"><div class="empty"><div class="empty-icon">📚</div><div class="empty-text">Načítavam projekty...</div></div></div>
+</div>
+
+<div class="page" id="montazPage">
+  <div class="montaz-toolbar" id="montazToolbar">
+    <button class="tool-btn active" id="btnModeSelect" onclick="setMontazMode('select')">👆 Označiť zvar</button>
+    <button class="tool-btn green" id="btnModeNew" onclick="setMontazMode('new')">➕ Nový zvar</button>
+    <button class="tool-btn" id="btnUndo" onclick="mUndo()" style="background:#292d3e;color:#94a3b8">↩ Späť</button>
+    <button class="tool-btn red" id="btnSave" onclick="mSave()" style="background:#064e3b;color:#34d399">💾 Uložiť</button>
+    <button class="tool-btn" onclick="mZoomIn()" style="font-size:16px;padding:8px 10px">+</button>
+    <button class="tool-btn" onclick="mZoomOut()" style="font-size:16px;padding:8px 10px">−</button>
+    <button class="tool-btn" onclick="mZoomFit()" style="font-size:11px">Fit</button>
+  </div>
+  <div class="canvas-container" id="mCanvasWrap">
+    <canvas id="mca"></canvas>
+  </div>
+  <div class="montaz-info">
+    <div id="mInfo">Otvor výkres z Knižnice</div>
+    <div id="mWeldCount">0 zvarov</div>
+  </div>
+</div>
+
+<div class="page" id="weldbookPage">
+  <div class="wb-filters">
+    <input class="wb-search" id="wbSearch" placeholder="🔍 Hľadaj..." oninput="filterWB()">
+    <div class="wb-filters-row">
+      <select class="wb-select" id="wbFPart" onchange="onWbPartChange()">
+        <option value="">Všetky časti</option>
+        <option value="SUL">SUL</option>
+        <option value="LIG">LIG</option>
+        <option value="DRY">DRY</option>
+        <option value="FLA">FLA</option>
+        <option value="LHT">LHT</option>
+      </select>
+      <select class="wb-select" id="wbFIso" onchange="filterWB()">
+        <option value="">Všetky izometrie</option>
+      </select>
+    </div>
+    <div class="wb-count" id="wbCount">Načítavam...</div>
+  </div>
+  <div class="wb-table-wrap">
+    <table class="wb-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Č.zvaru</th>
+          <th>Izometria</th>
+          <th>Sh.</th>
+          <th>Zvarač</th>
+          <th>Dátum</th>
+        </tr>
+      </thead>
+      <tbody id="wbBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav" id="bottomNav">
+  <button class="nav-btn active" onclick="switchPage('kniznica')" id="navKniznica">
+    <span class="icon">📚</span>
+    <span>Knižnica</span>
+  </button>
+  <button class="nav-btn" onclick="switchPage('montaz')" id="navMontaz">
+    <span class="icon">🏗️</span>
+    <span>Montáž</span>
+  </button>
+  <button class="nav-btn" onclick="switchPage('weldbook')" id="navWeldbook">
+    <span class="icon">📗</span>
+    <span>WeldBook</span>
+  </button>
+</div>
+
+<!-- MODALS -->
+<!-- Welder modal -->
+<div class="modal-overlay" id="welderModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🔧 Priradiť zvarača</div>
+    <div class="modal-body">
+      <div class="weld-info-box">
+        <div class="weld-info-row"><span class="weld-info-label">Č. zvaru</span><span class="weld-info-val" id="wm_weldNum">#1</span></div>
+        <div class="weld-info-row"><span class="weld-info-label">Izometria</span><span class="weld-info-val" id="wm_iso" style="font-size:11px">-</span></div>
+      </div>
+      <label class="modal-label">Welder ID</label>
+      <input class="modal-input" id="wm_welder" placeholder="Zadaj Welder ID..." autocapitalize="characters">
+      <label class="modal-label">Dátum zvárania</label>
+      <input class="modal-input" id="wm_date" type="date">
+      <div class="modal-row">
+        <button class="btn-secondary" onclick="closeWelderModal()">Zrušiť</button>
+        <button class="btn-primary" onclick="saveWelderModal()">✅ Uložiť</button>
+      </div>
+      <button class="btn-danger" id="wm_remove" onclick="removeWelderModal()">🗑️ Odstrániť zvarača</button>
+    </div>
+  </div>
+</div>
+
+<!-- WB Edit modal -->
+<div class="modal-overlay" id="wbModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">✏️ Upraviť zvar</div>
+    <div class="modal-body">
+      <div class="weld-info-box">
+        <div class="weld-info-row"><span class="weld-info-label">Č. zvaru</span><span class="weld-info-val" id="wb_weldNum">-</span></div>
+        <div class="weld-info-row"><span class="weld-info-label">Izometria</span><span class="weld-info-val" id="wb_iso" style="font-size:11px">-</span></div>
+        <div class="weld-info-row"><span class="weld-info-label">Sheet</span><span class="weld-info-val" id="wb_sheet">-</span></div>
+      </div>
+      <label class="modal-label">Welder ID</label>
+      <input class="modal-input" id="wb_welder" placeholder="Zadaj Welder ID..." autocapitalize="characters">
+      <label class="modal-label">Dátum zvárania</label>
+      <input class="modal-input" id="wb_date" type="date">
+      <div class="modal-row">
+        <button class="btn-secondary" onclick="closeWbModal()">Zrušiť</button>
+        <button class="btn-primary" onclick="saveWbModal()">✅ Uložiť</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="loading" id="loading"><div class="spinner"></div><div class="loading-text" id="loadingText">Načítavam...</div></div>
+
+<!-- FIREBASE - načíta sa dynamicky s fallback CDN -->
+<script>
+(function() {
+  var cdns = [
+    'https://www.gstatic.com/firebasejs/9.22.0/',
+    'https://unpkg.com/firebase@9.22.0/',
+    'https://cdn.jsdelivr.net/npm/firebase@9.22.0/'
+  ];
+  var libs = [
+    'firebase-app-compat.js',
+    'firebase-firestore-compat.js', 
+    'firebase-auth-compat.js'
+  ];
+  var cdnIdx = 0;
+  
+  function tryLoadAll(cdn) {
+    var loaded = 0;
+    var failed = false;
+    libs.forEach(function(lib) {
+      var s = document.createElement('script');
+      s.src = cdn + lib;
+      s.onerror = function() {
+        if (failed) return;
+        failed = true;
+        cdnIdx++;
+        if (cdnIdx < cdns.length) {
+          console.log('CDN failed, trying:', cdns[cdnIdx]);
+          tryLoadAll(cdns[cdnIdx]);
+        }
+      };
+      s.onload = function() {
+        loaded++;
+        if (loaded === libs.length) console.log('Firebase SDK loaded from:', cdn);
+      };
+      document.head.appendChild(s);
+    });
+  }
+  tryLoadAll(cdns[cdnIdx]);
+})();
+</script>
+
+<script>
+// ===== FIREBASE =====
+const firebaseConfig = {
+  apiKey: "AIzaSyDYFCovgo873FIrX4_pEdG1LpDKevxxEU4",
+  authDomain: "weldpro-66d2a-8336e.firebaseapp.com",
+  projectId: "weldpro-66d2a-8336e",
+  storageBucket: "weldpro-66d2a-8336e.firebasestorage.app",
+  messagingSenderId: "1062303461642",
+  appId: "1:1062303461642:web:e90ff234366c88a5eccaf3"
+};
+
+let db = null, auth = null;
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+function showError(msg) {
+  document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif"><div style="font-size:48px">⚠️</div><h2 style="color:#ef4444;margin:16px 0">Chyba</h2><p style="color:#374151">'+msg+'</p><button onclick="location.reload()" style="margin-top:20px;padding:12px 24px;background:#0078D4;color:white;border:none;border-radius:8px;font-size:16px">Skúsiť znova</button></div>';
+}
+
+async function initFirebase() {
+  // Čakaj až 15 sekúnd na Firebase SDK
+  let attempts = 0;
+  while (typeof firebase === 'undefined' && attempts < 150) {
+    await new Promise(r => setTimeout(r, 100));
+    attempts++;
+  }
+  if (typeof firebase === 'undefined') {
+    // Skús dynamicky načítať Firebase
+    try {
+      await loadScript('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
+      await loadScript('https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js');
+      await loadScript('https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js');
+    } catch(e) { console.error('Firebase SDK failed to load!'); showError('Chyba: Firebase sa nenačítal. Skontroluj internet.'); return false; }
+  }
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+    await auth.signInAnonymously();
+    console.log('Firebase ready');
+    return true;
+  } catch(e) {
+    console.error('Firebase init error:', e);
+    return false;
+  }
+}
+
+// ===== STATE =====
+let currentUser = { username: "test" };
+let weldBookData = [];
+let allProjects = [];
+let currentProject = null; // { name, welds: [], originalFileName }
+let montazMode = 'select'; // 'select' | 'new'
+let newWeldPt1 = null;
+let weldCounter = 1;
+let currentWeldForModal = null; // { weld, wbEntry }
+let currentWbRow = null;
+let mScale = 1;
+let mOffX = 0, mOffY = 0;
+let mImg = null; // background image
+
+// Canvas
+const mca = document.getElementById('mca');
+const mctx = mca.getContext('2d');
+
+// ===== UTILS =====
+function showToast(msg, duration=2000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+function showLoading(text='Načítavam...') {
+  document.getElementById('loadingText').textContent = text;
+  document.getElementById('loading').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loading').classList.remove('show');
+}
+function today() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// ===== LOGIN =====
+async function doLogin() {
+  const user = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const err = document.getElementById('loginErr');
+  if (!user || !pass) { err.textContent = 'Zadaj meno aj heslo'; err.style.display='block'; return; }
+
+  showLoading('Prihlasovanie...');
+  try {
+    const doc = await db.collection('users').doc(user).get();
+    if (!doc.exists) throw new Error('Používateľ neexistuje');
+    const data = doc.data();
+    if (data.password !== pass && data.passwordHash !== pass) throw new Error('Zlé heslo');
+    currentUser = { username: user, ...data };
+    localStorage.setItem('mobileUser', JSON.stringify(currentUser));
+    showApp();
+  } catch(e) {
+    err.textContent = e.message;
+    err.style.display = 'block';
+  }
+  hideLoading();
+}
+
+function doLogout() {
+  if (!confirm('Odhlásiť sa?')) return;
+  currentUser = null;
+  localStorage.removeItem('mobileUser');
+  location.reload();
+}
+
+async function showApp() {
+  document.getElementById('loginPage').classList.add('hidden');
+  document.getElementById('mainHeader').style.display = 'flex';
+  document.getElementById('bottomNav').style.display = 'flex';
+  document.getElementById('headerUser').textContent = currentUser.username;
+  await auth.signInAnonymously();
+  loadWeldBook();
+  loadProjects();
+}
+
+// Auto login
+window.addEventListener('DOMContentLoaded', async () => {
+  const ok = await initFirebase();
+  if (!ok) {
+    document.getElementById('headerSub').textContent = '❌ Firebase error';
+    return;
+  }
+  loadWeldBook();
+  loadProjects();
+});
+
+// ===== NAVIGATION =====
+function switchPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(page + 'Page').classList.add('active');
+  document.getElementById('nav' + page.charAt(0).toUpperCase() + page.slice(1)).classList.add('active');
+  document.getElementById('headerSub').textContent =
+    page === 'kniznica' ? 'Knižnica' :
+    page === 'montaz' ? (currentProject ? currentProject.name.substring(0,30) : 'Montáž') :
+    'WeldBook';
+  if (page === 'montaz') setTimeout(mDraw, 100);
+}
+
+// ===== KNIZNICA =====
+async function loadProjects() {
+  showLoading('Načítavam projekty...');
+  try {
+    const snap = await db.collection('projects').get();
+    allProjects = [];
+    for (const doc of snap.docs) {
+      if (doc.id === 'weldbook_main' || doc.id.startsWith('_')) continue;
+      const meta = doc.data();
+      allProjects.push({ id: doc.id, meta, _docRef: doc.ref });
+    }
+    renderProjects(allProjects);
+  } catch(e) { showToast('❌ Chyba: ' + e.message); }
+  hideLoading();
+}
+
+function getPart(name) {
+  if (!name) return 'other';
+  const m = name.match(/^([A-Z]{2,6})[_,]/);
+  if (m) return m[1];
+  return 'other';
+}
+
+function renderProjects(list) {
+  const el = document.getElementById('kList');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">Žiadne projekty</div></div>';
+    return;
+  }
+  el.innerHTML = list.map(p => {
+    const part = getPart(p.id);
+    const weldCount = p.meta.count || '?';
+    return `<div class="project-card" onclick="openProject('${p.id}')">
+      <div class="project-icon">📐</div>
+      <div class="project-info">
+        <div class="project-name">${p.id.replace(/_/g,' ')}</div>
+        <div class="project-meta">${weldCount} zvarov · ${p.meta.date ? p.meta.date.substring(0,10) : ''}</div>
+      </div>
+      <span class="project-part part-${part}">${part}</span>
+    </div>`;
+  }).join('');
+}
+
+function filterProjects() {
+  const q = document.getElementById('kSearch').value.toLowerCase();
+  const filtered = allProjects.filter(p => p.id.toLowerCase().includes(q));
+  renderProjects(filtered);
+}
+
+async function openProject(projId) {
+  showLoading('Načítavam výkres...');
+  try {
+    const docRef = db.collection('projects').doc(projId);
+    const metaDoc = await docRef.get();
+    const meta = metaDoc.data();
+    const chunks = [];
+    for (let i = 0; i < (meta.chunks||1); i++) {
+      const c = await docRef.collection('data').doc('c'+i).get();
+      if (c.exists) chunks.push(c.data().d);
+    }
+    const parsed = JSON.parse(chunks.join(''));
+    currentProject = {
+      id: projId,
+      name: projId,
+      originalFileName: parsed.projectName || projId,
+      welds: parsed.welds || [],
+      image: parsed.image || null
+    };
+    // Max weld counter
+    weldCounter = Math.max(1, ...currentProject.welds.map(w => parseInt(w.displayNum)||0)) + 1;
+    newWeldPt1 = null;
+    mScale = 1;
+
+    // Načítaj obrázok ak existuje
+    if (currentProject.image) {
+      const img = new Image();
+      img.onload = () => { mImg = img; mZoomFit(); mDraw(); };
+      img.src = currentProject.image;
+    } else {
+      mImg = null;
+      mZoomFit();
+      mDraw();
+    }
+
+    document.getElementById('mInfo').textContent = projId.substring(0,35);
+    document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
+    switchPage('montaz');
+    showToast('✅ Načítané: ' + currentProject.welds.length + ' zvarov');
+  } catch(e) { showToast('❌ ' + e.message); console.error(e); }
+  hideLoading();
+}
+
+// ===== MONTAZ CANVAS =====
+function mGetWbEntry(weld) {
+  if (!weldBookData || !currentProject) return null;
+  const iso = splitIso(currentProject.originalFileName).iso;
+  return weldBookData.find(r =>
+    String(r.weldId) === String(weld.displayNum) &&
+    (r.isometric === iso || r.isometric === currentProject.originalFileName ||
+     (r.isometric && currentProject.originalFileName && currentProject.originalFileName.includes(r.isometric)))
+  ) || null;
+}
+
+function mDraw() {
+  if (!mca) return;
+  const wrap = document.getElementById('mCanvasWrap');
+  mca.width = wrap.clientWidth || window.innerWidth;
+  mca.height = wrap.clientHeight || (window.innerHeight - 56 - 64 - 38 - 40);
+
+  mctx.clearRect(0, 0, mca.width, mca.height);
+  mctx.save();
+  mctx.translate(mOffX, mOffY);
+  mctx.scale(mScale, mScale);
+
+  // Background image
+  if (mImg) {
+    mctx.drawImage(mImg, 0, 0, mca.width / mScale, mca.height / mScale);
+  } else {
+    mctx.fillStyle = '#f8fafc';
+    mctx.fillRect(0, 0, mca.width / mScale, mca.height / mScale);
+    if (!currentProject) {
+      mctx.fillStyle = '#94a3b8';
+      mctx.font = '16px sans-serif';
+      mctx.textAlign = 'center';
+      mctx.fillText('Otvor výkres z Knižnice', mca.width / mScale / 2, mca.height / mScale / 2);
+    }
+  }
+
+  // Draw welds
+  if (currentProject) {
+    const W = mca.width / mScale;
+    const H = mca.height / mScale;
+    currentProject.welds.forEach(w => {
+      const ex = w.end.x * W;
+      const ey = w.end.y * H;
+      const sx = w.start.x * W;
+      const sy = w.start.y * H;
+      const wbEntry = mGetWbEntry(w);
+      const hasDone = wbEntry && wbEntry.welderId && wbEntry.welderId.trim();
+
+      // Line
+      mctx.beginPath();
+      mctx.moveTo(sx, sy);
+      mctx.lineTo(ex, ey);
+      mctx.strokeStyle = hasDone ? '#10b981' : '#ef4444';
+      mctx.lineWidth = 2;
+      mctx.stroke();
+
+      // Circle
+      mctx.beginPath();
+      mctx.arc(ex, ey, 14, 0, Math.PI * 2);
+      mctx.fillStyle = hasDone ? '#10b981' : '#ef4444';
+      mctx.fill();
+      mctx.strokeStyle = 'white';
+      mctx.lineWidth = 2;
+      mctx.stroke();
+
+      // Number
+      mctx.fillStyle = 'white';
+      mctx.font = 'bold 10px sans-serif';
+      mctx.textAlign = 'center';
+      mctx.textBaseline = 'middle';
+      mctx.fillText(String(w.displayNum), ex, ey);
+    });
+
+    // New weld pt1 indicator
+    if (newWeldPt1 && montazMode === 'new') {
+      const px = newWeldPt1.x * W;
+      const py = newWeldPt1.y * H;
+      mctx.beginPath();
+      mctx.arc(px, py, 8, 0, Math.PI * 2);
+      mctx.fillStyle = '#3b82f6';
+      mctx.fill();
+    }
+  }
+  mctx.restore();
+}
+
+function mZoomIn() { mScale = Math.min(mScale * 1.3, 8); mDraw(); }
+function mZoomOut() { mScale = Math.max(mScale / 1.3, 0.3); mDraw(); }
+function mZoomFit() {
+  mScale = 1; mOffX = 0; mOffY = 0;
+  mDraw();
+}
+
+function setMontazMode(mode) {
+  montazMode = mode;
+  newWeldPt1 = null;
+  document.getElementById('btnModeSelect').classList.toggle('active', mode === 'select');
+  document.getElementById('btnModeNew').classList.toggle('active', mode === 'new');
+  mDraw();
+  if (mode === 'new') showToast('Tap = 1. bod zvaru');
+  else showToast('Tap na krúžok = priradiť zvarača');
+}
+
+function mUndo() {
+  if (!currentProject || !currentProject.welds.length) return;
+  currentProject.welds.pop();
+  weldCounter = Math.max(1, ...currentProject.welds.map(w => parseInt(w.displayNum)||0)) + 1;
+  document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
+  mDraw();
+  showToast('↩ Zrušený posledný zvar');
+}
+
+async function mSave() {
+  if (!currentProject || !db) return;
+  showLoading('Ukladám...');
+  try {
+    // Update weldbook too
+    saveWeldBookToFirebase();
+    showToast('✅ Uložené');
+  } catch(e) { showToast('❌ ' + e.message); }
+  hideLoading();
+}
+
+// Touch handling on canvas
+let _tSX=0,_tSY=0,_tTime=0,_tMoved=false;
+// Pinch zoom
+let _pinchDist=0;
+
+mca.addEventListener('touchstart', function(e) {
+  if (e.touches.length === 2) {
+    // Pinch start
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    _pinchDist = Math.sqrt(dx*dx + dy*dy);
+    return;
+  }
+  if (e.touches.length !== 1) return;
+  const t = e.touches[0];
+  _tSX = t.clientX; _tSY = t.clientY;
+  _tTime = Date.now(); _tMoved = false;
+}, {passive: true});
+
+mca.addEventListener('touchmove', function(e) {
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (_pinchDist > 0) {
+      const ratio = dist / _pinchDist;
+      mScale = Math.max(0.3, Math.min(8, mScale * ratio));
+      mDraw();
+    }
+    _pinchDist = dist;
+    return;
+  }
+  if (e.touches.length !== 1) return;
+  const t = e.touches[0];
+  if (Math.abs(t.clientX - _tSX) > 8 || Math.abs(t.clientY - _tSY) > 8) _tMoved = true;
+}, {passive: false});
+
+mca.addEventListener('touchend', function(e) {
+  _pinchDist = 0;
+  if (_tMoved || Date.now() - _tTime > 500) return;
+  if (e.changedTouches.length !== 1) return;
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  handleCanvasTap(t.clientX, t.clientY);
+}, {passive: false});
+
+// Also support mouse click for desktop testing
+mca.addEventListener('click', function(e) {
+  if ('ontouchstart' in window) return; // Skip on touch devices (handled above)
+  handleCanvasTap(e.clientX, e.clientY);
+});
+
+function handleCanvasTap(clientX, clientY) {
+  if (!currentProject) { showToast('Najprv otvor výkres z Knižnice'); return; }
+  const rect = mca.getBoundingClientRect();
+  const rawX = clientX - rect.left;
+  const rawY = clientY - rect.top;
+  // Transform to canvas coords
+  const canvasX = (rawX - mOffX) / mScale;
+  const canvasY = (rawY - mOffY) / mScale;
+  const W = mca.width / mScale;
+  const H = mca.height / mScale;
+
+  if (montazMode === 'select') {
+    // Find tapped weld (radius 40px in screen coords = 40/mScale in canvas coords)
+    const tapRadius = 40 / mScale;
+    let found = null;
+    for (const w of currentProject.welds) {
+      const ex = w.end.x * W;
+      const ey = w.end.y * H;
+      const dist = Math.sqrt((canvasX-ex)**2 + (canvasY-ey)**2);
+      if (dist < tapRadius) { found = w; break; }
+    }
+    if (found) {
+      openWelderModal(found);
+    } else {
+      showToast('Klikni priamo na krúžok zvaru');
+    }
+  } else if (montazMode === 'new') {
+    if (!newWeldPt1) {
+      newWeldPt1 = { x: canvasX / W, y: canvasY / H };
+      mDraw();
+      showToast('✅ 1. bod. Tap = 2. bod (koniec zvaru)');
+    } else {
+      // Create weld
+      const weld = {
+        id: Date.now() + '_' + Math.random(),
+        start: newWeldPt1,
+        end: { x: canvasX / W, y: canvasY / H },
+        displayNum: weldCounter,
+        source: 'new'
+      };
+      currentProject.welds.push(weld);
+      weldCounter++;
+      newWeldPt1 = null;
+      document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
+      mDraw();
+      // Immediately open welder modal for new weld
+      openWelderModal(weld);
+    }
+  }
+}
+
+// ===== WELDER MODAL =====
+function openWelderModal(weld) {
+  const wbEntry = mGetWbEntry(weld);
+  currentWeldForModal = { weld, wbEntry };
+
+  document.getElementById('wm_weldNum').textContent = '#' + weld.displayNum;
+  document.getElementById('wm_iso').textContent = currentProject ? currentProject.originalFileName.substring(0,40) : '-';
+  document.getElementById('wm_welder').value = wbEntry?.welderId || '';
+  document.getElementById('wm_date').value = wbEntry?.dateWelding || today();
+  document.getElementById('wm_remove').style.display = (wbEntry?.welderId) ? 'block' : 'none';
+
+  document.getElementById('welderModal').classList.add('show');
+  setTimeout(() => document.getElementById('wm_welder').focus(), 300);
+}
+
+function closeWelderModal() {
+  document.getElementById('welderModal').classList.remove('show');
+  currentWeldForModal = null;
+}
+
+function saveWelderModal() {
+  const welder = document.getElementById('wm_welder').value.trim();
+  const date = document.getElementById('wm_date').value;
+  if (!welder) { showToast('⚠️ Zadaj Welder ID'); return; }
+
+  const { weld, wbEntry } = currentWeldForModal;
+  if (wbEntry) {
+    wbEntry.welderId = welder;
+    wbEntry.dateWelding = date;
+  } else {
+    const iso = splitIso(currentProject.originalFileName);
+    weldBookData.push({
+      part: iso.part, isometric: iso.iso, sheets: 1,
+      weldId: String(weld.displayNum),
+      welderId: welder, dateWelding: date
+    });
+  }
+  saveWeldBookToFirebase();
+  mDraw();
+  closeWelderModal();
+  showToast('✅ Zvar #' + weld.displayNum + ' → ' + welder);
+}
+
+function removeWelderModal() {
+  const { wbEntry } = currentWeldForModal;
+  if (wbEntry) { wbEntry.welderId = ''; wbEntry.dateWelding = ''; }
+  saveWeldBookToFirebase();
+  mDraw();
+  closeWelderModal();
+  showToast('🗑️ Zvarač odstránený');
+}
+
+// Close modal on overlay click
+document.getElementById('welderModal').addEventListener('click', function(e) {
+  if (e.target === this) closeWelderModal();
+});
+
+// ===== WELDBOOK =====
+async function loadWeldBook() {
+  try {
+    // Try new single-doc format first
+    const mainDoc = await db.collection('weldbook').doc('weldbook_main').get();
+    if (mainDoc.exists) {
+      const meta = mainDoc.data();
+      const chunkPromises = [];
+      for (let i = 0; i < (meta.chunks||1); i++)
+        chunkPromises.push(db.collection('weldbook').doc('weldbook_main').collection('data').doc('c'+i).get());
+      const chunkDocs = await Promise.all(chunkPromises);
+      const chunks = chunkDocs.filter(c=>c.exists).map(c=>c.data().d);
+      weldBookData = JSON.parse(chunks.join(''));
+    } else {
+      // Fallback: old per-isometric format
+      const snap = await db.collection('weldbook').get();
+      weldBookData = [];
+      await Promise.all(snap.docs.filter(d=>d.id!=='weldbook_main').map(async docSnap => {
+        const meta = docSnap.data();
+        const cp = [];
+        for (let i=0;i<(meta.chunks||1);i++) {
+          const c = await docSnap.ref.collection('data').doc('c'+i).get();
+          if(c.exists) cp.push(c.data().d);
+        }
+        if(cp.length){ const p=JSON.parse(cp.join('')); if(p.welds) weldBookData=weldBookData.concat(p.welds); }
+      }));
+    }
+    renderWeldBook(weldBookData);
+    document.getElementById('wbCount').textContent = weldBookData.length + ' zvarov celkom';
+  } catch(e) { console.error('WB load error:', e); }
+}
+
+async function saveWeldBookToFirebase() {
+  if (!db) return;
+  try {
+    const json = JSON.stringify(weldBookData);
+    const CHUNK = 800*1024;
+    const chunks = [];
+    for(let i=0;i<json.length;i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
+    const oldSubs = await db.collection('weldbook').doc('weldbook_main').collection('data').get();
+    await Promise.all(oldSubs.docs.map(d=>d.ref.delete()));
+    await db.collection('weldbook').doc('weldbook_main').set({
+      type:'main', chunks:chunks.length, count:weldBookData.length,
+      modifiedBy: currentUser?.username||'mobile', date:new Date().toISOString()
+    });
+    await Promise.all(chunks.map((c,i)=>
+      db.collection('weldbook').doc('weldbook_main').collection('data').doc('c'+i).set({d:c})
+    ));
+    // Signal to other users
+    await db.collection('weldbook_signal').doc('latest').set({
+      by: currentUser?.username||'mobile', at:new Date().toISOString(), count:weldBookData.length
+    });
+  } catch(e) { console.error('WB save error:', e); }
+}
+
+function onWbPartChange() {
+  const part = document.getElementById('wbFPart').value;
+  const isoSel = document.getElementById('wbFIso');
+  const isos = [...new Set(
+    weldBookData.filter(r => !part || (r.part||'').toUpperCase() === part)
+               .map(r => r.isometric||'').filter(Boolean)
+  )].sort();
+  isoSel.innerHTML = '<option value="">Všetky izometrie (' + isos.length + ')</option>' +
+    isos.map(v=>`<option value="${v}">${v}</option>`).join('');
+  filterWB();
+}
+
+let _wbTimer = null;
+function filterWB() {
+  clearTimeout(_wbTimer);
+  _wbTimer = setTimeout(_applyWbFilter, 150);
+}
+
+function _applyWbFilter() {
+  const search = document.getElementById('wbSearch').value.toLowerCase().trim();
+  const part = document.getElementById('wbFPart').value;
+  const iso = document.getElementById('wbFIso').value;
+
+  const filtered = weldBookData.filter(r => {
+    if (part && (r.part||'').toUpperCase() !== part) return false;
+    if (iso && (r.isometric||'') !== iso) return false;
+    if (search) {
+      const s = [r.isometric,r.weldId,r.welderId,r.dateWelding].join(' ').toLowerCase();
+      if (!s.includes(search)) return false;
+    }
+    return true;
+  });
+  renderWeldBook(filtered);
+  document.getElementById('wbCount').textContent = filtered.length + ' / ' + weldBookData.length + ' zvarov';
+}
+
+function renderWeldBook(rows) {
+  const tbody = document.getElementById('wbBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9ca3af">Žiadne záznamy</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map((r,i) => {
+    const done = r.welderId && r.welderId.trim();
+    return `<tr onclick="openWbModal(${weldBookData.indexOf(r)})">
+      <td><span class="weld-status ${done?'status-done':'status-todo'}"></span></td>
+      <td style="font-weight:700;color:#111">${r.weldId||'-'}</td>
+      <td style="font-size:11px;color:#374151;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.isometric||'-'}</td>
+      <td style="color:#6b7280">${r.sheets||1}</td>
+      <td style="font-weight:${done?'600':'400'};color:${done?'#059669':'#9ca3af'}">${r.welderId||'—'}</td>
+      <td style="font-size:12px;color:#6b7280">${r.dateWelding||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function openWbModal(idx) {
+  const r = weldBookData[idx];
+  if (!r) return;
+  currentWbRow = { idx, row: r };
+  document.getElementById('wb_weldNum').textContent = r.weldId || '-';
+  document.getElementById('wb_iso').textContent = (r.isometric||'-').substring(0,40);
+  document.getElementById('wb_sheet').textContent = r.sheets || 1;
+  document.getElementById('wb_welder').value = r.welderId || '';
+  document.getElementById('wb_date').value = r.dateWelding || today();
+  document.getElementById('wbModal').classList.add('show');
+  setTimeout(() => document.getElementById('wb_welder').focus(), 300);
+}
+
+function closeWbModal() {
+  document.getElementById('wbModal').classList.remove('show');
+  currentWbRow = null;
+}
+
+function saveWbModal() {
+  const welder = document.getElementById('wb_welder').value.trim();
+  const date = document.getElementById('wb_date').value;
+  if (!welder) { showToast('⚠️ Zadaj Welder ID'); return; }
+  const r = currentWbRow.row;
+  r.welderId = welder;
+  r.dateWelding = date;
+  saveWeldBookToFirebase();
+  filterWB();
+  closeWbModal();
+  showToast('✅ Uložené: zvar #' + r.weldId + ' → ' + welder);
+}
+
+document.getElementById('wbModal').addEventListener('click', function(e) {
+  if (e.target === this) closeWbModal();
+});
+
+// ===== HELPERS =====
+function splitIso(fullName) {
+  if (!fullName) return { part:'', iso:'' };
+  if (fullName.includes(',')) {
+    const last = fullName.lastIndexOf(',');
+    const rawPart = fullName.substring(0, last);
+    const iso = fullName.substring(last+1).trim();
+    const m = rawPart.match(/^([A-Z]{2,6})/);
+    return { part: m?m[1]:'', iso };
+  }
+  return { part:'', iso: fullName.trim() };
+}
+
+// ===== RESIZE =====
+window.addEventListener('resize', () => {
+  if (document.getElementById('montazPage').classList.contains('active')) mDraw();
+});
+</script>
+</body>
+</html>
