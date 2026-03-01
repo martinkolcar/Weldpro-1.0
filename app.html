@@ -9704,7 +9704,10 @@ async function _runComparison(selectedPart) {
         var rawName = parsed.projectName || parsed.originalFileName || projDoc.id;
         var split = splitIsometricName(rawName);
         var partName = (split.part || '').toUpperCase().replace(/[^A-Z]/g,'').substring(0,5);
-        var isoClean = (split.isometric || rawName).trim();
+        // Extrahuj číslo sheetu z názvu (napr. _Sheet2 → sheetNum=2)
+        var sheetMatch = (split.isometric || rawName).match(/_[Ss]heet(\d+)$/);
+        var sheetNum = sheetMatch ? parseInt(sheetMatch[1]) : 1;
+        isoClean = (split.isometric || rawName).trim().replace(/_[Ss]heet\d+$/, '').trim();
 
         // Len zvary patriace do selectedPart
         if (partName !== selectedPart) continue;
@@ -9714,21 +9717,23 @@ async function _runComparison(selectedPart) {
         if (parsed.welds && Array.isArray(parsed.welds)) {
           parsed.welds.forEach(function(w) {
             var wid = String(w.displayNum || w.num || w.weldId || '').trim();
-            if (wid) jsonIsos[isoClean].weldIds.add(wid);
+            // Kľúč: sheet_weldId aby sme rozlíšili rovnaké čísla na rôznych sheetoch
+            if (wid) jsonIsos[isoClean].weldIds.add(sheetNum + '_' + wid);
           });
         }
       } catch(e) { /* skip */ }
     }
 
-    // 3. WeldBook pre selectedPart
+    // 3. WeldBook pre selectedPart - kľúč: sheet_weldId
     var wbIsos = {};
     weldBookData.forEach(function(row) {
       if ((row.part||'').toUpperCase() !== selectedPart) return;
       var iso = (row.isometric||'').trim();
       var wid = String(row.weldId||'').trim();
+      var sheetNum = parseInt(row.sheets || row.sheet || 1) || 1;
       if (!iso) return;
       if (!wbIsos[iso]) wbIsos[iso] = new Set();
-      if (wid) wbIsos[iso].add(wid);
+      if (wid) wbIsos[iso].add(sheetNum + '_' + wid);
     });
 
     setStatus('Porovnávam...');
@@ -9744,7 +9749,8 @@ async function _runComparison(selectedPart) {
       }
       var missingWelds = Array.from(info.weldIds).filter(function(id) { return !wbIsos[iso].has(id); });
       if (missingWelds.length > 0) {
-        missingInWb.push({ iso: iso, reason: 'Chýba ' + missingWelds.length + ' zvarov: ' + missingWelds.slice(0,8).join(', ') + (missingWelds.length > 8 ? '...' : ''), count: missingWelds.length });
+        var displayIds = missingWelds.map(function(id) { return id.replace(/^\d+_/, ''); });
+        missingInWb.push({ iso: iso, reason: 'Chyba ' + missingWelds.length + ' zvarov: ' + displayIds.slice(0,8).join(', ') + (missingWelds.length > 8 ? '...' : ''), count: missingWelds.length });
       }
     });
 
