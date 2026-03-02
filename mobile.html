@@ -1236,13 +1236,27 @@ async function loadWbForPart(part) {
 async function saveWeldBookToFirebase() {
   if (!db) return;
   try {
-    // Zisti časť zo zmenených dát
-    const part = currentProject ? getProjectPart() : (selectedPart || null);
+    // Zisti aktívnu časť - z WB filtru, alebo z projektu, alebo z dát
+    let part = null;
+    const wbFilterPart = document.getElementById('wbFPart') ? document.getElementById('wbFPart').value : '';
+    if (wbFilterPart) {
+      part = wbFilterPart.toUpperCase();
+    } else if (currentProject) {
+      part = getProjectPart() || null;
+    } else if (selectedPart) {
+      part = selectedPart.toUpperCase();
+    }
+    // Ak nemáme part, zisti z dát samotných (všetky riadky musia mať rovnaký part)
+    if (!part && weldBookData.length > 0) {
+      const parts = [...new Set(weldBookData.map(r => (r.part||'').toUpperCase()).filter(Boolean))];
+      if (parts.length === 1) part = parts[0];
+    }
+
     const partRows = part
-      ? weldBookData.filter(r => (r.part||'').toUpperCase() === part.toUpperCase())
+      ? weldBookData.filter(r => (r.part||'').toUpperCase() === part)
       : weldBookData;
 
-    const docId = part ? (part.toUpperCase() + '_main') : 'weldbook_main';
+    const docId = part ? (part + '_main') : 'weldbook_main';
     const json = JSON.stringify(partRows);
     const CHUNK = 800*1024;
     const chunks = [];

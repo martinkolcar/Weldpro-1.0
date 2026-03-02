@@ -9480,9 +9480,14 @@ function startWbRealtimeSync() {
     if (signalAge > 60000 || data.by === myUser) return;
 
     var changedPart = (data.part && data.part !== 'ALL') ? data.part : null;
-    // Načítaj len ak sa zmenila naša aktívna časť (alebo ALL)
+
+    // Ak sa zmenila iná časť ako máme aktívnu - prepni na tú časť automaticky
     if (changedPart && wbActivePart && changedPart !== wbActivePart) {
-      console.log('📡 Signal pre ' + changedPart + ', aktívna: ' + wbActivePart + ' - ignorujem');
+      console.log('📡 Signal pre ' + changedPart + ' (aktívna: ' + wbActivePart + ') - načítavam ' + changedPart);
+      showWbSyncNotification('🔄 ' + data.by + ' upravil ' + changedPart + ' - načítavam...');
+      loadWbPart(changedPart).then(function() {
+        showWbSyncNotification('✅ ' + data.by + ' - WeldBook [' + changedPart + '] aktualizovaný (' + weldBookData.length + ' zvarov)');
+      });
       return;
     }
 
