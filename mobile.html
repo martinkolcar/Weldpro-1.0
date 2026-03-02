@@ -338,7 +338,10 @@ canvas#mca { display: block; }
 
 <div class="page" id="weldbookPage">
   <div class="wb-filters">
-    <input class="wb-search" id="wbSearch" placeholder="🔍 Hľadaj..." oninput="filterWB()">
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input class="wb-search" id="wbSearch" placeholder="🔍 Hľadaj..." oninput="filterWB()" style="flex:1">
+      <button class="tool-btn green" onclick="openAddWbModal()" style="flex-shrink:0;padding:8px 12px">➕ Pridať</button>
+    </div>
     <div class="wb-filters-row">
       <select class="wb-select" id="wbFPart" onchange="onWbPartChange()">
         <option value="">Všetky časti</option>
@@ -406,7 +409,7 @@ canvas#mca { display: block; }
         <button class="btn-secondary" onclick="closeWelderModal()">Zrušiť</button>
         <button class="btn-primary" onclick="saveWelderModal()">✅ Uložiť</button>
       </div>
-      <button class="btn-danger" id="wm_remove" onclick="removeWelderModal()">🗑️ Odstrániť zvarača</button>
+      <button class="btn-danger" onclick="deleteWeldModal()" style="margin-top:8px">🗑️ Vymazať zvar</button>
     </div>
   </div>
 </div>
@@ -431,6 +434,36 @@ canvas#mca { display: block; }
         <button class="btn-primary" onclick="saveWbModal()">✅ Uložiť</button>
       </div>
       <button class="btn-danger" id="wb_remove" onclick="removeWbModal()" style="display:none">🗑️ Odstrániť zvarača</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add WB entry modal -->
+<div class="modal-overlay" id="addWbModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">➕ Pridať zvar do WeldBook</div>
+    <div class="modal-body">
+      <label class="modal-label">Časť</label>
+      <select class="modal-input" id="awb_part">
+        <option value="SUL">SUL</option>
+        <option value="LIG">LIG</option>
+        <option value="DRY">DRY</option>
+        <option value="FLA">FLA</option>
+        <option value="LHT">LHT</option>
+      </select>
+      <label class="modal-label">Izometria</label>
+      <input class="modal-input" id="awb_iso" placeholder="napr. KF-712-20002-4-25-10H1A">
+      <label class="modal-label">Číslo zvaru</label>
+      <input class="modal-input" id="awb_weldid" placeholder="napr. 5 alebo 2B" autocapitalize="characters">
+      <label class="modal-label">Welder ID</label>
+      <input class="modal-input" id="awb_welder" placeholder="Zadaj Welder ID..." autocapitalize="characters">
+      <label class="modal-label">Dátum zvárania</label>
+      <input class="modal-input" id="awb_date" type="date">
+      <div class="modal-row">
+        <button class="btn-secondary" onclick="closeAddWbModal()">Zrušiť</button>
+        <button class="btn-primary" onclick="saveAddWbModal()">✅ Pridať</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1135,8 +1168,6 @@ function openWelderModal(weld) {
   const hasWelder = wbEntry && wbEntry.welderId && wbEntry.welderId.trim() !== '';
   document.getElementById('wm_welder').value = hasWelder ? wbEntry.welderId : '';
   document.getElementById('wm_date').value = (wbEntry && wbEntry.dateWelding) ? wbEntry.dateWelding : today();
-  // Tlačidlo Odstraniť - len ak má zvarača
-  document.getElementById('wm_remove').style.display = hasWelder ? 'block' : 'none';
 
   document.getElementById('welderModal').classList.add('show');
   setTimeout(() => document.getElementById('wm_welder').focus(), 300);
@@ -1157,15 +1188,16 @@ function saveWelderModal() {
     wbEntry.welderId = welder;
     wbEntry.dateWelding = date;
   } else {
-    // Nový záznam - použi rovnaký iso kľúč ako ostatné záznamy v WB
-    weldBookData.push({
+    // Nový záznam - vlož na správne miesto zoradené podľa weldId
+    const newRow = {
       part: getProjectPart(),
       isometric: getProjectIso(),
       sheets: 1,
       weldId: String(weld.displayNum),
       welderId: welder,
       dateWelding: date
-    });
+    };
+    wbInsertSorted(newRow);
   }
   mDraw();
   closeWelderModal();
@@ -1175,19 +1207,88 @@ function saveWelderModal() {
   });
 }
 
+// Vlož WB záznam zoradený podľa čísla zvaru (2B ide medzi 2 a 3)
+function wbInsertSorted(newRow) {
+  const newNum = parseFloat(newRow.weldId) || 0;
+  const newStr = String(newRow.weldId);
+  // Nájdi správnu pozíciu
+  let idx = weldBookData.findIndex(r => {
+    const n = parseFloat(r.weldId) || 0;
+    if (n !== newNum) return n > newNum;
+    return String(r.weldId) > newStr;
+  });
+  if (idx === -1) weldBookData.push(newRow);
+  else weldBookData.splice(idx, 0, newRow);
+}
+
 function removeWelderModal() {
   const { weld, wbEntry } = currentWeldForModal;
-  if (wbEntry) {
-    wbEntry.welderId = '';
-    wbEntry.dateWelding = '';
-  }
+  if (wbEntry) { wbEntry.welderId = ''; wbEntry.dateWelding = ''; }
   mDraw();
   closeWelderModal();
-  showToast('💾 Odstraňujem...');
+  saveWeldBookToFirebase().then(() => showToast('🗑️ Zvarač odstránený: zvar #' + weld.displayNum));
+}
+
+function deleteWeldModal() {
+  if (!currentWeldForModal || !currentProject) return;
+  const { weld } = currentWeldForModal;
+  if (!confirm('Vymazať zvar #' + weld.displayNum + '?')) return;
+  // Vymaž zo zoznamu zvarov
+  currentProject.welds = currentProject.welds.filter(w => w.id !== weld.id);
+  weldCounter = currentProject.welds.length > 0
+    ? Math.max(...currentProject.welds.map(w => parseInt(w.displayNum)||0)) + 1
+    : 1;
+  document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
+  // Vymaž aj z WeldBooku
+  const iso = getProjectIso();
+  const wbIdx = weldBookData.findIndex(r =>
+    String(r.weldId) === String(weld.displayNum) &&
+    (r.isometric === iso || (iso && r.isometric && (iso.includes(r.isometric) || r.isometric.includes(iso))))
+  );
+  if (wbIdx !== -1) weldBookData.splice(wbIdx, 1);
+  mDraw();
+  closeWelderModal();
+  saveWeldBookToFirebase().then(() => showToast('🗑️ Zvar #' + weld.displayNum + ' vymazaný'));
+}
+
+// ===== ADD WB ENTRY MODAL =====
+function openAddWbModal() {
+  // Predvyplň časť z aktívneho filtra
+  const part = document.getElementById('wbFPart').value || 'SUL';
+  document.getElementById('awb_part').value = part;
+  document.getElementById('awb_iso').value = '';
+  document.getElementById('awb_weldid').value = '';
+  document.getElementById('awb_welder').value = '';
+  document.getElementById('awb_date').value = today();
+  document.getElementById('addWbModal').classList.add('show');
+  setTimeout(() => document.getElementById('awb_iso').focus(), 300);
+}
+
+function closeAddWbModal() {
+  document.getElementById('addWbModal').classList.remove('show');
+}
+
+function saveAddWbModal() {
+  const part = document.getElementById('awb_part').value;
+  const iso = document.getElementById('awb_iso').value.trim();
+  const weldId = document.getElementById('awb_weldid').value.trim();
+  const welder = document.getElementById('awb_welder').value.trim();
+  const date = document.getElementById('awb_date').value;
+  if (!iso) { showToast('⚠️ Zadaj izometriu'); return; }
+  if (!weldId) { showToast('⚠️ Zadaj číslo zvaru'); return; }
+  const newRow = { part, isometric: iso, sheets: 1, weldId, welderId: welder, dateWelding: date };
+  wbInsertSorted(newRow);
+  closeAddWbModal();
+  showToast('💾 Ukladám...');
   saveWeldBookToFirebase().then(() => {
-    showToast('🗑️ Zvarač odstránený: zvar #' + weld.displayNum);
+    filterWB();
+    showToast('✅ Zvar #' + weldId + ' pridaný');
   });
 }
+
+document.getElementById('addWbModal').addEventListener('click', function(e) {
+  if (e.target === this) closeAddWbModal();
+});
 
 // Close modal on overlay click
 document.getElementById('welderModal').addEventListener('click', function(e) {
