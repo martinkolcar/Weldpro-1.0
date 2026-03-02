@@ -1032,12 +1032,48 @@ function mUndo() {
 
 async function mSave() {
   if (!currentProject || !db) return;
-  showLoading('Ukladám...');
+  showLoading('Ukladám projekt...');
   try {
-    // Update weldbook too
-    saveWeldBookToFirebase();
-    showToast('✅ Uložené');
-  } catch(e) { showToast('❌ ' + e.message); }
+    const docRef = db.collection('projects').doc(currentProject.id);
+    // Načítaj existujúce dáta (aby sme zachovali pdfData a ostatné polia)
+    const metaDoc = await docRef.get();
+    const meta = metaDoc.data() || {};
+    const chunks = [];
+    for (let i = 0; i < (meta.chunks||1); i++) {
+      const c = await docRef.collection('data').doc('c'+i).get();
+      if (c.exists) chunks.push(c.data().d);
+    }
+    let parsed = {};
+    try { parsed = JSON.parse(chunks.join('')); } catch(e) {}
+
+    // Aktualizuj len zvary, zachovaj pdfData a ostatné
+    parsed.welds = currentProject.welds;
+    parsed.projectName = currentProject.originalFileName || currentProject.id;
+
+    // Ulož späť
+    const json = JSON.stringify(parsed);
+    const CHUNK = 800 * 1024;
+    const newChunks = [];
+    for (let i = 0; i < json.length; i += CHUNK) newChunks.push(json.slice(i, i + CHUNK));
+
+    await Promise.all(newChunks.map((c, i) =>
+      docRef.collection('data').doc('c' + i).set({ d: c })
+    ));
+    await docRef.set({
+      ...meta,
+      chunks: newChunks.length,
+      lastModified: new Date().toISOString(),
+      modifiedBy: currentUser?.username || 'mobile'
+    });
+
+    // Ulož aj WeldBook
+    await saveWeldBookToFirebase();
+
+    showToast('✅ Projekt uložený (' + currentProject.welds.length + ' zvarov)');
+  } catch(e) {
+    console.error('mSave error:', e);
+    showToast('❌ Chyba: ' + e.message);
+  }
   hideLoading();
 }
 
