@@ -315,6 +315,7 @@ canvas#mca { display: block; }
   <div class="montaz-toolbar" id="montazToolbar">
     <button class="tool-btn active" id="btnModeSelect" onclick="setMontazMode('select')">👆 Zvar</button>
     <button class="tool-btn" id="btnModeWeld" onclick="setMontazMode('weld')">➕ Kresliť zvar</button>
+    <button class="tool-btn" id="btnModeDelete" onclick="setMontazMode('delete')" style="background:#450a0a;color:#f87171">🗑️ Vymazať</button>
     <button class="tool-btn" id="btnModeLine" onclick="setMontazMode('line')">╱ Palička</button>
     <button class="tool-btn" id="btnModeText" onclick="setMontazMode('text')">T Text</button>
     <button class="tool-btn" id="btnModeCloud" onclick="setMontazMode('cloud')">💬 Oblačik</button>
@@ -987,6 +988,7 @@ function mZoomFit() {
 const TOOL_LABELS = {
   select: 'Tap na krúžok = priradiť zvarača',
   weld: 'Tap = 1. bod zvaru, Tap = 2. bod',
+  delete: 'Tap na zvar = vymazať',
   line: 'Tap = začiatok paličky, Tap = koniec',
   text: 'Tap = miesto textu',
   cloud: 'Tap = 1. roh oblačika, Tap = 2. roh',
@@ -998,9 +1000,13 @@ function setMontazMode(mode) {
   montazMode = mode;
   annPt1 = null;
   newWeldPt1 = null;
-  // Update button states
-  ['select','weld','line','text','cloud','arrow','dblarrow'].forEach(m => {
-    const btn = document.getElementById('btnMode' + m.charAt(0).toUpperCase() + m.slice(1));
+  const modeIdMap = {
+    select:'btnModeSelect', weld:'btnModeWeld', delete:'btnModeDelete',
+    line:'btnModeLine', text:'btnModeText', cloud:'btnModeCloud',
+    arrow:'btnModeArrow', dblarrow:'btnModeDblArrow'
+  };
+  Object.entries(modeIdMap).forEach(([m, id]) => {
+    const btn = document.getElementById(id);
     if (btn) btn.classList.toggle('active', m === mode);
   });
   mDraw();
@@ -1111,14 +1117,53 @@ function handleCanvasTap(clientX, clientY) {
     if (found) openWelderModal(found);
     else showToast('Klikni priamo na krúžok zvaru');
 
+  } else if (montazMode === 'delete') {
+    // Vymaž zvar na ktorý klikol
+    const tapRadius = 40 / mScale;
+    let foundIdx = -1;
+    for (let i = 0; i < currentProject.welds.length; i++) {
+      const w = currentProject.welds[i];
+      const ex = w.end.x * W;
+      const ey = w.end.y * H;
+      if (Math.sqrt((canvasX-ex)**2 + (canvasY-ey)**2) < tapRadius) { foundIdx = i; break; }
+    }
+    if (foundIdx !== -1) {
+      const weld = currentProject.welds[foundIdx];
+      currentProject.welds.splice(foundIdx, 1);
+      // Vymaž aj z WeldBooku
+      const iso = getProjectIso();
+      const wbIdx = weldBookData.findIndex(r =>
+        String(r.weldId) === String(weld.displayNum) &&
+        (r.isometric === iso || (iso && r.isometric && (iso.includes(r.isometric) || r.isometric.includes(iso))))
+      );
+      if (wbIdx !== -1) weldBookData.splice(wbIdx, 1);
+      weldCounter = currentProject.welds.length > 0
+        ? Math.max(...currentProject.welds.map(w => parseInt(w.displayNum)||0)) + 1
+        : 1;
+      document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
+      mDraw();
+      saveWeldBookToFirebase().catch(()=>{});
+      showToast('🗑️ Zvar #' + weld.displayNum + ' vymazaný');
+    } else {
+      showToast('Klikni priamo na krúžok zvaru');
+    }
+
   } else if (montazMode === 'weld') {
     if (!newWeldPt1) {
       newWeldPt1 = pt;
       mDraw();
       showToast('✅ 1. bod. Tap = koniec zvaru');
     } else {
-      const weld = { id: Date.now()+'_'+Math.random(), start: newWeldPt1, end: pt, displayNum: weldCounter++, source: 'new' };
+      // Opýtaj sa na číslo zvaru
+      const suggestedNum = weldCounter;
+      const numInput = prompt('Číslo zvaru (napr. ' + suggestedNum + ' alebo 2B):', String(suggestedNum));
+      if (!numInput) { newWeldPt1 = null; mDraw(); return; }
+      const displayNum = numInput.trim();
+      const weld = { id: Date.now()+'_'+Math.random(), start: newWeldPt1, end: pt, displayNum: displayNum, source: 'new' };
       currentProject.welds.push(weld);
+      // Aktualizuj counter
+      const parsed = parseInt(displayNum);
+      if (!isNaN(parsed) && parsed >= weldCounter) weldCounter = parsed + 1;
       newWeldPt1 = null;
       document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
       mDraw();
