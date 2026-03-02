@@ -1044,71 +1044,91 @@ document.getElementById('welderModal').addEventListener('click', function(e) {
 // ===== WELDBOOK =====
 async function loadWeldBook() {
   try {
-    // Try new single-doc format first
-    const mainDoc = await db.collection('weldbook').doc('weldbook_main').get();
-    if (mainDoc.exists) {
-      const meta = mainDoc.data();
-      const chunkPromises = [];
-      for (let i = 0; i < (meta.chunks||1); i++)
-        chunkPromises.push(db.collection('weldbook').doc('weldbook_main').collection('data').doc('c'+i).get());
-      const chunkDocs = await Promise.all(chunkPromises);
-      const chunks = chunkDocs.filter(c=>c.exists).map(c=>c.data().d);
-      weldBookData = JSON.parse(chunks.join(''));
-    } else {
-      // Fallback: old per-isometric format
-      const snap = await db.collection('weldbook').get();
-      weldBookData = [];
-      await Promise.all(snap.docs.filter(d=>d.id!=='weldbook_main').map(async docSnap => {
-        const meta = docSnap.data();
-        const cp = [];
-        for (let i=0;i<(meta.chunks||1);i++) {
-          const c = await docSnap.ref.collection('data').doc('c'+i).get();
-          if(c.exists) cp.push(c.data().d);
-        }
-        if(cp.length){ const p=JSON.parse(cp.join('')); if(p.welds) weldBookData=weldBookData.concat(p.welds); }
-      }));
-    }
-    renderWeldBook(weldBookData);
-    document.getElementById('wbCount').textContent = weldBookData.length + ' zvarov celkom';
+    await loadWbForPart(document.getElementById('wbFPart').value || null);
   } catch(e) { console.error('WB load error:', e); }
+}
+
+async function loadWbForPart(part) {
+  const docId = part ? (part.toUpperCase() + '_main') : 'weldbook_main';
+  try {
+    // Skús part doc
+    const doc = await db.collection('weldbook').doc(docId).get();
+    if (doc.exists) {
+      const meta = doc.data();
+      const cps = [];
+      for (let i=0; i<(meta.chunks||1); i++)
+        cps.push(db.collection('weldbook').doc(docId).collection('data').doc('c'+i).get());
+      const cds = await Promise.all(cps);
+      weldBookData = JSON.parse(cds.filter(c=>c.exists).map(c=>c.data().d).join(''));
+    } else {
+      // Fallback na weldbook_main + filter
+      const mainDoc = await db.collection('weldbook').doc('weldbook_main').get();
+      if (mainDoc.exists) {
+        const meta = mainDoc.data();
+        const cps = [];
+        for (let i=0; i<(meta.chunks||1); i++)
+          cps.push(db.collection('weldbook').doc('weldbook_main').collection('data').doc('c'+i).get());
+        const cds = await Promise.all(cps);
+        const all = JSON.parse(cds.filter(c=>c.exists).map(c=>c.data().d).join(''));
+        weldBookData = part ? all.filter(r=>(r.part||'').toUpperCase()===part.toUpperCase()) : all;
+      }
+    }
+    // Cache
+    try { localStorage.setItem('wbCache_'+(part||'ALL'), JSON.stringify(weldBookData)); } catch(e){}
+    renderWeldBook(weldBookData);
+    document.getElementById('wbCount').textContent = weldBookData.length + ' zvarov' + (part ? ' ('+part+')' : '');
+  } catch(e) { console.error('WB load part error:', e); }
 }
 
 async function saveWeldBookToFirebase() {
   if (!db) return;
   try {
-    const json = JSON.stringify(weldBookData);
+    // Zisti časť zo zmenených dát
+    const part = currentProject ? getProjectPart() : (selectedPart || null);
+    const partRows = part
+      ? weldBookData.filter(r => (r.part||'').toUpperCase() === part.toUpperCase())
+      : weldBookData;
+
+    const docId = part ? (part.toUpperCase() + '_main') : 'weldbook_main';
+    const json = JSON.stringify(partRows);
     const CHUNK = 800*1024;
     const chunks = [];
     for(let i=0;i<json.length;i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
 
-    // 1. Najprv ulož chunky
+    // 1. Najprv chunky
     await Promise.all(chunks.map((c,i)=>
-      db.collection('weldbook').doc('weldbook_main').collection('data').doc('c'+i).set({d:c})
+      db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c})
     ));
 
-    // 2. Potom metadata (PC použije chunks count odtiaľto)
-    await db.collection('weldbook').doc('weldbook_main').set({
-      type:'main', chunks:chunks.length, count:weldBookData.length,
+    // 2. Metadata
+    await db.collection('weldbook').doc(docId).set({
+      type:'part', part: part||'ALL', chunks:chunks.length, count:partRows.length,
       modifiedBy: currentUser?.username||'mobile', date:new Date().toISOString()
     });
 
-    // 3. Signal až keď sú chunky hotové
+    // 3. Signal
     await db.collection('weldbook_signal').doc('latest').set({
-      by: currentUser?.username||'mobile', at:new Date().toISOString(), count:weldBookData.length
+      by: currentUser?.username||'mobile',
+      at: new Date().toISOString(),
+      part: part||'ALL',
+      count: partRows.length
     });
+    console.log('✅ WeldBook [' + (part||'ALL') + '] uložený:', partRows.length, 'zvarov');
   } catch(e) { console.error('WB save error:', e); showToast('❌ Chyba ukladania: ' + e.message); }
 }
 
 function onWbPartChange() {
   const part = document.getElementById('wbFPart').value;
-  const isoSel = document.getElementById('wbFIso');
-  const isos = [...new Set(
-    weldBookData.filter(r => !part || (r.part||'').toUpperCase() === part)
-               .map(r => r.isometric||'').filter(Boolean)
-  )].sort();
-  isoSel.innerHTML = '<option value="">Všetky izometrie (' + isos.length + ')</option>' +
-    isos.map(v=>`<option value="${v}">${v}</option>`).join('');
-  filterWB();
+  // Načítaj z Firebase pre túto časť
+  document.getElementById('wbCount').textContent = 'Načítavam ' + (part||'všetko') + '...';
+  loadWbForPart(part || null).then(() => {
+    // Obnov izometrie dropdown
+    const isoSel = document.getElementById('wbFIso');
+    const isos = [...new Set(weldBookData.map(r=>r.isometric||'').filter(Boolean))].sort();
+    isoSel.innerHTML = '<option value="">Všetky izometrie (' + isos.length + ')</option>' +
+      isos.map(v=>`<option value="${v}">${v}</option>`).join('');
+    filterWB();
+  });
 }
 
 let _wbTimer = null;
