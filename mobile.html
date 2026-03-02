@@ -790,26 +790,32 @@ function mDraw() {
       const wbEntry = mGetWbEntry(w);
       const hasDone = wbEntry && wbEntry.welderId && wbEntry.welderId.trim();
 
-      // Line
+      // Rovnaký štýl ako PC verzia
+      const weldColor = '#FF0000';  // červená linka + krúžok vždy
+      const fillColor = hasDone ? '#00FF00' : 'transparent'; // zelená výplň ak hotové, prázdne ak nie
+
+      // Linka (červená vždy)
       mctx.beginPath();
       mctx.moveTo(sx, sy);
       mctx.lineTo(ex, ey);
-      mctx.strokeStyle = hasDone ? '#10b981' : '#ef4444';
+      mctx.strokeStyle = weldColor;
       mctx.lineWidth = 2;
       mctx.stroke();
 
-      // Circle
+      // Krúžok - výplň len ak hotové (zelená #00FF00), obrys vždy červený
       mctx.beginPath();
       mctx.arc(ex, ey, 14, 0, Math.PI * 2);
-      mctx.fillStyle = hasDone ? '#10b981' : '#ef4444';
-      mctx.fill();
-      mctx.strokeStyle = 'white';
+      if (hasDone) {
+        mctx.fillStyle = '#00FF00';
+        mctx.fill();
+      }
+      mctx.strokeStyle = weldColor;
       mctx.lineWidth = 2;
       mctx.stroke();
 
-      // Number
-      mctx.fillStyle = 'white';
-      mctx.font = 'bold 10px sans-serif';
+      // Číslo zvaru - červené ako na PC
+      mctx.fillStyle = hasDone ? '#000000' : weldColor;
+      mctx.font = '11px Arial';
       mctx.textAlign = 'center';
       mctx.textBaseline = 'middle';
       mctx.fillText(String(w.displayNum), ex, ey);

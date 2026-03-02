@@ -2103,6 +2103,24 @@ selectedTextForRotation=null;
 dw();
 };
 
+// Shift+scroll = horizontal pan, normal scroll = vertical pan
+ca.addEventListener('wheel', function(e) {
+  var cw = document.getElementById('cw');
+  if (!cw) return;
+  e.preventDefault();
+  if (e.shiftKey) {
+    // Shift+scroll = horizontálny posun
+    cw.scrollLeft += e.deltaY || e.deltaX;
+  } else if (e.ctrlKey || e.metaKey) {
+    // Ctrl+scroll = zoom (ak chceš v budúcnosti)
+    cw.scrollTop += e.deltaY;
+  } else {
+    // Normálny scroll = vertikálny posun
+    cw.scrollTop += e.deltaY;
+    cw.scrollLeft += e.deltaX;
+  }
+}, { passive: false });
+
 ca.onmouseup=function(e){
 if(isPanning){
 isPanning=false;
@@ -9305,15 +9323,33 @@ async function _saveWbPartToFirebase(part) {
 }
 
 async function _saveWbToFirebase() {
-  // Ulož len aktívnu časť (rýchle) + signal
-  var part = wbActivePart;
-  await _saveWbPartToFirebase(part);
+  // Zisti ktoré časti máme v pamäti
+  var partsInMemory = {};
+  var knownParts = ['SUL','LIG','DRY','FLA','LHT'];
+  weldBookData.forEach(function(r) {
+    var p = (r.part||'').toUpperCase();
+    if (knownParts.indexOf(p) !== -1) partsInMemory[p] = true;
+  });
+  var partsToSave = Object.keys(partsInMemory);
 
-  // Signal
+  if (partsToSave.length > 1) {
+    // Máme viac častí v pamäti (napr. po Excel importe) - ulož každú zvlášť
+    console.log('💾 Full save - ukladám časti:', partsToSave.join(', '));
+    await Promise.all(partsToSave.map(function(p) {
+      return _saveWbPartToFirebase(p).catch(function(e){ console.warn('Part save error:', p, e); });
+    }));
+  } else {
+    // Len jedna časť v pamäti - rýchle uloženie
+    var part = partsToSave.length === 1 ? partsToSave[0] : wbActivePart;
+    await _saveWbPartToFirebase(part);
+  }
+
+  // Signal - informuj ostatných
+  var savedPart = partsToSave.length === 1 ? partsToSave[0] : 'ALL';
   await db.collection('weldbook_signal').doc('latest').set({
     by: window.currentUser ? window.currentUser.username : 'unknown',
     at: new Date().toISOString(),
-    part: part || 'ALL',
+    part: savedPart,
     count: weldBookData.length
   });
 }
