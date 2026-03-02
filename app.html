@@ -9481,20 +9481,16 @@ function startWbRealtimeSync() {
 
     var changedPart = (data.part && data.part !== 'ALL') ? data.part : null;
 
-    // Ak sa zmenila iná časť ako máme aktívnu - prepni na tú časť automaticky
     if (changedPart && wbActivePart && changedPart !== wbActivePart) {
-      console.log('📡 Signal pre ' + changedPart + ' (aktívna: ' + wbActivePart + ') - načítavam ' + changedPart);
-      showWbSyncNotification('🔄 ' + data.by + ' upravil ' + changedPart + ' - načítavam...');
-      loadWbPart(changedPart).then(function() {
-        showWbSyncNotification('✅ ' + data.by + ' - WeldBook [' + changedPart + '] aktualizovaný (' + weldBookData.length + ' zvarov)');
-      });
+      // Iná časť ako máme otvorenú - len notifikácia, nenačítavaj
+      showWbSyncNotification('📢 ' + data.by + ' označil zvar v časti ' + changedPart, 'info');
       return;
     }
 
-    console.log('📡 WeldBook signal od:', data.by, '- načítavam [' + (wbActivePart||'ALL') + ']');
-    showWbSyncNotification('🔄 ' + data.by + ' upravil WeldBook...');
+    // Naša aktívna časť sa zmenila - načítaj
+    showWbSyncNotification('🔄 ' + data.by + ' upravil WeldBook...', 'loading');
     loadWbPart(wbActivePart).then(function() {
-      showWbSyncNotification('✅ ' + data.by + ' - WeldBook aktualizovaný (' + weldBookData.length + ' zvarov)');
+      showWbSyncNotification('✅ ' + data.by + ' - WeldBook aktualizovaný (' + weldBookData.length + ' zvarov)', 'success');
     });
   });
   wbRealtimeListeners.push(unsubSignal);
@@ -9578,15 +9574,28 @@ function updateWbOnlineBar() {
   bar.innerHTML = html;
 }
 
-function showWbSyncNotification(msg) {
+function showWbSyncNotification(msg, type) {
   var t = document.getElementById('wbSyncToast');
   if (t) t.remove();
   t = document.createElement('div');
   t.id = 'wbSyncToast';
-  t.style.cssText = 'position:fixed;bottom:80px;right:20px;background:#1e40af;color:white;padding:10px 16px;border-radius:8px;font-size:13px;z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,0.3)';
-  t.textContent = '🔄 ' + msg;
+  var bg = type === 'success' ? '#166534' : type === 'info' ? '#92400e' : '#1e40af';
+  t.style.cssText = 'position:fixed;bottom:80px;right:20px;background:'+bg+';color:white;padding:10px 16px;border-radius:8px;font-size:13px;z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,0.3);max-width:320px;cursor:pointer;';
+  t.textContent = msg;
+  // Klik na notifikáciu = načítaj tú časť
+  if (type === 'info') {
+    t.title = 'Klikni pre načítanie tejto časti';
+    t.onclick = function() {
+      var m = msg.match(/časti\s+([A-Z]+)/);
+      if (m) loadWbPart(m[1]).then(function() {
+        showWbSyncNotification('✅ WeldBook [' + m[1] + '] načítaný (' + weldBookData.length + ' zvarov)', 'success');
+      });
+      t.remove();
+    };
+  }
   document.body.appendChild(t);
-  setTimeout(function() { if (t.parentNode) t.remove(); }, 3000);
+  var timeout = type === 'info' ? 6000 : 3000; // info zostane dlhšie
+  setTimeout(function() { if (t.parentNode) t.remove(); }, timeout);
 }
 
 // ============= EXPORT DO EXCEL =============
