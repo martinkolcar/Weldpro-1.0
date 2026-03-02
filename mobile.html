@@ -313,12 +313,18 @@ canvas#mca { display: block; }
 
 <div class="page" id="montazPage">
   <div class="montaz-toolbar" id="montazToolbar">
-    <button class="tool-btn active" id="btnModeSelect" onclick="setMontazMode('select')">👆 Označiť zvar</button>
-    <button class="tool-btn green" id="btnModeNew" onclick="setMontazMode('new')">➕ Nový zvar</button>
-    <button class="tool-btn" id="btnUndo" onclick="mUndo()" style="background:#292d3e;color:#94a3b8">↩ Späť</button>
-    <button class="tool-btn red" id="btnSave" onclick="mSave()" style="background:#064e3b;color:#34d399">💾 Uložiť</button>
-    <button class="tool-btn" onclick="mZoomIn()" style="font-size:16px;padding:8px 10px">+</button>
-    <button class="tool-btn" onclick="mZoomOut()" style="font-size:16px;padding:8px 10px">−</button>
+    <button class="tool-btn active" id="btnModeSelect" onclick="setMontazMode('select')">👆 Zvar</button>
+    <button class="tool-btn" id="btnModeWeld" onclick="setMontazMode('weld')">➕ Kresliť zvar</button>
+    <button class="tool-btn" id="btnModeLine" onclick="setMontazMode('line')">╱ Palička</button>
+    <button class="tool-btn" id="btnModeText" onclick="setMontazMode('text')">T Text</button>
+    <button class="tool-btn" id="btnModeCloud" onclick="setMontazMode('cloud')">💬 Oblačik</button>
+    <button class="tool-btn" id="btnModeArrow" onclick="setMontazMode('arrow')">→ Šípka</button>
+    <button class="tool-btn" id="btnModeDblArrow" onclick="setMontazMode('dblarrow')">↔ 2xŠípka</button>
+    <div style="width:1px;background:#475569;flex-shrink:0;margin:4px 2px"></div>
+    <button class="tool-btn" onclick="mUndo()" style="background:#292d3e;color:#94a3b8">↩</button>
+    <button class="tool-btn" onclick="mSave()" style="background:#064e3b;color:#34d399">💾</button>
+    <button class="tool-btn" onclick="mZoomIn()" style="padding:8px 10px">+</button>
+    <button class="tool-btn" onclick="mZoomOut()" style="padding:8px 10px">−</button>
     <button class="tool-btn" onclick="mZoomFit()" style="font-size:11px">Fit</button>
   </div>
   <div class="canvas-container" id="mCanvasWrap">
@@ -424,6 +430,7 @@ canvas#mca { display: block; }
         <button class="btn-secondary" onclick="closeWbModal()">Zrušiť</button>
         <button class="btn-primary" onclick="saveWbModal()">✅ Uložiť</button>
       </div>
+      <button class="btn-danger" id="wb_remove" onclick="removeWbModal()" style="display:none">🗑️ Odstrániť zvarača</button>
     </div>
   </div>
 </div>
@@ -483,8 +490,9 @@ let currentUser = { username: "test" };
 let weldBookData = [];
 let allProjects = [];
 let currentProject = null; // { name, welds: [], originalFileName }
-let montazMode = 'select'; // 'select' | 'new'
+let montazMode = 'select';
 let newWeldPt1 = null;
+let annPt1 = null; // First point for annotations (line/arrow/cloud/dblarrow)
 let weldCounter = 1;
 let currentWeldForModal = null; // { weld, wbEntry }
 let currentWbRow = null;
@@ -748,6 +756,74 @@ function getProjectPart() {
   return sample ? (sample.part || '') : '';
 }
 
+// Kreslenie anotácií (palička, šípka, text, oblačik)
+function drawAnnotation(ctx, a, W, H) {
+  const x1 = a.x1 * W, y1 = a.y1 * H;
+  const x2 = (a.x2||a.x) * W, y2 = (a.y2||a.y) * H;
+  ctx.save();
+  ctx.strokeStyle = '#0000FF';
+  ctx.fillStyle = '#0000FF';
+  ctx.lineWidth = 2;
+
+  if (a.type === 'line') {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+  } else if (a.type === 'arrow') {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    drawArrowHead(ctx, x1, y1, x2, y2);
+
+  } else if (a.type === 'dblarrow') {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    drawArrowHead(ctx, x1, y1, x2, y2);
+    drawArrowHead(ctx, x2, y2, x1, y1);
+
+  } else if (a.type === 'cloud') {
+    const mx = Math.min(x1,x2), my = Math.min(y1,y2);
+    const mw = Math.abs(x2-x1), mh = Math.abs(y2-y1);
+    const r = Math.min(18, mw/4, mh/3);
+    // Simple rounded rect as cloud
+    ctx.beginPath();
+    ctx.roundRect(mx, my, mw, mh, r);
+    ctx.fillStyle = 'rgba(255,255,200,0.7)';
+    ctx.fill();
+    ctx.strokeStyle = '#0000FF';
+    ctx.stroke();
+
+  } else if (a.type === 'text') {
+    ctx.font = 'bold 14px Arial';
+    ctx.fillStyle = '#0000FF';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    // Background
+    const tw = ctx.measureText(a.text).width;
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillRect(x2-2, y2-2, tw+4, 18);
+    ctx.fillStyle = '#0000FF';
+    ctx.fillText(a.text, x2, y2);
+  }
+  ctx.restore();
+}
+
+function drawArrowHead(ctx, fromX, fromY, toX, toY) {
+  const angle = Math.atan2(toY - fromY, toX - fromX);
+  const size = 12;
+  ctx.beginPath();
+  ctx.moveTo(toX, toY);
+  ctx.lineTo(toX - size * Math.cos(angle - Math.PI/6), toY - size * Math.sin(angle - Math.PI/6));
+  ctx.lineTo(toX - size * Math.cos(angle + Math.PI/6), toY - size * Math.sin(angle + Math.PI/6));
+  ctx.closePath();
+  ctx.fill();
+}
+
 function mDraw() {
   if (!mca) return;
   const wrap = document.getElementById('mCanvasWrap');
@@ -782,6 +858,12 @@ function mDraw() {
   if (currentProject) {
     const W = mImg ? mImg.naturalWidth : mca.width / mScale;
     const H = mImg ? mImg.naturalHeight : mca.height / mScale;
+
+    // Draw annotations (lines, text, arrows, clouds)
+    if (currentProject.annotations) {
+      currentProject.annotations.forEach(a => drawAnnotation(mctx, a, W, H));
+    }
+
     currentProject.welds.forEach(w => {
       const ex = w.end.x * W;
       const ey = w.end.y * H;
@@ -790,21 +872,37 @@ function mDraw() {
       const wbEntry = mGetWbEntry(w);
       const hasDone = wbEntry && wbEntry.welderId && wbEntry.welderId.trim();
 
-      // Rovnaký štýl ako PC verzia
-      const weldColor = '#FF0000';  // červená linka + krúžok vždy
-      const fillColor = hasDone ? '#00FF00' : 'transparent'; // zelená výplň ak hotové, prázdne ak nie
+      const weldColor = '#FF0000';
+      // Dynamický radius podľa dĺžky čísla (ako PC)
+      const displayText = String(w.displayNum);
+      const tLen = displayText.length;
+      const ry = 18; // základný radius Y
+      const rx = tLen <= 2 ? ry : Math.max(ry, tLen * 11 * 0.6 / 2 + 6);
 
-      // Linka (červená vždy)
+      // Výpočet priesečníka línie s elipsou (ako PC)
+      const dirX = sx - ex;
+      const dirY = sy - ey;
+      const dirLen = Math.sqrt(dirX*dirX + dirY*dirY);
+      let lineEndX = ex, lineEndY = ey;
+      if (dirLen > 0) {
+        const ndx = dirX / dirLen;
+        const ndy = dirY / dirLen;
+        const t = 1 / Math.sqrt((ndx/rx)*(ndx/rx) + (ndy/ry)*(ndy/ry));
+        lineEndX = ex + ndx * t;
+        lineEndY = ey + ndy * t;
+      }
+
+      // Linka končí na kraji krúžku
       mctx.beginPath();
       mctx.moveTo(sx, sy);
-      mctx.lineTo(ex, ey);
+      mctx.lineTo(lineEndX, lineEndY);
       mctx.strokeStyle = weldColor;
       mctx.lineWidth = 2;
       mctx.stroke();
 
-      // Krúžok - výplň len ak hotové (zelená #00FF00), obrys vždy červený
+      // Krúžok (elipsa pre dlhé čísla)
       mctx.beginPath();
-      mctx.arc(ex, ey, 14, 0, Math.PI * 2);
+      mctx.ellipse(ex, ey, rx, ry, 0, 0, Math.PI * 2);
       if (hasDone) {
         mctx.fillStyle = '#00FF00';
         mctx.fill();
@@ -813,12 +911,13 @@ function mDraw() {
       mctx.lineWidth = 2;
       mctx.stroke();
 
-      // Číslo zvaru - červené ako na PC
+      // Číslo zvaru
+      const fontSize = tLen >= 5 ? 10 : tLen >= 3 ? 12 : 14;
       mctx.fillStyle = hasDone ? '#000000' : weldColor;
-      mctx.font = '11px Arial';
+      mctx.font = fontSize + 'px Arial';
       mctx.textAlign = 'center';
       mctx.textBaseline = 'middle';
-      mctx.fillText(String(w.displayNum), ex, ey);
+      mctx.fillText(displayText, ex, ey);
     });
 
     // New weld pt1 indicator
@@ -852,23 +951,43 @@ function mZoomFit() {
   wrap.scrollTop = 0; wrap.scrollLeft = 0;
 }
 
+const TOOL_LABELS = {
+  select: 'Tap na krúžok = priradiť zvarača',
+  weld: 'Tap = 1. bod zvaru, Tap = 2. bod',
+  line: 'Tap = začiatok paličky, Tap = koniec',
+  text: 'Tap = miesto textu',
+  cloud: 'Tap = 1. roh oblačika, Tap = 2. roh',
+  arrow: 'Tap = začiatok šípky, Tap = koniec',
+  dblarrow: 'Tap = 1. bod, Tap = 2. bod'
+};
+
 function setMontazMode(mode) {
   montazMode = mode;
+  annPt1 = null;
   newWeldPt1 = null;
-  document.getElementById('btnModeSelect').classList.toggle('active', mode === 'select');
-  document.getElementById('btnModeNew').classList.toggle('active', mode === 'new');
+  // Update button states
+  ['select','weld','line','text','cloud','arrow','dblarrow'].forEach(m => {
+    const btn = document.getElementById('btnMode' + m.charAt(0).toUpperCase() + m.slice(1));
+    if (btn) btn.classList.toggle('active', m === mode);
+  });
   mDraw();
-  if (mode === 'new') showToast('Tap = 1. bod zvaru');
-  else showToast('Tap na krúžok = priradiť zvarača');
+  showToast(TOOL_LABELS[mode] || mode);
 }
 
 function mUndo() {
-  if (!currentProject || !currentProject.welds.length) return;
-  currentProject.welds.pop();
-  weldCounter = Math.max(1, ...currentProject.welds.map(w => parseInt(w.displayNum)||0)) + 1;
-  document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
-  mDraw();
-  showToast('↩ Zrušený posledný zvar');
+  if (!currentProject) return;
+  // Undo annotations first, then welds
+  if (currentProject.annotations && currentProject.annotations.length > 0) {
+    currentProject.annotations.pop();
+    mDraw();
+    showToast('↩ Zrušená anotácia');
+  } else if (currentProject.welds.length > 0) {
+    currentProject.welds.pop();
+    weldCounter = Math.max(1, ...currentProject.welds.map(w => parseInt(w.displayNum)||0)) + 1;
+    document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
+    mDraw();
+    showToast('↩ Zrušený posledný zvar');
+  }
 }
 
 async function mSave() {
@@ -946,42 +1065,61 @@ function handleCanvasTap(clientX, clientY) {
   const W = mImg ? mImg.naturalWidth : mca.width / mScale;
   const H = mImg ? mImg.naturalHeight : mca.height / mScale;
 
+  const pt = { x: canvasX / W, y: canvasY / H };
+
   if (montazMode === 'select') {
-    // Find tapped weld (radius 40px in screen coords = 40/mScale in canvas coords)
     const tapRadius = 40 / mScale;
     let found = null;
     for (const w of currentProject.welds) {
       const ex = w.end.x * W;
       const ey = w.end.y * H;
-      const dist = Math.sqrt((canvasX-ex)**2 + (canvasY-ey)**2);
-      if (dist < tapRadius) { found = w; break; }
+      if (Math.sqrt((canvasX-ex)**2 + (canvasY-ey)**2) < tapRadius) { found = w; break; }
     }
-    if (found) {
-      openWelderModal(found);
-    } else {
-      showToast('Klikni priamo na krúžok zvaru');
-    }
-  } else if (montazMode === 'new') {
+    if (found) openWelderModal(found);
+    else showToast('Klikni priamo na krúžok zvaru');
+
+  } else if (montazMode === 'weld') {
     if (!newWeldPt1) {
-      newWeldPt1 = { x: canvasX / W, y: canvasY / H };
+      newWeldPt1 = pt;
       mDraw();
-      showToast('✅ 1. bod. Tap = 2. bod (koniec zvaru)');
+      showToast('✅ 1. bod. Tap = koniec zvaru');
     } else {
-      // Create weld
-      const weld = {
-        id: Date.now() + '_' + Math.random(),
-        start: newWeldPt1,
-        end: { x: canvasX / W, y: canvasY / H },
-        displayNum: weldCounter,
-        source: 'new'
-      };
+      const weld = { id: Date.now()+'_'+Math.random(), start: newWeldPt1, end: pt, displayNum: weldCounter++, source: 'new' };
       currentProject.welds.push(weld);
-      weldCounter++;
       newWeldPt1 = null;
       document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
       mDraw();
-      // Immediately open welder modal for new weld
       openWelderModal(weld);
+    }
+
+  } else if (montazMode === 'line' || montazMode === 'arrow' || montazMode === 'dblarrow') {
+    if (!annPt1) {
+      annPt1 = pt;
+      showToast('1. bod. Tap = koniec');
+    } else {
+      if (!currentProject.annotations) currentProject.annotations = [];
+      currentProject.annotations.push({ type: montazMode, x1: annPt1.x, y1: annPt1.y, x2: pt.x, y2: pt.y });
+      annPt1 = null;
+      mDraw();
+    }
+
+  } else if (montazMode === 'cloud') {
+    if (!annPt1) {
+      annPt1 = pt;
+      showToast('1. roh. Tap = 2. roh');
+    } else {
+      if (!currentProject.annotations) currentProject.annotations = [];
+      currentProject.annotations.push({ type: 'cloud', x1: annPt1.x, y1: annPt1.y, x2: pt.x, y2: pt.y });
+      annPt1 = null;
+      mDraw();
+    }
+
+  } else if (montazMode === 'text') {
+    const txt = prompt('Zadaj text:');
+    if (txt && txt.trim()) {
+      if (!currentProject.annotations) currentProject.annotations = [];
+      currentProject.annotations.push({ type: 'text', x: pt.x, y: pt.y, text: txt.trim() });
+      mDraw();
     }
   }
 }
@@ -1189,6 +1327,8 @@ function openWbModal(idx) {
   document.getElementById('wb_sheet').textContent = r.sheets || 1;
   document.getElementById('wb_welder').value = r.welderId || '';
   document.getElementById('wb_date').value = r.dateWelding || today();
+  // Zobraz tlačidlo Odstrániť len ak má zvarača
+  document.getElementById('wb_remove').style.display = (r.welderId && r.welderId.trim()) ? 'block' : 'none';
   document.getElementById('wbModal').classList.add('show');
   setTimeout(() => document.getElementById('wb_welder').focus(), 300);
 }
@@ -1210,6 +1350,20 @@ function saveWbModal() {
   saveWeldBookToFirebase().then(() => {
     filterWB();
     showToast('✅ Uložené: zvar #' + r.weldId + ' → ' + welder);
+  });
+}
+
+function removeWbModal() {
+  if (!currentWbRow) return;
+  const r = currentWbRow.row;
+  const weldId = r.weldId;
+  r.welderId = '';
+  r.dateWelding = '';
+  closeWbModal();
+  showToast('💾 Odstraňujem...');
+  saveWeldBookToFirebase().then(() => {
+    filterWB();
+    showToast('🗑️ Zvarač odstránený: zvar #' + weldId);
   });
 }
 
