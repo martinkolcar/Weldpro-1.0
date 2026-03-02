@@ -278,6 +278,35 @@ canvas#mca { display: block; }
 
 /* Empty state */
 .empty { text-align: center; padding: 60px 20px; color: var(--gray); }
+
+/* Login page */
+.login-page {
+  position: fixed; inset: 0; background: #0f172a;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999; padding: 24px;
+}
+.login-page.hidden { display: none; }
+.login-box {
+  background: #1e293b; border-radius: 16px; padding: 32px 24px;
+  width: 100%; max-width: 360px; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.login-logo { text-align: center; font-size: 40px; margin-bottom: 8px; }
+.login-title { text-align: center; color: white; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.login-sub { text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 28px; }
+.login-label { color: #94a3b8; font-size: 13px; font-weight: 500; margin-bottom: 6px; display: block; }
+.login-input {
+  width: 100%; padding: 14px; border-radius: 10px; border: 1.5px solid #334155;
+  background: #0f172a; color: white; font-size: 16px; box-sizing: border-box;
+  margin-bottom: 16px; outline: none;
+}
+.login-input:focus { border-color: #3b82f6; }
+.login-btn {
+  width: 100%; padding: 15px; background: #3b82f6; color: white;
+  border: none; border-radius: 10px; font-size: 16px; font-weight: 700;
+  cursor: pointer; margin-top: 4px;
+}
+.login-btn:active { background: #2563eb; }
+.login-err { color: #f87171; font-size: 13px; margin-top: 10px; text-align: center; display: none; }
 .empty-icon { font-size: 48px; margin-bottom: 12px; }
 .empty-text { font-size: 15px; font-weight: 500; }
 .empty-sub { font-size: 13px; margin-top: 4px; }
@@ -285,13 +314,29 @@ canvas#mca { display: block; }
 </head>
 <body>
 
+<!-- LOGIN PAGE -->
+<div class="login-page" id="loginPage">
+  <div class="login-box">
+    <div class="login-logo">🔧</div>
+    <div class="login-title">WeldPro</div>
+    <div class="login-sub">Mobile verzia</div>
+    <label class="login-label">Meno / Username</label>
+    <input class="login-input" id="loginUser" placeholder="Zadaj meno..." autocapitalize="none" autocorrect="off">
+    <label class="login-label">Heslo</label>
+    <input class="login-input" id="loginPass" type="password" placeholder="Zadaj heslo..."
+      onkeydown="if(event.key==='Enter') doLogin()">
+    <button class="login-btn" onclick="doLogin()">🔐 Prihlásiť sa</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
 <!-- HEADER -->
-<div class="header" id="mainHeader">
+<div class="header" id="mainHeader" style="display:none">
   <div>
     <div class="header-title">🔧 WeldPro</div>
     <div class="header-sub" id="headerSub">Mobile</div>
   </div>
-  <span style="font-size:13px;color:rgba(255,255,255,0.8)">Mobile</span>
+  <span id="headerUser" style="font-size:13px;color:rgba(255,255,255,0.8);cursor:pointer" onclick="doLogout()">👤</span>
 </div>
 
 <!-- PAGES -->
@@ -376,7 +421,7 @@ canvas#mca { display: block; }
 </div>
 
 <!-- BOTTOM NAV -->
-<div class="bottom-nav" id="bottomNav">
+<div class="bottom-nav" id="bottomNav" style="display:none">
   <button class="nav-btn active" onclick="switchPage('kniznica')" id="navKniznica">
     <span class="icon">📚</span>
     <span>Knižnica</span>
@@ -511,7 +556,6 @@ async function initFirebase() {
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
     auth = firebase.auth();
-    await auth.signInAnonymously();
     console.log('Firebase ready');
     return true;
   } catch(e) {
@@ -521,7 +565,7 @@ async function initFirebase() {
 }
 
 // ===== STATE =====
-let currentUser = { username: "test" };
+let currentUser = null;
 let weldBookData = [];
 let allProjects = [];
 let currentProject = null; // { name, welds: [], originalFileName }
@@ -535,9 +579,9 @@ let mScale = 1;
 let mOffX = 0, mOffY = 0;
 let mImg = null; // background image
 
-// Canvas
-const mca = document.getElementById('mca');
-const mctx = mca.getContext('2d');
+// Canvas - inicializované v DOMContentLoaded
+let mca = null;
+let mctx = null;
 
 // ===== UTILS =====
 function showToast(msg, duration=2000) {
@@ -547,11 +591,14 @@ function showToast(msg, duration=2000) {
   setTimeout(() => t.classList.remove('show'), duration);
 }
 function showLoading(text='Načítavam...') {
-  document.getElementById('loadingText').textContent = text;
-  document.getElementById('loading').classList.add('show');
+  const lt = document.getElementById('loadingText');
+  const ld = document.getElementById('loading');
+  if (lt) lt.textContent = text;
+  if (ld) ld.classList.add('show');
 }
 function hideLoading() {
-  document.getElementById('loading').classList.remove('show');
+  const ld = document.getElementById('loading');
+  if (ld) ld.classList.remove('show');
 }
 function today() {
   return new Date().toISOString().split('T')[0];
@@ -591,29 +638,107 @@ async function showApp() {
   document.getElementById('loginPage').classList.add('hidden');
   document.getElementById('mainHeader').style.display = 'flex';
   document.getElementById('bottomNav').style.display = 'flex';
-  document.getElementById('headerUser').textContent = currentUser.username;
-  await auth.signInAnonymously();
+  document.getElementById('headerUser').textContent = '👤 ' + currentUser.username;
   loadWeldBook();
   loadProjects();
 }
 
 // Auto login
 window.addEventListener('DOMContentLoaded', async () => {
+  // Init canvas
+  mca = document.getElementById('mca');
+  if (mca) mctx = mca.getContext('2d');
+
+  // Canvas touch/click listeners
+  if (mca) {
+    mca.addEventListener('touchstart', function(e) {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        _pinchDist = Math.sqrt(dx*dx + dy*dy);
+        return;
+      }
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      _tSX = t.clientX; _tSY = t.clientY;
+      _tTime = Date.now(); _tMoved = false;
+    }, {passive: true});
+
+    mca.addEventListener('touchmove', function(e) {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (_pinchDist > 0) {
+          const ratio = dist / _pinchDist;
+          mScale = Math.max(0.3, Math.min(8, mScale * ratio));
+          mDraw();
+        }
+        _pinchDist = dist;
+        return;
+      }
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if (Math.abs(t.clientX - _tSX) > 8 || Math.abs(t.clientY - _tSY) > 8) _tMoved = true;
+    }, {passive: false});
+
+    mca.addEventListener('touchend', function(e) {
+      _pinchDist = 0;
+      if (_tMoved || Date.now() - _tTime > 500) return;
+      if (e.changedTouches.length !== 1) return;
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      handleCanvasTap(t.clientX, t.clientY);
+    }, {passive: false});
+
+    mca.addEventListener('click', function(e) {
+      if ('ontouchstart' in window) return;
+      handleCanvasTap(e.clientX, e.clientY);
+    });
+  }
+
+  // Modal overlay listeners
+  const welderModal = document.getElementById('welderModal');
+  if (welderModal) welderModal.addEventListener('click', function(e) { if (e.target === this) closeWelderModal(); });
+  const wbModal = document.getElementById('wbModal');
+  if (wbModal) wbModal.addEventListener('click', function(e) { if (e.target === this) closeWbModal(); });
+  const addWbModal = document.getElementById('addWbModal');
+  if (addWbModal) addWbModal.addEventListener('click', function(e) { if (e.target === this) closeAddWbModal(); });
+
   const ok = await initFirebase();
   if (!ok) {
-    document.getElementById('headerSub').textContent = '❌ Firebase error';
+    document.getElementById('loginErr').textContent = '❌ Firebase error - skontroluj internet';
+    document.getElementById('loginErr').style.display = 'block';
     return;
   }
-  loadWeldBook();
-  loadProjects();
+  // Skús auto-login z localStorage
+  const saved = localStorage.getItem('mobileUser');
+  if (saved) {
+    try {
+      currentUser = JSON.parse(saved);
+      // Overenie že používateľ stále existuje
+      const doc = await db.collection('users').doc(currentUser.username).get();
+      if (doc.exists) {
+        showApp();
+        return;
+      }
+    } catch(e) {}
+    localStorage.removeItem('mobileUser');
+  }
+  // Zobraz login
+  document.getElementById('loginPage').classList.remove('hidden');
 });
 
 // ===== NAVIGATION =====
 function switchPage(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById(page + 'Page').classList.add('active');
-  document.getElementById('nav' + page.charAt(0).toUpperCase() + page.slice(1)).classList.add('active');
+  const pageEl = document.getElementById(page + 'Page');
+  if (pageEl) pageEl.classList.add('active');
+  const navId = 'nav' + page.charAt(0).toUpperCase() + page.slice(1);
+  const navEl = document.getElementById(navId);
+  if (navEl) navEl.classList.add('active');
   document.getElementById('headerSub').textContent =
     page === 'kniznica' ? 'Knižnica' :
     page === 'montaz' ? (currentProject ? currentProject.name.substring(0,30) : 'Montáž') :
@@ -1082,53 +1207,7 @@ let _tSX=0,_tSY=0,_tTime=0,_tMoved=false;
 // Pinch zoom
 let _pinchDist=0;
 
-mca.addEventListener('touchstart', function(e) {
-  if (e.touches.length === 2) {
-    // Pinch start
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    _pinchDist = Math.sqrt(dx*dx + dy*dy);
-    return;
-  }
-  if (e.touches.length !== 1) return;
-  const t = e.touches[0];
-  _tSX = t.clientX; _tSY = t.clientY;
-  _tTime = Date.now(); _tMoved = false;
-}, {passive: true});
-
-mca.addEventListener('touchmove', function(e) {
-  if (e.touches.length === 2) {
-    e.preventDefault();
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    if (_pinchDist > 0) {
-      const ratio = dist / _pinchDist;
-      mScale = Math.max(0.3, Math.min(8, mScale * ratio));
-      mDraw();
-    }
-    _pinchDist = dist;
-    return;
-  }
-  if (e.touches.length !== 1) return;
-  const t = e.touches[0];
-  if (Math.abs(t.clientX - _tSX) > 8 || Math.abs(t.clientY - _tSY) > 8) _tMoved = true;
-}, {passive: false});
-
-mca.addEventListener('touchend', function(e) {
-  _pinchDist = 0;
-  if (_tMoved || Date.now() - _tTime > 500) return;
-  if (e.changedTouches.length !== 1) return;
-  e.preventDefault();
-  const t = e.changedTouches[0];
-  handleCanvasTap(t.clientX, t.clientY);
-}, {passive: false});
-
-// Also support mouse click for desktop testing
-mca.addEventListener('click', function(e) {
-  if ('ontouchstart' in window) return; // Skip on touch devices (handled above)
-  handleCanvasTap(e.clientX, e.clientY);
-});
+// mca listeners sa registrujú v DOMContentLoaded
 
 function handleCanvasTap(clientX, clientY) {
   if (!currentProject) { showToast('Najprv otvor výkres z Knižnice'); return; }
@@ -1251,12 +1330,12 @@ function openWelderModal(weld) {
   document.getElementById('wm_welder').value = hasWelder ? wbEntry.welderId : '';
   document.getElementById('wm_date').value = (wbEntry && wbEntry.dateWelding) ? wbEntry.dateWelding : today();
 
-  document.getElementById('welderModal').classList.add('show');
+  const _el_welderModal_add = document.getElementById('welderModal'); if (_el_welderModal_add) _el_welderModal_add.classList.add('show');
   setTimeout(() => document.getElementById('wm_welder').focus(), 300);
 }
 
 function closeWelderModal() {
-  document.getElementById('welderModal').classList.remove('show');
+  const _el_welderModal_remove = document.getElementById('welderModal'); if (_el_welderModal_remove) _el_welderModal_remove.classList.remove('show');
   currentWeldForModal = null;
 }
 
@@ -1377,12 +1456,12 @@ function openAddWbModal() {
   document.getElementById('awb_weldid').value = '';
   document.getElementById('awb_welder').value = '';
   document.getElementById('awb_date').value = today();
-  document.getElementById('addWbModal').classList.add('show');
+  const _el_addWbModal_add = document.getElementById('addWbModal'); if (_el_addWbModal_add) _el_addWbModal_add.classList.add('show');
   setTimeout(() => document.getElementById('awb_iso').focus(), 300);
 }
 
 function closeAddWbModal() {
-  document.getElementById('addWbModal').classList.remove('show');
+  const _el_addWbModal_remove = document.getElementById('addWbModal'); if (_el_addWbModal_remove) _el_addWbModal_remove.classList.remove('show');
 }
 
 function saveAddWbModal() {
@@ -1403,14 +1482,10 @@ function saveAddWbModal() {
   });
 }
 
-document.getElementById('addWbModal').addEventListener('click', function(e) {
-  if (e.target === this) closeAddWbModal();
-});
+// addWbModal listener sa registruje v DOMContentLoaded
 
 // Close modal on overlay click
-document.getElementById('welderModal').addEventListener('click', function(e) {
-  if (e.target === this) closeWelderModal();
-});
+// welderModal listener sa registruje v DOMContentLoaded
 
 // ===== WELDBOOK =====
 async function loadWeldBook() {
@@ -1570,12 +1645,12 @@ function openWbModal(idx) {
   document.getElementById('wb_date').value = r.dateWelding || today();
   // Zobraz tlačidlo Odstrániť len ak má zvarača
   document.getElementById('wb_remove').style.display = (r.welderId && r.welderId.trim()) ? 'block' : 'none';
-  document.getElementById('wbModal').classList.add('show');
+  const _el_wbModal_add = document.getElementById('wbModal'); if (_el_wbModal_add) _el_wbModal_add.classList.add('show');
   setTimeout(() => document.getElementById('wb_welder').focus(), 300);
 }
 
 function closeWbModal() {
-  document.getElementById('wbModal').classList.remove('show');
+  const _el_wbModal_remove = document.getElementById('wbModal'); if (_el_wbModal_remove) _el_wbModal_remove.classList.remove('show');
   currentWbRow = null;
 }
 
@@ -1624,9 +1699,7 @@ function deleteWbRowModal() {
   });
 }
 
-document.getElementById('wbModal').addEventListener('click', function(e) {
-  if (e.target === this) closeWbModal();
-});
+// wbModal listener sa registruje v DOMContentLoaded
 
 // ===== HELPERS =====
 function splitIso(fullName) {
