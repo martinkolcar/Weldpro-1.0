@@ -1131,9 +1131,12 @@ function openWelderModal(weld) {
 
   document.getElementById('wm_weldNum').textContent = '#' + weld.displayNum;
   document.getElementById('wm_iso').textContent = currentProject ? currentProject.originalFileName.substring(0,40) : '-';
-  document.getElementById('wm_welder').value = wbEntry?.welderId || '';
-  document.getElementById('wm_date').value = wbEntry?.dateWelding || today();
-  document.getElementById('wm_remove').style.display = (wbEntry?.welderId) ? 'block' : 'none';
+
+  const hasWelder = wbEntry && wbEntry.welderId && wbEntry.welderId.trim() !== '';
+  document.getElementById('wm_welder').value = hasWelder ? wbEntry.welderId : '';
+  document.getElementById('wm_date').value = (wbEntry && wbEntry.dateWelding) ? wbEntry.dateWelding : today();
+  // Tlačidlo Odstraniť - len ak má zvarača
+  document.getElementById('wm_remove').style.display = hasWelder ? 'block' : 'none';
 
   document.getElementById('welderModal').classList.add('show');
   setTimeout(() => document.getElementById('wm_welder').focus(), 300);
@@ -1173,11 +1176,17 @@ function saveWelderModal() {
 }
 
 function removeWelderModal() {
-  const { wbEntry } = currentWeldForModal;
-  if (wbEntry) { wbEntry.welderId = ''; wbEntry.dateWelding = ''; }
+  const { weld, wbEntry } = currentWeldForModal;
+  if (wbEntry) {
+    wbEntry.welderId = '';
+    wbEntry.dateWelding = '';
+  }
   mDraw();
   closeWelderModal();
-  saveWeldBookToFirebase().then(() => showToast('🗑️ Zvarač odstránený'));
+  showToast('💾 Odstraňujem...');
+  saveWeldBookToFirebase().then(() => {
+    showToast('🗑️ Zvarač odstránený: zvar #' + weld.displayNum);
+  });
 }
 
 // Close modal on overlay click
