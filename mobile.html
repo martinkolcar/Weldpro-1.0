@@ -435,6 +435,7 @@ canvas#mca { display: block; }
         <button class="btn-primary" onclick="saveWbModal()">✅ Uložiť</button>
       </div>
       <button class="btn-danger" id="wb_remove" onclick="removeWbModal()" style="display:none">🗑️ Odstrániť zvarača</button>
+      <button class="btn-danger" onclick="deleteWbRowModal()" style="margin-top:4px;background:#7f1d1d">🗑️ Vymazať zvar</button>
     </div>
   </div>
 </div>
@@ -1254,16 +1255,51 @@ function saveWelderModal() {
 
 // Vlož WB záznam zoradený podľa čísla zvaru (2B ide medzi 2 a 3)
 function wbInsertSorted(newRow) {
-  const newNum = parseFloat(newRow.weldId) || 0;
-  const newStr = String(newRow.weldId);
-  // Nájdi správnu pozíciu
-  let idx = weldBookData.findIndex(r => {
-    const n = parseFloat(r.weldId) || 0;
-    if (n !== newNum) return n > newNum;
-    return String(r.weldId) > newStr;
-  });
-  if (idx === -1) weldBookData.push(newRow);
-  else weldBookData.splice(idx, 0, newRow);
+  // Nájdi blok riadkov s rovnakou izometriou
+  const iso = newRow.isometric || '';
+  const part = (newRow.part || '').toUpperCase();
+
+  // Pomocná funkcia na porovnanie čísiel zvarov (2B < 3, 1 < 2B < 2)
+  function weldNumVal(id) {
+    const s = String(id);
+    const n = parseFloat(s);
+    if (!isNaN(n)) return n;
+    // "2B" → 2.5 (za číslom, pred nasledujúcim celým)
+    const m = s.match(/^(\d+)([A-Za-z]+)$/);
+    if (m) return parseFloat(m[1]) + 0.5;
+    return 999999;
+  }
+
+  const newVal = weldNumVal(newRow.weldId);
+
+  // Nájdi prvý index s rovnakou izometriou
+  const firstIsoIdx = weldBookData.findIndex(r =>
+    (r.isometric || '') === iso && (r.part || '').toUpperCase() === part
+  );
+
+  if (firstIsoIdx === -1) {
+    // Izometria neexistuje - pridaj na koniec
+    weldBookData.push(newRow);
+    return;
+  }
+
+  // Nájdi správnú pozíciu v rámci izometrie
+  let insertIdx = -1;
+  for (let i = firstIsoIdx; i < weldBookData.length; i++) {
+    const r = weldBookData[i];
+    if ((r.isometric || '') !== iso || (r.part || '').toUpperCase() !== part) {
+      // Skončila sekcia tejto izometrie - vlož tu
+      insertIdx = i;
+      break;
+    }
+    if (weldNumVal(r.weldId) > newVal) {
+      insertIdx = i;
+      break;
+    }
+  }
+
+  if (insertIdx === -1) weldBookData.push(newRow);
+  else weldBookData.splice(insertIdx, 0, newRow);
 }
 
 function removeWelderModal() {
@@ -1533,6 +1569,22 @@ function removeWbModal() {
   saveWeldBookToFirebase().then(() => {
     filterWB();
     showToast('🗑️ Zvarač odstránený: zvar #' + weldId);
+  });
+}
+
+function deleteWbRowModal() {
+  if (!currentWbRow) return;
+  const r = currentWbRow.row;
+  const weldId = r.weldId;
+  const iso = r.isometric || '';
+  // Vymaž z weldBookData
+  const idx = weldBookData.indexOf(r);
+  if (idx !== -1) weldBookData.splice(idx, 1);
+  closeWbModal();
+  showToast('💾 Mažem...');
+  saveWeldBookToFirebase().then(() => {
+    filterWB();
+    showToast('🗑️ Zvar #' + weldId + ' vymazaný');
   });
 }
 
