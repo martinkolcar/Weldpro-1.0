@@ -462,7 +462,7 @@ canvas#mca { display: block; }
 </div>
 
 <!-- Fitting / Heat Nr modal -->
-<div class="modal-overlay" id="fittingModal">
+<div class="modal-overlay" id="fittingModal" style="z-index:3000">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -1483,6 +1483,7 @@ function openFittingModalFromWb() {
 
 function openFittingModal() {
   if (!currentWeldForModal) { showToast('Najprv otvor zvar'); return; }
+  window._fittingSource = 'montaz';
   const { weld, wbEntry } = currentWeldForModal;
   document.getElementById('fit_weldNum').textContent = '#' + weld.displayNum;
   document.getElementById('fit_iso').textContent = currentProject
@@ -1499,41 +1500,49 @@ function closeFittingModal() {
   document.getElementById('fittingModal').classList.remove('show');
 }
 
-function saveFittingModal() {
+async function saveFittingModal() {
   var heat1 = document.getElementById('fit_heat1').value.trim();
   var heat2 = document.getElementById('fit_heat2').value.trim();
-  if (!heat1 && !heat2) { showToast('⚠️ Zadaj aspoň jeden Heat Nr'); return; }
-  var weldIdStr = '', notifProject = '';
+  if (!heat1 && !heat2) { showToast('Zadaj aspon jeden Heat Nr'); return; }
+  var weldIdStr = '', notifProject = '', targetRow = null;
   if (window._fittingSource === 'wb' && currentWbRow) {
-    var r = currentWbRow.row;
-    if (heat1) r.heatNr1 = heat1;
-    if (heat2) r.heatNr2 = heat2;
-    weldIdStr = String(r.weldId);
-    notifProject = r.isometric || '';
+    targetRow = currentWbRow.row;
+    weldIdStr = String(targetRow.weldId);
+    notifProject = targetRow.isometric || '';
   } else if (currentWeldForModal) {
     var weld = currentWeldForModal.weld;
     var wbEntry = currentWeldForModal.wbEntry;
-    if (wbEntry) {
-      if (heat1) wbEntry.heatNr1 = heat1;
-      if (heat2) wbEntry.heatNr2 = heat2;
-    } else {
-      wbInsertSorted({ part: getProjectPart(), isometric: getProjectIso(),
-        sheets: 1, weldId: String(weld.displayNum), heatNr1: heat1, heatNr2: heat2 });
+    if (!wbEntry) {
+      wbEntry = { part: getProjectPart(), isometric: getProjectIso(), sheets: 1, weldId: String(weld.displayNum) };
+      wbInsertSorted(wbEntry);
     }
+    targetRow = wbEntry;
     weldIdStr = String(weld.displayNum);
     notifProject = currentProject ? (currentProject.originalFileName || currentProject.id) : '?';
-  } else { return; }
+  } else { showToast('Ziadny zvar vybraty'); return; }
+  if (heat1) targetRow.heatNr1 = heat1;
+  if (heat2) targetRow.heatNr2 = heat2;
   window._fittingSource = null;
   closeFittingModal();
-  showToast('💾 Ukladám Heat Nr...');
-  saveWeldBookToFirebase().then(function() {
-    showToast('✅ Heat Nr uložené pre zvar #' + weldIdStr);
-    sendFirebaseNotification('fitting',
-      '🔩 ' + (currentUser ? currentUser.username : '?') + ' zadal Heat Nr pre zvar #' + weldIdStr + ' (' + notifProject + ')',
-      { weldId: weldIdStr, heatNr1: heat1, heatNr2: heat2 }
-    );
-  });
+  showToast('Ukladam Heat Nr...');
+  try {
+    var part = (targetRow.part || '').toUpperCase() || activeWbPart || null;
+    var partRows = weldBookData.filter(function(r){ return !part || (r.part||'').toUpperCase() === part; });
+    if (partRows.length === 0 && weldBookData.length > 0) partRows = weldBookData;
+    if (partRows.length === 0) { showToast('WB nie je nacitany - otvor WeldBook sekciu'); return; }
+    var docId = part ? (part + '_main') : 'weldbook_main';
+    var json = JSON.stringify(partRows);
+    var CHUNK = 800*1024, chunks = [];
+    for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
+    await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
+    await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() });
+    if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
+    showToast('Heat Nr ulozene pre zvar #' + weldIdStr);
+    sendFirebaseNotification('fitting', (currentUser?currentUser.username:'?') + ' zadal Heat Nr pre zvar #' + weldIdStr + ' (' + notifProject + ')', { weldId: weldIdStr, heatNr1: heat1, heatNr2: heat2 });
+  } catch(e) { showToast('Chyba: ' + e.message); console.error('Fitting save:', e); }
 }
+
 function removeWelderModal() {
   const { weld, wbEntry } = currentWeldForModal;
   if (wbEntry) { wbEntry.welderId = ''; wbEntry.dateWelding = ''; }
