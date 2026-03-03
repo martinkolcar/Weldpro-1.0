@@ -455,7 +455,41 @@ canvas#mca { display: block; }
         <button class="btn-secondary" onclick="closeWelderModal()">Zrušiť</button>
         <button class="btn-primary" onclick="saveWelderModal()">✅ Uložiť</button>
       </div>
+      <button onclick="openFittingModal()" style="width:100%;margin-top:8px;padding:12px;background:#7c3aed;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">🔩 Fitting / Heat Nr</button>
       <button class="btn-danger" onclick="deleteWeldModal()" style="margin-top:8px">🗑️ Vymazať zvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fitting / Heat Nr modal -->
+<div class="modal-overlay" id="fittingModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🔩 Fitting / Heat Nr</span>
+      <button onclick="closeFittingModal()" style="background:none;border:none;font-size:22px;color:#9ca3af;cursor:pointer;padding:0;line-height:1">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="weld-info-box">
+        <div class="weld-info-row"><span class="weld-info-label">Č. zvaru</span><span class="weld-info-val" id="fit_weldNum">#1</span></div>
+        <div class="weld-info-row"><span class="weld-info-label">Izometria</span><span class="weld-info-val" id="fit_iso" style="font-size:11px">-</span></div>
+      </div>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px">ITEM 1</div>
+        <div style="font-size:13px;color:#374151;margin-bottom:8px">Názov: <b id="fit_item1name" style="color:#166534">-</b></div>
+        <label class="modal-label">Heat Nr 1</label>
+        <input class="modal-input" id="fit_heat1" placeholder="Zadaj Heat Nr..." autocapitalize="characters">
+      </div>
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:8px">ITEM 2</div>
+        <div style="font-size:13px;color:#374151;margin-bottom:8px">Názov: <b id="fit_item2name" style="color:#1e40af">-</b></div>
+        <label class="modal-label">Heat Nr 2</label>
+        <input class="modal-input" id="fit_heat2" placeholder="Zadaj Heat Nr..." autocapitalize="characters">
+      </div>
+      <div class="modal-row">
+        <button class="btn-secondary" onclick="closeFittingModal()">Zrušiť</button>
+        <button class="btn-primary" style="background:#7c3aed" onclick="saveFittingModal()">✅ Uložiť Heat Nr</button>
+      </div>
     </div>
   </div>
 </div>
@@ -478,7 +512,7 @@ canvas#mca { display: block; }
       <div class="modal-row">
         <button class="btn-secondary" onclick="closeWbModal()">Zrušiť</button>
         <button class="btn-primary" onclick="saveWbModal()">✅ Uložiť</button>
-      </div>
+      <button onclick="openFittingModalFromWb()" style="width:100%;margin-top:8px;padding:12px;background:#7c3aed;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">🔩 Fitting / Heat Nr</button>
       <button class="btn-danger" id="wb_remove" onclick="removeWbModal()" style="display:none">🗑️ Odstrániť zvarača</button>
       <button class="btn-danger" onclick="deleteWbRowModal()" style="margin-top:4px;background:#7f1d1d">🗑️ Vymazať zvar</button>
     </div>
@@ -703,6 +737,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Modal overlay listeners
   const welderModal = document.getElementById('welderModal');
   if (welderModal) welderModal.addEventListener('click', function(e) { if (e.target === this) closeWelderModal(); });
+  const fittingModal = document.getElementById('fittingModal');
+  if (fittingModal) fittingModal.addEventListener('click', function(e) { if (e.target === this) closeFittingModal(); });
   const wbModal = document.getElementById('wbModal');
   if (wbModal) wbModal.addEventListener('click', function(e) { if (e.target === this) closeWbModal(); });
   const addWbModal = document.getElementById('addWbModal');
@@ -1429,6 +1465,75 @@ function wbInsertSorted(newRow) {
   else weldBookData.splice(insertIdx, 0, newRow);
 }
 
+// ===== FITTING / HEAT NR MODAL =====
+// WB verzia fitting modalu
+function openFittingModalFromWb() {
+  if (!currentWbRow) return;
+  window._fittingSource = "wb";
+  const r = currentWbRow.row;
+  document.getElementById("fit_weldNum").textContent = "#" + r.weldId;
+  document.getElementById("fit_iso").textContent = (r.isometric || "-").substring(0,40);
+  document.getElementById("fit_item1name").textContent = r.item1 || "—";
+  document.getElementById("fit_item2name").textContent = r.item2 || "—";
+  document.getElementById("fit_heat1").value = r.heatNr1 || "";
+  document.getElementById("fit_heat2").value = r.heatNr2 || "";
+  document.getElementById("fittingModal").classList.add("show");
+  setTimeout(function(){ document.getElementById("fit_heat1").focus(); }, 300);
+}
+
+function openFittingModal() {
+  if (!currentWeldForModal) { showToast('Najprv otvor zvar'); return; }
+  const { weld, wbEntry } = currentWeldForModal;
+  document.getElementById('fit_weldNum').textContent = '#' + weld.displayNum;
+  document.getElementById('fit_iso').textContent = currentProject
+    ? (currentProject.originalFileName || currentProject.id).substring(0,40) : '-';
+  document.getElementById('fit_item1name').textContent = (wbEntry && wbEntry.item1) ? wbEntry.item1 : '—';
+  document.getElementById('fit_item2name').textContent = (wbEntry && wbEntry.item2) ? wbEntry.item2 : '—';
+  document.getElementById('fit_heat1').value = (wbEntry && wbEntry.heatNr1) ? wbEntry.heatNr1 : '';
+  document.getElementById('fit_heat2').value = (wbEntry && wbEntry.heatNr2) ? wbEntry.heatNr2 : '';
+  document.getElementById('fittingModal').classList.add('show');
+  setTimeout(() => document.getElementById('fit_heat1').focus(), 300);
+}
+
+function closeFittingModal() {
+  document.getElementById('fittingModal').classList.remove('show');
+}
+
+function saveFittingModal() {
+  var heat1 = document.getElementById('fit_heat1').value.trim();
+  var heat2 = document.getElementById('fit_heat2').value.trim();
+  if (!heat1 && !heat2) { showToast('⚠️ Zadaj aspoň jeden Heat Nr'); return; }
+  var weldIdStr = '', notifProject = '';
+  if (window._fittingSource === 'wb' && currentWbRow) {
+    var r = currentWbRow.row;
+    if (heat1) r.heatNr1 = heat1;
+    if (heat2) r.heatNr2 = heat2;
+    weldIdStr = String(r.weldId);
+    notifProject = r.isometric || '';
+  } else if (currentWeldForModal) {
+    var weld = currentWeldForModal.weld;
+    var wbEntry = currentWeldForModal.wbEntry;
+    if (wbEntry) {
+      if (heat1) wbEntry.heatNr1 = heat1;
+      if (heat2) wbEntry.heatNr2 = heat2;
+    } else {
+      wbInsertSorted({ part: getProjectPart(), isometric: getProjectIso(),
+        sheets: 1, weldId: String(weld.displayNum), heatNr1: heat1, heatNr2: heat2 });
+    }
+    weldIdStr = String(weld.displayNum);
+    notifProject = currentProject ? (currentProject.originalFileName || currentProject.id) : '?';
+  } else { return; }
+  window._fittingSource = null;
+  closeFittingModal();
+  showToast('💾 Ukladám Heat Nr...');
+  saveWeldBookToFirebase().then(function() {
+    showToast('✅ Heat Nr uložené pre zvar #' + weldIdStr);
+    sendFirebaseNotification('fitting',
+      '🔩 ' + (currentUser ? currentUser.username : '?') + ' zadal Heat Nr pre zvar #' + weldIdStr + ' (' + notifProject + ')',
+      { weldId: weldIdStr, heatNr1: heat1, heatNr2: heat2 }
+    );
+  });
+}
 function removeWelderModal() {
   const { weld, wbEntry } = currentWeldForModal;
   if (wbEntry) { wbEntry.welderId = ''; wbEntry.dateWelding = ''; }
