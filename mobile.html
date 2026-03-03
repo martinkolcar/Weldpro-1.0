@@ -1739,50 +1739,61 @@ async function deleteWbRowModal() {
   const idx = weldBookData.indexOf(r);
   if (idx !== -1) weldBookData.splice(idx, 1);
   closeWbModal();
-  showToast('💾 Mažem zo WeldBook aj výkresu...');
+  showToast('🔍 Hľadám projekt...');
 
-  // Nájdi projekt podľa izometrie a vymaž zvar aj z výkresu
-  // Project doc ID = "PART_iso" napr. "SUL_KF-712-20002-4"
+  // Nájdi projekt - prehľadaj VŠETKY projekty a hľadaj podľa projectName/originalFileName
+  let deleted = false;
   try {
-    const projId = part ? (part + '_' + iso) : iso;
-    const docRef = db.collection('projects').doc(projId);
-    const metaDoc = await docRef.get();
-    if (metaDoc.exists) {
-      const meta = metaDoc.data() || {};
+    const snap = await db.collection('projects').get();
+    for (const doc of snap.docs) {
+      const meta = doc.data() || {};
+      const projName = meta.originalFileName || meta.projectName || doc.id;
+      // Zhoda ak iso je súčasťou názvu projektu alebo naopak
+      const isoClean = iso.trim().toLowerCase();
+      const projClean = projName.trim().toLowerCase();
+      if (!projClean.includes(isoClean) && !isoClean.includes(projClean) && doc.id !== iso) continue;
+
+      // Načítaj chunky
       const chunks = [];
       for (let i = 0; i < (meta.chunks||1); i++) {
-        const c = await docRef.collection('data').doc('c'+i).get();
+        const c = await doc.ref.collection('data').doc('c'+i).get();
         if (c.exists) chunks.push(c.data().d);
       }
-      let parsed = {};
-      try { parsed = JSON.parse(chunks.join('')); } catch(e) {}
-      if (parsed.welds) {
-        const before = parsed.welds.length;
-        parsed.welds = parsed.welds.filter(w => String(w.displayNum) !== String(weldId));
-        if (parsed.welds.length < before) {
-          // Ulož projekt
-          const json = JSON.stringify(parsed);
-          const CHUNK = 800*1024;
-          const newChunks = [];
-          for (let i = 0; i < json.length; i += CHUNK) newChunks.push(json.slice(i, i+CHUNK));
-          await Promise.all(newChunks.map((c, i) => docRef.collection('data').doc('c'+i).set({d:c})));
-          await docRef.set({...meta, chunks: newChunks.length, lastModified: new Date().toISOString()});
-        }
-      }
+      if (!chunks.length) continue;
+      let parsed;
+      try { parsed = JSON.parse(chunks.join('')); } catch(e) { continue; }
+      if (!parsed.welds || !parsed.welds.length) continue;
+
+      const before = parsed.welds.length;
+      parsed.welds = parsed.welds.filter(w => String(w.displayNum).trim() !== String(weldId).trim());
+      if (parsed.welds.length === before) continue; // Zvar tu nie je
+
+      showToast('💾 Mažem zvar #' + weldId + ' z ' + doc.id + '...');
+      const json = JSON.stringify(parsed);
+      const CHUNK = 800*1024;
+      const newChunks = [];
+      for (let i = 0; i < json.length; i += CHUNK) newChunks.push(json.slice(i, i+CHUNK));
+      await Promise.all(newChunks.map((c, i) => doc.ref.collection('data').doc('c'+i).set({d:c})));
+      await doc.ref.set({...meta, chunks: newChunks.length, lastModified: new Date().toISOString(),
+        modifiedBy: currentUser?.username||'mobile'});
+      deleted = true;
+      console.log('✅ Zvar #' + weldId + ' vymazaný z projektu:', doc.id);
     }
-  } catch(e) { console.warn('Delete from project failed:', e); }
+  } catch(e) { console.error('Delete from project error:', e); showToast('❌ Chyba: ' + e.message); }
 
   // Ulož WeldBook
   await saveWeldBookToFirebase();
 
-  // Notifikácia
-  sendFirebaseNotification('delete_weld',
-    '🗑️ Vymazaný zvar #' + weldId + ' z ' + iso,
+  // Notifikácia do zvončeka PC
+  await sendFirebaseNotification('delete_weld',
+    '🗑️ ' + (currentUser?.username||'?') + ' vymazal zvar #' + weldId + ' z ' + iso,
     { weldId, iso, part }
   );
 
   filterWB();
-  showToast('🗑️ Zvar #' + weldId + ' vymazaný z WeldBook aj výkresu');
+  showToast(deleted
+    ? '✅ Zvar #' + weldId + ' vymazaný z WeldBook aj výkresu'
+    : '⚠️ Zvar #' + weldId + ' vymazaný z WeldBook (výkres s ID "'+iso+'" nenájdený vo Firebase)');
 }
 
 // wbModal listener sa registruje v DOMContentLoaded

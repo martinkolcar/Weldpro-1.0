@@ -5714,40 +5714,53 @@ updateNotificationBadge();
 var firebaseNotifUnsub = null;
 
 function startFirebaseNotifListener() {
-  if (!db || firebaseNotifUnsub) return;
+  if (!db) return;
+  if (firebaseNotifUnsub) { try{firebaseNotifUnsub();}catch(e){} firebaseNotifUnsub = null; }
+  if (!window._pcSessionId) window._pcSessionId = 'pc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   var startTime = new Date().toISOString();
-  firebaseNotifUnsub = db.collection('notifications')
-    .where('read', '==', false)
-    .limit(50)
-    .onSnapshot(function(snap) {
-      snap.docChanges().forEach(function(change) {
-        if (change.type === 'added') {
-          var d = change.doc.data();
-          // Ignoruj staré (pred spustením PC) - len nové od iných
-          if (d.at < startTime) return;
-          // Ignoruj len notifikácie od tejto session (nie od tohto usera)
-          if (d.sessionId && window._pcSessionId && d.sessionId === window._pcSessionId) return;
-          // Pridaj do lokálnych notifikácií
-          var notif = {
-            id: change.doc.id,
-            message: d.message,
-            timestamp: d.at,
-            by: d.by,
-            fbId: change.doc.id
-          };
-          // Skontroluj či už existuje
-          if (!notifications.find(function(n){ return n.fbId === change.doc.id; })) {
-            notifications.push(notif);
-            saveNotifications();
-            updateNotificationBadge();
-            // Flash zvončeka
-            var btn = document.getElementById('notificationsBtn');
-            if (btn) { btn.style.background='#fef3c7'; setTimeout(function(){ btn.style.background=''; }, 2000); }
-            console.log('🔔 Firebase notifikácia:', d.message);
-          }
-        }
-      });
-    }, function(err){ console.warn('Notif listener error:', err); });
+  console.log('🔔 Notif listener štart, session:', window._pcSessionId);
+
+  // 1. Načítaj históriu (BEZ orderBy - žiaden index potrebný)
+  db.collection('notifications').limit(50).get().then(function(snap){
+    var hist = [];
+    snap.docs.forEach(function(doc){
+      var d = doc.data();
+      if (d.message && d.at) hist.push({ id: doc.id, fbId: doc.id, message: d.message, timestamp: d.at, by: d.by||'' });
+    });
+    // Zoraď lokálne
+    hist.sort(function(a,b){ return b.timestamp.localeCompare(a.timestamp); });
+    hist.forEach(function(n){
+      if (!notifications.find(function(x){ return x.fbId === n.fbId; })) notifications.push(n);
+    });
+    saveNotifications();
+    updateNotificationBadge();
+    buildNotificationList();
+    console.log('🔔 História načítaná:', hist.length, 'notifikácií');
+  }).catch(function(e){ console.warn('Notif history err:', e.message); });
+
+  // 2. Realtime - onSnapshot BEZ orderBy/where - jednoduché
+  firebaseNotifUnsub = db.collection('notifications').onSnapshot(function(snap) {
+    var changed = false;
+    snap.docChanges().forEach(function(change) {
+      if (change.type !== 'added') return;
+      var d = change.doc.data();
+      if (!d.at || !d.message) return;
+      if (d.at <= startTime) return; // Staré - ignoruj
+      if (d.sessionId && d.sessionId === window._pcSessionId) return; // Vlastná session
+      if (notifications.find(function(n){ return n.fbId === change.doc.id; })) return; // Duplikát
+      var notif = { id: change.doc.id, fbId: change.doc.id, message: d.message, timestamp: d.at, by: d.by||'' };
+      notifications.unshift(notif);
+      changed = true;
+      console.log('🔔 Nová notifikácia:', d.message);
+    });
+    if (changed) {
+      saveNotifications();
+      updateNotificationBadge();
+      buildNotificationList();
+      var btn = document.getElementById('notificationsBtn');
+      if (btn) { btn.style.background='#fef3c7'; setTimeout(function(){ btn.style.background=''; }, 3000); }
+    }
+  }, function(err){ console.warn('Notif listener err:', err.message); });
 }
 
 function addNotification(message){
