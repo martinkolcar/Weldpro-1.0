@@ -5720,22 +5720,22 @@ function startFirebaseNotifListener() {
   var startTime = new Date().toISOString();
   console.log('🔔 Notif listener štart, session:', window._pcSessionId);
 
-  // 1. Načítaj históriu (BEZ orderBy - žiaden index potrebný)
-  db.collection('notifications').limit(50).get().then(function(snap){
+  // 1. Načítaj históriu - 7 dní, vymaž staršie
+  var sevenDaysAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString();
+  db.collection('notifications').limit(500).get().then(function(snap){
     var hist = [];
     snap.docs.forEach(function(doc){
       var d = doc.data();
-      if (d.message && d.at) hist.push({ id: doc.id, fbId: doc.id, message: d.message, timestamp: d.at, by: d.by||'' });
+      if (!d.message || !d.at) { doc.ref.delete().catch(function(){}); return; }
+      if (d.at < sevenDaysAgo) { doc.ref.delete().catch(function(){}); return; } // Auto-cleanup
+      hist.push({ id: doc.id, fbId: doc.id, message: d.message, timestamp: d.at, by: d.by||'' });
     });
-    // Zoraď lokálne
     hist.sort(function(a,b){ return b.timestamp.localeCompare(a.timestamp); });
-    hist.forEach(function(n){
-      if (!notifications.find(function(x){ return x.fbId === n.fbId; })) notifications.push(n);
-    });
+    notifications = hist; // Nahraď - Firebase je master
     saveNotifications();
     updateNotificationBadge();
     buildNotificationList();
-    console.log('🔔 História načítaná:', hist.length, 'notifikácií');
+    console.log('🔔 História načítaná:', hist.length, 'notifikácií (7 dní)');
   }).catch(function(e){ console.warn('Notif history err:', e.message); });
 
   // 2. Realtime - onSnapshot BEZ orderBy/where - jednoduché
@@ -5789,9 +5789,11 @@ console.log('✓ Notifikácia odstránená');
 function updateNotificationBadge(){
 var badge=document.getElementById('notificationBadge');
 var badge2=document.getElementById('notificationsBadge');
-if(notifications.length>0){
-if(badge){badge.style.display='block';badge.textContent=notifications.length;}
-if(badge2){badge2.style.display='block';badge2.textContent=notifications.length;}
+var oneDayAgo = new Date(Date.now() - 24*60*60*1000).toISOString();
+var recentCount = notifications.filter(function(n){ return (n.timestamp||'') >= oneDayAgo; }).length;
+if(recentCount>0){
+if(badge){badge.style.display='block';badge.textContent=recentCount;}
+if(badge2){badge2.style.display='block';badge2.textContent=recentCount;}
 }else{
 if(badge)badge.style.display='none';
 if(badge2)badge2.style.display='none';
@@ -9551,18 +9553,23 @@ function startWbRealtimeSync() {
     var changedPart = (data.part && data.part !== 'ALL') ? data.part : null;
     var msg = '📋 ' + data.by + ' upravil WeldBook [' + (changedPart||'ALL') + ']';
 
+    // Vždy načítaj aktívnu časť - či už je zmena v nej alebo inej
     if (changedPart && wbActivePart && changedPart !== wbActivePart) {
-      // Iná časť - notifikácia do zvončeka + toast
-      showWbSyncNotification('📢 ' + data.by + ' označil zvar v časti ' + changedPart, 'info');
+      // Iná časť zmenená - len notifikácia, ale neblokuj
+      showWbSyncNotification('📢 ' + data.by + ' upravil WeldBook [' + changedPart + ']', 'info');
       addNotification(msg);
       return;
     }
 
-    // Naša aktívna časť - načítaj + notifikácia do zvončeka
+    // Naša aktívna časť sa zmenila - načítaj
     showWbSyncNotification('🔄 ' + data.by + ' upravil WeldBook...', 'loading');
     loadWbPart(wbActivePart).then(function() {
-      showWbSyncNotification('✅ ' + data.by + ' - WeldBook aktualizovaný (' + weldBookData.length + ' zvarov)', 'success');
+      showWbSyncNotification('✅ WeldBook aktualizovaný (' + weldBookData.length + ' zvarov)', 'success');
       addNotification(msg);
+      if (weldBookGrid && weldBookGrid.api) {
+        weldBookGrid.api.setGridOption('rowData', weldBookData);
+        populateWeldBookFilterDropdowns();
+      }
     });
   });
   wbRealtimeListeners.push(unsubSignal);
@@ -13639,24 +13646,39 @@ if(typeof updateHistory !== 'undefined') {
 allItems.sort(function(a,b){ return (b.timestamp||'').localeCompare(a.timestamp||''); });
 
 if(allItems.length===0){
-  content.innerHTML='<div style="text-align:center;color:#999;padding:30px;font-size:14px">🔔 Žiadne notifikácie</div>';
+  content.innerHTML='<div style="text-align:center;color:#999;padding:30px;font-size:14px">🔔 Žiadne notifikácie za posledný týždeň</div>';
   return;
 }
 
-var html='';
+var nowMs = Date.now();
+var oneDayAgo = new Date(nowMs-86400000).toISOString();
+var todayStr = new Date(nowMs).toISOString().slice(0,10);
+var yesterdayStr = new Date(nowMs-86400000).toISOString().slice(0,10);
+var recentCnt = allItems.filter(function(i){ return (i.timestamp||'')>=oneDayAgo; }).length;
+var html='<div style="padding:8px 12px;background:#eff6ff;border-radius:6px;margin-bottom:10px;font-size:12px;color:#1d4ed8;font-weight:500">📊 Posledných 24h: <b>'+recentCnt+'</b> zmien &nbsp;|&nbsp; Celkom 7 dní: <b>'+allItems.length+'</b></div>';
+var lastDay='';
 allItems.forEach(function(item){
   var date=new Date(item.timestamp);
-  var dateStr=date.toLocaleDateString("sk-SK")+' '+date.toLocaleTimeString("sk-SK",{hour:"2-digit",minute:"2-digit"});
+  var dayStr=(item.timestamp||'').slice(0,10);
+  if(dayStr!==lastDay){
+    var dl=dayStr===todayStr?'Dnes':dayStr===yesterdayStr?'Včera':date.toLocaleDateString('sk-SK',{weekday:'long',day:'numeric',month:'short'});
+    html+='<div style="font-size:11px;font-weight:700;color:#6b7280;padding:'+(lastDay?'8px':'2px')+' 0 4px;'+(lastDay?'border-top:1px solid #e5e7eb;':'')+'">📅 '+dl+'</div>';
+    lastDay=dayStr;
+  }
+  var timeStr=date.toLocaleTimeString('sk-SK',{hour:'2-digit',minute:'2-digit'});
   var byStr=item.by?('<b style="color:#3b82f6">'+item.by+'</b> · '):'';
-  var delBtn = item.fbId ? '<button onclick="removeNotification(\'' + item.id + '\')" style="float:right;background:#ef4444;color:white;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin-left:8px">✕</button>' : '';
-  html+='<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px">';
+  var isRecent=(item.timestamp||'')>=oneDayAgo;
+  var delId=item.id||item.fbId||'';
+  var delBtn=delId?('<button onclick="removeNotification(\''+delId+'\')" style="float:right;background:transparent;border:none;color:#d1d5db;font-size:18px;cursor:pointer;padding:0">×</button>'):'';
+  html+='<div style="background:'+(isRecent?'#fefce8':'white')+';border:1px solid '+(isRecent?'#fde68a':'#e5e7eb')+';border-radius:8px;padding:9px 12px;margin-bottom:5px">';
   html+=delBtn;
-  html+='<div style="font-size:13px;color:#1f2937;margin-bottom:4px">'+item.message+'</div>';
-  html+='<div style="font-size:11px;color:#6b7280">'+byStr+dateStr+'</div>';
+  html+='<div style="font-size:13px;color:#1f2937;margin-bottom:3px;padding-right:20px">'+item.message+'</div>';
+  html+='<div style="font-size:11px;color:#9ca3af">'+byStr+timeStr+'</div>';
   html+='</div>';
 });
 content.innerHTML=html;
 }
+
 
 // Načítaj históriu update notifikácií
 function loadUpdateHistory(){
