@@ -1283,6 +1283,11 @@ function handleCanvasTap(clientX, clientY) {
       newWeldPt1 = null;
       document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
       mDraw();
+      // Notifikácia do PC
+      sendFirebaseNotification('new_weld',
+        '➕ Nový zvar #' + displayNum + ' v ' + (currentProject.originalFileName || currentProject.id),
+        { weldId: displayNum, project: currentProject.id, iso: currentProject.originalFileName || currentProject.id }
+      );
       openWelderModal(weld);
     }
 
@@ -1365,6 +1370,11 @@ function saveWelderModal() {
   showToast('💾 Ukladám...');
   saveWeldBookToFirebase().then(() => {
     showToast('✅ Zvar #' + weld.displayNum + ' → ' + welder);
+    // Notifikácia do PC zvončeka
+    sendFirebaseNotification('welder_assigned',
+      '✅ ' + welder + ' priradený k zvaru #' + weld.displayNum + ' (' + (currentProject ? currentProject.originalFileName || currentProject.id : '?') + ')',
+      { weldId: String(weld.displayNum), welder, project: currentProject ? currentProject.id : '' }
+    );
   });
 }
 
@@ -1445,6 +1455,21 @@ function deleteWeldModal() {
   mDraw();
   closeWelderModal();
   saveWeldBookToFirebase().then(() => showToast('🗑️ Zvar #' + weld.displayNum + ' vymazaný'));
+}
+
+// ===== FIREBASE NOTIFICATIONS =====
+async function sendFirebaseNotification(type, message, extra) {
+  if (!db) return;
+  try {
+    await db.collection('notifications').add({
+      type: type,
+      message: message,
+      by: currentUser ? currentUser.username : 'mobile',
+      at: new Date().toISOString(),
+      read: false,
+      ...(extra || {})
+    });
+  } catch(e) { console.warn('Notification error:', e); }
 }
 
 // ===== ADD WB ENTRY MODAL =====
@@ -1528,6 +1553,8 @@ async function loadWbForPart(part) {
 
 async function saveWeldBookToFirebase() {
   if (!db) return;
+  // Unikátne session ID pre toto mobile okno
+  if (!window._mobileSessionId) window._mobileSessionId = 'mob_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   try {
     // Zisti aktívnu časť - z WB filtru, alebo z projektu, alebo z dát
     let part = null;
@@ -1571,7 +1598,8 @@ async function saveWeldBookToFirebase() {
       by: currentUser?.username||'mobile',
       at: new Date().toISOString(),
       part: part||'ALL',
-      count: partRows.length
+      count: partRows.length,
+      sessionId: window._mobileSessionId
     });
     console.log('✅ WeldBook [' + (part||'ALL') + '] uložený:', partRows.length, 'zvarov');
   } catch(e) { console.error('WB save error:', e); showToast('❌ Chyba ukladania: ' + e.message); }
@@ -1666,6 +1694,10 @@ function saveWbModal() {
   saveWeldBookToFirebase().then(() => {
     filterWB();
     showToast('✅ Uložené: zvar #' + r.weldId + ' → ' + welder);
+    sendFirebaseNotification('welder_assigned',
+      '✅ ' + welder + ' priradený k zvaru #' + r.weldId + ' (' + (r.isometric||'?') + ')',
+      { weldId: String(r.weldId), welder, iso: r.isometric||'' }
+    );
   });
 }
 
@@ -1683,20 +1715,60 @@ function removeWbModal() {
   });
 }
 
-function deleteWbRowModal() {
+async function deleteWbRowModal() {
   if (!currentWbRow) return;
   const r = currentWbRow.row;
   const weldId = r.weldId;
   const iso = r.isometric || '';
+  const part = r.part || '';
+
   // Vymaž z weldBookData
   const idx = weldBookData.indexOf(r);
   if (idx !== -1) weldBookData.splice(idx, 1);
   closeWbModal();
-  showToast('💾 Mažem...');
-  saveWeldBookToFirebase().then(() => {
-    filterWB();
-    showToast('🗑️ Zvar #' + weldId + ' vymazaný');
-  });
+  showToast('💾 Mažem zo WeldBook aj výkresu...');
+
+  // Nájdi projekt podľa izometrie a vymaž zvar aj z výkresu
+  try {
+    const projId = iso; // project ID = izometria
+    const docRef = db.collection('projects').doc(projId);
+    const metaDoc = await docRef.get();
+    if (metaDoc.exists) {
+      const meta = metaDoc.data() || {};
+      const chunks = [];
+      for (let i = 0; i < (meta.chunks||1); i++) {
+        const c = await docRef.collection('data').doc('c'+i).get();
+        if (c.exists) chunks.push(c.data().d);
+      }
+      let parsed = {};
+      try { parsed = JSON.parse(chunks.join('')); } catch(e) {}
+      if (parsed.welds) {
+        const before = parsed.welds.length;
+        parsed.welds = parsed.welds.filter(w => String(w.displayNum) !== String(weldId));
+        if (parsed.welds.length < before) {
+          // Ulož projekt
+          const json = JSON.stringify(parsed);
+          const CHUNK = 800*1024;
+          const newChunks = [];
+          for (let i = 0; i < json.length; i += CHUNK) newChunks.push(json.slice(i, i+CHUNK));
+          await Promise.all(newChunks.map((c, i) => docRef.collection('data').doc('c'+i).set({d:c})));
+          await docRef.set({...meta, chunks: newChunks.length, lastModified: new Date().toISOString()});
+        }
+      }
+    }
+  } catch(e) { console.warn('Delete from project failed:', e); }
+
+  // Ulož WeldBook
+  await saveWeldBookToFirebase();
+
+  // Notifikácia
+  sendFirebaseNotification('delete_weld',
+    '🗑️ Vymazaný zvar #' + weldId + ' z ' + iso,
+    { weldId, iso, part }
+  );
+
+  filterWB();
+  showToast('🗑️ Zvar #' + weldId + ' vymazaný z WeldBook aj výkresu');
 }
 
 // wbModal listener sa registruje v DOMContentLoaded
