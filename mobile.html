@@ -1480,7 +1480,7 @@ function openFittingModalFromWb() {
   document.getElementById("fit_item2name").textContent = r.item2 || "—";
   document.getElementById("fit_heat1").value = r.heatNr1 || "";
   document.getElementById("fit_heat2").value = r.heatNr2 || "";
-  document.getElementById("fittingModal").classList.add("show");
+  var _fm=document.getElementById("fittingModal"); if(_fm)_fm.classList.add("show");
   setTimeout(function(){ document.getElementById("fit_heat1").focus(); }, 300);
 }
 
@@ -1495,12 +1495,12 @@ function openFittingModal() {
   document.getElementById('fit_item2name').textContent = (wbEntry && wbEntry.item2) ? wbEntry.item2 : '—';
   document.getElementById('fit_heat1').value = (wbEntry && wbEntry.heatNr1) ? wbEntry.heatNr1 : '';
   document.getElementById('fit_heat2').value = (wbEntry && wbEntry.heatNr2) ? wbEntry.heatNr2 : '';
-  document.getElementById('fittingModal').classList.add('show');
+  var _fm2=document.getElementById('fittingModal'); if(_fm2)_fm2.classList.add('show');
   setTimeout(() => document.getElementById('fit_heat1').focus(), 300);
 }
 
 function closeFittingModal() {
-  document.getElementById('fittingModal').classList.remove('show');
+  var _fm3=document.getElementById('fittingModal'); if(_fm3)_fm3.classList.remove('show');
 }
 
 
@@ -1537,6 +1537,7 @@ async function clearFittingModal() {
     if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
     await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
     showToast('Heat Nr vymazany pre zvar #' + weldIdStr);
+    var _wbF = weldBookData.filter(function(r){ return !activeWbPart || (r.part||'').toUpperCase() === activeWbPart; }); renderWeldBook(_wbF);
     sendFirebaseNotification('fitting_clear', (currentUser?currentUser.username:'?') + ' vymazal Heat Nr #' + weldIdStr + ' (' + notifProject + ')', { weldId: weldIdStr });
   } catch(e) { showToast('Chyba: ' + e.message); }
 }
