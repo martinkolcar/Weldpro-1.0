@@ -407,12 +407,14 @@ canvas#mca { display: block; }
     <table class="wb-table">
       <thead>
         <tr>
-          <th></th>
-          <th>Č.zvaru</th>
-          <th>Izometria</th>
-          <th>Sh.</th>
-          <th>Zvarač</th>
-          <th>Dátum</th>
+          <th style="padding:6px 3px"></th>
+          <th style="padding:6px 3px">Č.Z.</th>
+          <th style="padding:6px 3px">Izometria</th>
+          <th style="padding:6px 3px">Zvarač</th>
+          <th style="padding:6px 3px;color:#7c3aed">Item 1</th>
+          <th style="padding:6px 3px;color:#7c3aed">Heat 1</th>
+          <th style="padding:6px 3px;color:#1e40af">Item 2</th>
+          <th style="padding:6px 3px;color:#1e40af">Heat 2</th>
         </tr>
       </thead>
       <tbody id="wbBody"></tbody>
@@ -490,6 +492,7 @@ canvas#mca { display: block; }
         <button class="btn-secondary" onclick="closeFittingModal()">Zrušiť</button>
         <button class="btn-primary" style="background:#7c3aed" onclick="saveFittingModal()">✅ Uložiť Heat Nr</button>
       </div>
+      <button onclick="clearFittingModal()" style="width:100%;margin-top:8px;padding:11px;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">🗑️ Vymazať Heat Nr</button>
     </div>
   </div>
 </div>
@@ -1500,6 +1503,44 @@ function closeFittingModal() {
   document.getElementById('fittingModal').classList.remove('show');
 }
 
+
+async function clearFittingModal() {
+  if (!confirm('Vymazat Heat Nr pre tento zvar?')) return;
+  var targetRow = null, weldIdStr = '', notifProject = '';
+  if (window._fittingSource === 'wb' && currentWbRow) {
+    targetRow = currentWbRow.row;
+    weldIdStr = String(targetRow.weldId);
+    notifProject = targetRow.isometric || '';
+  } else if (currentWeldForModal) {
+    targetRow = currentWeldForModal.wbEntry;
+    if (!targetRow) { showToast('Zvar nema WB zaznam'); return; }
+    weldIdStr = String(currentWeldForModal.weld.displayNum);
+    notifProject = currentProject ? (currentProject.originalFileName || currentProject.id) : '?';
+  } else return;
+  targetRow.heatNr1 = '';
+  targetRow.heatNr2 = '';
+  document.getElementById('fit_heat1').value = '';
+  document.getElementById('fit_heat2').value = '';
+  window._fittingSource = null;
+  closeFittingModal();
+  showToast('Mazem Heat Nr...');
+  try {
+    var part = (targetRow.part || '').toUpperCase() || activeWbPart || null;
+    var partRows = weldBookData.filter(function(r){ return !part || (r.part||'').toUpperCase() === part; });
+    if (partRows.length === 0 && weldBookData.length > 0) partRows = weldBookData;
+    if (!partRows.length) { showToast('WB nie je nacitany'); return; }
+    var docId = part ? (part + '_main') : 'weldbook_main';
+    var json = JSON.stringify(partRows), CHUNK = 800*1024, chunks = [];
+    for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
+    await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
+    await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() });
+    if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
+    showToast('Heat Nr vymazany pre zvar #' + weldIdStr);
+    sendFirebaseNotification('fitting_clear', (currentUser?currentUser.username:'?') + ' vymazal Heat Nr #' + weldIdStr + ' (' + notifProject + ')', { weldId: weldIdStr });
+  } catch(e) { showToast('Chyba: ' + e.message); }
+}
+
 async function saveFittingModal() {
   var heat1 = document.getElementById('fit_heat1').value.trim();
   var heat2 = document.getElementById('fit_heat2').value.trim();
@@ -1783,18 +1824,21 @@ function _applyWbFilter() {
 function renderWeldBook(rows) {
   const tbody = document.getElementById('wbBody');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9ca3af">Žiadne záznamy</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9ca3af">Žiadne záznamy</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map((r,i) => {
     const done = r.welderId && r.welderId.trim();
-    return `<tr onclick="openWbModal(${weldBookData.indexOf(r)})">
-      <td><span class="weld-status ${done?'status-done':'status-todo'}"></span></td>
-      <td style="font-weight:700;color:#111">${r.weldId||'-'}</td>
-      <td style="font-size:11px;color:#374151;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.isometric||'-'}</td>
-      <td style="color:#6b7280">${r.sheets||1}</td>
-      <td style="font-weight:${done?'600':'400'};color:${done?'#059669':'#9ca3af'}">${r.welderId||'—'}</td>
-      <td style="font-size:12px;color:#6b7280">${r.dateWelding||'—'}</td>
+    const hasHeat = r.heatNr1 || r.heatNr2;
+    return `<tr onclick="openWbModal(${weldBookData.indexOf(r)})" style="background:${hasHeat?'#f5f3ff':'white'}">
+      <td style="padding:6px 3px"><span class="weld-status ${done?'status-done':'status-todo'}"></span></td>
+      <td style="padding:6px 3px;font-weight:700;color:#111">${r.weldId||'-'}</td>
+      <td style="padding:6px 3px;font-size:10px;color:#374151;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.isometric||'-'}</td>
+      <td style="padding:6px 3px;font-weight:${done?'600':'400'};color:${done?'#059669':'#9ca3af'};font-size:12px">${r.welderId||'—'}</td>
+      <td style="padding:6px 3px;font-size:11px;color:#374151;max-width:65px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.item1||'—'}</td>
+      <td style="padding:6px 3px;font-size:11px;font-weight:${r.heatNr1?'700':'400'};color:${r.heatNr1?'#7c3aed':'#d1d5db'}">${r.heatNr1||'—'}</td>
+      <td style="padding:6px 3px;font-size:11px;color:#374151;max-width:65px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.item2||'—'}</td>
+      <td style="padding:6px 3px;font-size:11px;font-weight:${r.heatNr2?'700':'400'};color:${r.heatNr2?'#1e40af':'#d1d5db'}">${r.heatNr2||'—'}</td>
     </tr>`;
   }).join('');
 }
