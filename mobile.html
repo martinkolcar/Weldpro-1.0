@@ -1585,6 +1585,8 @@ async function saveWeldBookToFirebase() {
       : weldBookData;
 
     const docId = part ? (part + '_main') : 'weldbook_main';
+    console.log('💾 WB save → docId:', docId, '| rows:', partRows.length, '| activeWbPart:', activeWbPart, '| wbFPart:', document.getElementById('wbFPart')?.value);
+    showToast('💾 Ukladám ' + docId + ' (' + partRows.length + ' zvarov)');
     const json = JSON.stringify(partRows);
     const CHUNK = 800*1024;
     const chunks = [];

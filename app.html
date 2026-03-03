@@ -7299,25 +7299,19 @@ alert('💾 Export do Excel - funkcia v implementácii');
 }
 
 function buildNotificationList(){
+// Ak je panel otvorený, obnov ho
+var panel=document.getElementById('notificationsPanel');
+if(panel && panel.style.display!=='none') showCombinedNotifications();
+// Starý list pre kompatibilitu
 var list=document.getElementById('notificationList');
-if(notifications.length===0){
-list.innerHTML='<div style="text-align:center;color:#999;padding:20px">Žiadne notifikácie</div>';
-return;
-}
-
+if(!list) return;
+if(notifications.length===0){ list.innerHTML=''; return; }
 var html='';
 notifications.forEach(function(notif){
 var date=new Date(notif.timestamp);
 var dateStr=date.toLocaleDateString('sk-SK')+' '+date.toLocaleTimeString('sk-SK',{hour:'2-digit',minute:'2-digit'});
-
-html+='<div style="background:#f9f9f9;border:1px solid #ddd;border-radius:4px;padding:12px;margin-bottom:8px;position:relative">';
-html+='<button onclick="removeNotification(\''+notif.id+'\')" style="position:absolute;top:8px;right:8px;background:#ef4444;color:white;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:12px">✕</button>';
-html+='<div style="font-size:13px;color:#333;margin-bottom:5px;padding-right:40px">'+notif.message+'</div>';
-var byStr = notif.by ? ('<span style="color:#3b82f6;font-weight:600">'+notif.by+'</span> · ') : '';
-html+='<div style="font-size:11px;color:#666">'+byStr+dateStr+'</div>';
-html+='</div>';
+html+='<div style="padding:8px;border-bottom:1px solid #eee;font-size:12px">'+notif.message+'<br><span style="color:#999">'+dateStr+'</span></div>';
 });
-
 list.innerHTML=html;
 }
 
@@ -13608,10 +13602,58 @@ function toggleNotificationsPanel(){
 const panel=document.getElementById('notificationsPanel');
 if(panel.style.display==='none'){
 panel.style.display='block';
-loadUpdateHistory(); // Načítaj históriu zmien
+showCombinedNotifications();
 }else{
 panel.style.display='none';
 }
+}
+
+function showCombinedNotifications(){
+const content=document.getElementById('notificationsContent');
+if(!content) return;
+
+// Spoj mobile notifikácie + update históriu
+var allItems = [];
+
+// 1. Mobile Firebase notifikácie
+notifications.forEach(function(n){
+  allItems.push({
+    type:'mobile', id:n.id, fbId:n.fbId,
+    message:n.message, timestamp:n.timestamp, by:n.by||''
+  });
+});
+
+// 2. Update história projektov
+if(typeof updateHistory !== 'undefined') {
+  updateHistory.forEach(function(n){
+    allItems.push({
+      type:'project', message:'📁 '+n.project+(n.unread?' [NOVÉ]':''), 
+      timestamp:n.timestamp, by:''
+    });
+  });
+}
+
+// Zoraď podľa času - najnovšie hore
+allItems.sort(function(a,b){ return (b.timestamp||'').localeCompare(a.timestamp||''); });
+
+if(allItems.length===0){
+  content.innerHTML='<div style="text-align:center;color:#999;padding:30px;font-size:14px">🔔 Žiadne notifikácie</div>';
+  return;
+}
+
+var html='';
+allItems.forEach(function(item){
+  var date=new Date(item.timestamp);
+  var dateStr=date.toLocaleDateString("sk-SK")+' '+date.toLocaleTimeString("sk-SK",{hour:"2-digit",minute:"2-digit"});
+  var byStr=item.by?('<b style="color:#3b82f6">'+item.by+'</b> · '):'';
+  var delBtn = item.fbId ? '<button onclick="removeNotification(\'' + item.id + '\')" style="float:right;background:#ef4444;color:white;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin-left:8px">✕</button>' : '';
+  html+='<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px">';
+  html+=delBtn;
+  html+='<div style="font-size:13px;color:#1f2937;margin-bottom:4px">'+item.message+'</div>';
+  html+='<div style="font-size:11px;color:#6b7280">'+byStr+dateStr+'</div>';
+  html+='</div>';
+});
+content.innerHTML=html;
 }
 
 // Načítaj históriu update notifikácií
