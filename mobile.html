@@ -568,6 +568,7 @@ async function initFirebase() {
 let currentUser = null;
 let weldBookData = [];
 let activeWbPart = null; // Ktorá časť je momentálne v weldBookData
+let isWbLoading = false; // Ochrana pred ukladaním počas načítavania
 let allProjects = [];
 let currentProject = null; // { name, welds: [], originalFileName }
 let montazMode = 'select';
@@ -1530,7 +1531,8 @@ async function loadWeldBook() {
 
 async function loadWbForPart(part) {
   const docId = part ? (part.toUpperCase() + '_main') : 'weldbook_main';
-  activeWbPart = part ? part.toUpperCase() : null; // Sleduj čo je načítané
+  activeWbPart = part ? part.toUpperCase() : null;
+  isWbLoading = true; // Blokuj ukladanie počas načítavania
   try {
     // Skús part doc
     const doc = await db.collection('weldbook').doc(docId).get();
@@ -1559,11 +1561,16 @@ async function loadWbForPart(part) {
     renderWeldBook(weldBookData);
     document.getElementById('wbCount').textContent = weldBookData.length + ' zvarov' + (part ? ' ('+part+')' : '');
   } catch(e) { console.error('WB load part error:', e); }
+  finally { isWbLoading = false; } // Uvoľni zámok
 }
 
 async function saveWeldBookToFirebase() {
   if (!db) return;
-  // Unikátne session ID pre toto mobile okno
+  // KRITICKÁ OCHRANA: Nikdy neukladaj ak sa načítava alebo dáta sú prázdne bez dôvodu
+  if (isWbLoading) {
+    console.warn('⚠️ WB save zablokovaný - načítavanie prebieha');
+    return;
+  }
   if (!window._mobileSessionId) window._mobileSessionId = 'mob_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   try {
     // Zisti aktívnu časť - VŽDY z dát samotných, nikdy z UI filtra!
@@ -1585,7 +1592,13 @@ async function saveWeldBookToFirebase() {
       : weldBookData;
 
     const docId = part ? (part + '_main') : 'weldbook_main';
-    console.log('💾 WB save → docId:', docId, '| rows:', partRows.length, '| activeWbPart:', activeWbPart, '| wbFPart:', document.getElementById('wbFPart')?.value);
+    // KRITICKÁ OCHRANA: Nikdy nezapíš 0 riadkov do konkrétnej časti
+    if (part && partRows.length === 0) {
+      console.warn('⚠️ WB save ZABLOKOVANÝ: 0 riadkov pre', docId, '- pravdepodobne chyba načítavania');
+      showToast('⚠️ Ukladanie zablokované: prázdne dáta pre ' + part);
+      return;
+    }
+    console.log('💾 WB save → docId:', docId, '| rows:', partRows.length);
     showToast('💾 Ukladám ' + docId + ' (' + partRows.length + ' zvarov)');
     const json = JSON.stringify(partRows);
     const CHUNK = 800*1024;
