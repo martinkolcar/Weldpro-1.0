@@ -5693,11 +5693,10 @@ console.log('✅ Balík vytvorený:',packageId);
 var notifications=[];
 
 function loadNotifications(){
-if(!projectsData.currentProject)return;
-var key='notifications_'+projectsData.currentProject;
+var key='notifications_global';
 var saved=localStorage.getItem(key);
 if(saved){
-notifications=JSON.parse(saved);
+try { notifications=JSON.parse(saved); } catch(e){ notifications=[]; }
 console.log('🔔 Notifikácie načítané:',notifications.length);
 }else{
 notifications=[];
@@ -5706,10 +5705,49 @@ updateNotificationBadge();
 }
 
 function saveNotifications(){
-if(!projectsData.currentProject)return;
-var key='notifications_'+projectsData.currentProject;
-localStorage.setItem(key,JSON.stringify(notifications));
+var key='notifications_global';
+try { localStorage.setItem(key,JSON.stringify(notifications)); } catch(e){}
 updateNotificationBadge();
+}
+
+// Firebase notifications - globálny zoznam (localStorage + Firebase)
+var firebaseNotifUnsub = null;
+
+function startFirebaseNotifListener() {
+  if (!db || firebaseNotifUnsub) return;
+  var startTime = new Date().toISOString();
+  firebaseNotifUnsub = db.collection('notifications')
+    .where('read', '==', false)
+    .limit(50)
+    .onSnapshot(function(snap) {
+      snap.docChanges().forEach(function(change) {
+        if (change.type === 'added') {
+          var d = change.doc.data();
+          // Ignoruj staré (pred spustením PC) - len nové od iných
+          if (d.at < startTime) return;
+          // Ignoruj len notifikácie od tejto session (nie od tohto usera)
+          if (d.sessionId && window._pcSessionId && d.sessionId === window._pcSessionId) return;
+          // Pridaj do lokálnych notifikácií
+          var notif = {
+            id: change.doc.id,
+            message: d.message,
+            timestamp: d.at,
+            by: d.by,
+            fbId: change.doc.id
+          };
+          // Skontroluj či už existuje
+          if (!notifications.find(function(n){ return n.fbId === change.doc.id; })) {
+            notifications.push(notif);
+            saveNotifications();
+            updateNotificationBadge();
+            // Flash zvončeka
+            var btn = document.getElementById('notificationsBtn');
+            if (btn) { btn.style.background='#fef3c7'; setTimeout(function(){ btn.style.background=''; }, 2000); }
+            console.log('🔔 Firebase notifikácia:', d.message);
+          }
+        }
+      });
+    }, function(err){ console.warn('Notif listener error:', err); });
 }
 
 function addNotification(message){
@@ -5724,6 +5762,11 @@ console.log('🔔 Nová notifikácia:',message);
 }
 
 function removeNotification(notifId){
+// Ak má fbId, označ ako prečítané vo Firebase
+var notif = notifications.find(function(n){ return n.id === notifId; });
+if (notif && notif.fbId && db) {
+  db.collection('notifications').doc(notif.fbId).update({read: true}).catch(function(){});
+}
 notifications=notifications.filter(function(n){return n.id!==notifId;});
 saveNotifications();
 buildNotificationList();
@@ -5732,11 +5775,13 @@ console.log('✓ Notifikácia odstránená');
 
 function updateNotificationBadge(){
 var badge=document.getElementById('notificationBadge');
+var badge2=document.getElementById('notificationsBadge');
 if(notifications.length>0){
-badge.style.display='block';
-badge.textContent=notifications.length;
+if(badge){badge.style.display='block';badge.textContent=notifications.length;}
+if(badge2){badge2.style.display='block';badge2.textContent=notifications.length;}
 }else{
-badge.style.display='none';
+if(badge)badge.style.display='none';
+if(badge2)badge2.style.display='none';
 }
 }
 
@@ -7255,7 +7300,8 @@ var dateStr=date.toLocaleDateString('sk-SK')+' '+date.toLocaleTimeString('sk-SK'
 html+='<div style="background:#f9f9f9;border:1px solid #ddd;border-radius:4px;padding:12px;margin-bottom:8px;position:relative">';
 html+='<button onclick="removeNotification(\''+notif.id+'\')" style="position:absolute;top:8px;right:8px;background:#ef4444;color:white;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:12px">✕</button>';
 html+='<div style="font-size:13px;color:#333;margin-bottom:5px;padding-right:40px">'+notif.message+'</div>';
-html+='<div style="font-size:11px;color:#666">'+dateStr+'</div>';
+var byStr = notif.by ? ('<span style="color:#3b82f6;font-weight:600">'+notif.by+'</span> · ') : '';
+html+='<div style="font-size:11px;color:#666">'+byStr+dateStr+'</div>';
 html+='</div>';
 });
 
@@ -8593,8 +8639,8 @@ function openWeldBook() {
     });
   }
 
-  // 🔥 Spusti realtime sync + presence
-  startWbRealtimeSync();
+  // 🔥 Spusti realtime sync + presence + notifikácie
+  startFirebaseServices();
   startWbPresence();
 }
 
@@ -9463,12 +9509,20 @@ async function loadWeldBookFromStorage() {
 }
 
 // ============= REALTIME SYNC (onSnapshot) =============
+function startFirebaseServices() {
+  startFirebaseNotifListener();
+  startWbRealtimeSync();
+}
+
 function startWbRealtimeSync() {
   if (!db) return;
   wbRealtimeListeners.forEach(function(u) { try { u(); } catch(e) {} });
   wbRealtimeListeners = [];
 
   var myUser = window.currentUser ? window.currentUser.username : '';
+  // Unikátne ID tejto session (nie username) - aby admin na mobile != admin na PC
+  if (!window._pcSessionId) window._pcSessionId = 'pc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  var mySessionId = window._pcSessionId;
   var initialLoad = true;
   setTimeout(function() { initialLoad = false; }, 3000);
 
@@ -9477,20 +9531,25 @@ function startWbRealtimeSync() {
     if (!doc.exists || initialLoad) return;
     var data = doc.data();
     var signalAge = Date.now() - (data.at ? new Date(data.at).getTime() : 0);
-    if (signalAge > 60000 || data.by === myUser) return;
+    if (signalAge > 60000) return;
+    // Ignoruj len ak to poslala táto konkrétna session (nie len rovnaký user)
+    if (data.sessionId && data.sessionId === mySessionId) return;
 
     var changedPart = (data.part && data.part !== 'ALL') ? data.part : null;
+    var msg = '📋 ' + data.by + ' upravil WeldBook [' + (changedPart||'ALL') + ']';
 
     if (changedPart && wbActivePart && changedPart !== wbActivePart) {
-      // Iná časť ako máme otvorenú - len notifikácia, nenačítavaj
+      // Iná časť - notifikácia do zvončeka + toast
       showWbSyncNotification('📢 ' + data.by + ' označil zvar v časti ' + changedPart, 'info');
+      addNotification(msg);
       return;
     }
 
-    // Naša aktívna časť sa zmenila - načítaj
+    // Naša aktívna časť - načítaj + notifikácia do zvončeka
     showWbSyncNotification('🔄 ' + data.by + ' upravil WeldBook...', 'loading');
     loadWbPart(wbActivePart).then(function() {
       showWbSyncNotification('✅ ' + data.by + ' - WeldBook aktualizovaný (' + weldBookData.length + ' zvarov)', 'success');
+      addNotification(msg);
     });
   });
   wbRealtimeListeners.push(unsubSignal);
@@ -9501,7 +9560,7 @@ function startWbRealtimeSync() {
     if (initialLoad) { initialLoad = false; return; }
     if (!doc.exists) return;
     var data = doc.data();
-    if ((data.modifiedBy || '') === myUser) return;
+    if (data.sessionId && data.sessionId === mySessionId) return;
 
     var chunkCount = data.chunks || 1;
     var chunkPromises = [];
@@ -9517,7 +9576,9 @@ function startWbRealtimeSync() {
         weldBookGrid.api.setGridOption('rowData', weldBookData);
         populateWeldBookFilterDropdowns();
       }
-      showWbSyncNotification((data.modifiedBy||'?') + ' upravil WeldBook (' + weldBookData.length + ' zvarov)');
+      var syncMsg = (data.modifiedBy||'?') + ' upravil WeldBook (' + weldBookData.length + ' zvarov)';
+      showWbSyncNotification(syncMsg);
+      addNotification('📋 ' + syncMsg);
     }).catch(function(e){ console.error('WB sync error:', e); });
   });
   wbRealtimeListeners.push(unsubMain);

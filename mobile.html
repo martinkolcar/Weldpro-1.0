@@ -567,6 +567,7 @@ async function initFirebase() {
 // ===== STATE =====
 let currentUser = null;
 let weldBookData = [];
+let activeWbPart = null; // Ktorá časť je momentálne v weldBookData
 let allProjects = [];
 let currentProject = null; // { name, welds: [], originalFileName }
 let montazMode = 'select';
@@ -1432,7 +1433,13 @@ function removeWelderModal() {
   if (wbEntry) { wbEntry.welderId = ''; wbEntry.dateWelding = ''; }
   mDraw();
   closeWelderModal();
-  saveWeldBookToFirebase().then(() => showToast('🗑️ Zvarač odstránený: zvar #' + weld.displayNum));
+  saveWeldBookToFirebase().then(() => {
+    showToast('🗑️ Zvarač odstránený: zvar #' + weld.displayNum);
+    sendFirebaseNotification('welder_removed',
+      '❌ Zvarač odznačený na zvare #' + weld.displayNum + ' (' + (currentProject ? currentProject.originalFileName || currentProject.id : '?') + ')',
+      { weldId: String(weld.displayNum), project: currentProject ? currentProject.id : '' }
+    );
+  });
 }
 
 function deleteWeldModal() {
@@ -1460,6 +1467,7 @@ function deleteWeldModal() {
 // ===== FIREBASE NOTIFICATIONS =====
 async function sendFirebaseNotification(type, message, extra) {
   if (!db) return;
+  if (!window._mobileSessionId) window._mobileSessionId = 'mob_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   try {
     await db.collection('notifications').add({
       type: type,
@@ -1467,6 +1475,7 @@ async function sendFirebaseNotification(type, message, extra) {
       by: currentUser ? currentUser.username : 'mobile',
       at: new Date().toISOString(),
       read: false,
+      sessionId: window._mobileSessionId,
       ...(extra || {})
     });
   } catch(e) { console.warn('Notification error:', e); }
@@ -1521,6 +1530,7 @@ async function loadWeldBook() {
 
 async function loadWbForPart(part) {
   const docId = part ? (part.toUpperCase() + '_main') : 'weldbook_main';
+  activeWbPart = part ? part.toUpperCase() : null; // Sleduj čo je načítané
   try {
     // Skús part doc
     const doc = await db.collection('weldbook').doc(docId).get();
@@ -1556,21 +1566,19 @@ async function saveWeldBookToFirebase() {
   // Unikátne session ID pre toto mobile okno
   if (!window._mobileSessionId) window._mobileSessionId = 'mob_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   try {
-    // Zisti aktívnu časť - z WB filtru, alebo z projektu, alebo z dát
+    // Zisti aktívnu časť - VŽDY z dát samotných, nikdy z UI filtra!
     let part = null;
-    const wbFilterPart = document.getElementById('wbFPart') ? document.getElementById('wbFPart').value : '';
-    if (wbFilterPart) {
-      part = wbFilterPart.toUpperCase();
-    } else if (currentProject) {
-      part = getProjectPart() || null;
-    } else if (selectedPart) {
-      part = selectedPart.toUpperCase();
-    }
-    // Ak nemáme part, zisti z dát samotných (všetky riadky musia mať rovnaký part)
-    if (!part && weldBookData.length > 0) {
+    // 1. Najspoľahlivejšie - z dát samotných
+    if (weldBookData.length > 0) {
       const parts = [...new Set(weldBookData.map(r => (r.part||'').toUpperCase()).filter(Boolean))];
       if (parts.length === 1) part = parts[0];
     }
+    // 2. activeWbPart - čo bolo naposledy načítané do weldBookData
+    if (!part && activeWbPart) part = activeWbPart;
+    // 3. Ak sme v Montáži - z projektu
+    if (!part && currentProject) part = getProjectPart() || null;
+    // 4. Posledný fallback
+    if (!part && selectedPart) part = selectedPart.toUpperCase();
 
     const partRows = part
       ? weldBookData.filter(r => (r.part||'').toUpperCase() === part)
@@ -1705,6 +1713,7 @@ function removeWbModal() {
   if (!currentWbRow) return;
   const r = currentWbRow.row;
   const weldId = r.weldId;
+  const iso = r.isometric || '';
   r.welderId = '';
   r.dateWelding = '';
   closeWbModal();
@@ -1712,6 +1721,10 @@ function removeWbModal() {
   saveWeldBookToFirebase().then(() => {
     filterWB();
     showToast('🗑️ Zvarač odstránený: zvar #' + weldId);
+    sendFirebaseNotification('welder_removed',
+      '❌ Zvarač odznačený na zvare #' + weldId + ' (' + iso + ')',
+      { weldId: String(weldId), iso }
+    );
   });
 }
 
@@ -1729,8 +1742,9 @@ async function deleteWbRowModal() {
   showToast('💾 Mažem zo WeldBook aj výkresu...');
 
   // Nájdi projekt podľa izometrie a vymaž zvar aj z výkresu
+  // Project doc ID = "PART_iso" napr. "SUL_KF-712-20002-4"
   try {
-    const projId = iso; // project ID = izometria
+    const projId = part ? (part + '_' + iso) : iso;
     const docRef = db.collection('projects').doc(projId);
     const metaDoc = await docRef.get();
     if (metaDoc.exists) {
