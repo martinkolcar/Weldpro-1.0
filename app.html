@@ -10234,6 +10234,7 @@ function importAllPartsExcel() {
         let totalAdded = 0, totalUpdated = 0, totalSkipped = 0;
         const sheetResults = [];
 
+        // Spracuj a ulož každú časť ZVLÁŠŤ - nikdy nie všetko naraz v pamäti
         for (const sheetName of availableSheets) {
           statusEl.innerHTML = '⚙️ Spracovávam <strong>' + sheetName + '</strong>...<br><small style="color:#999">' + sheetResults.length + ' / ' + availableSheets.length + ' hotových</small>';
 
@@ -10250,6 +10251,8 @@ function importAllPartsExcel() {
           let added = 0, updated = 0, skipped = 0;
           const dataRows = rows.slice(headerRowIdx + 1);
 
+          // Buduj len dáta tejto časti
+          const partRows = [];
           dataRows.forEach(function(row) {
             if (!row || row.every(c => c === '' || c === null || c === undefined)) return;
             const obj = { part: sheetName };
@@ -10264,48 +10267,48 @@ function importAllPartsExcel() {
               }
             });
             if (!obj.weldId || obj.weldId === '' || obj.weldId === '0') { skipped++; return; }
-
-            const existingIdx = weldBookData.findIndex(r =>
-              String(r.weldId).trim() === String(obj.weldId).trim() &&
-              String(r.isometric || '').trim() === String(obj.isometric || '').trim()
-            );
-            if (existingIdx >= 0) {
-              Object.entries(obj).forEach(([f, v]) => { if (v && v !== '') weldBookData[existingIdx][f] = v; });
-              updated++;
-            } else {
-              weldBookData.push(obj);
-              added++;
-            }
+            partRows.push(obj);
+            added++;
           });
 
+          // Ulož túto časť priamo do Firebase bez toho aby sme ju pridávali do weldBookData
+          statusEl.innerHTML = '🔥 Ukladám <strong>' + sheetName + '</strong> do Firebase...<br><small style="color:#999">' + partRows.length + ' zvarov</small>';
+          if (db) {
+            const docId = sheetName + '_main';
+            const jsonStr = JSON.stringify(partRows);
+            const CHUNK = 800*1024;
+            const chunks = [];
+            for (let ci = 0; ci < jsonStr.length; ci += CHUNK) chunks.push(jsonStr.slice(ci, ci + CHUNK));
+            await Promise.all(chunks.map((c, i) =>
+              db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d: c})
+            ));
+            await db.collection('weldbook').doc(docId).set({
+              type:'part', part: sheetName, chunks: chunks.length, count: partRows.length,
+              modifiedBy: window.currentUser ? window.currentUser.username : 'unknown',
+              date: new Date().toISOString()
+            });
+          }
+
           totalAdded += added;
-          totalUpdated += updated;
           totalSkipped += skipped;
-          sheetResults.push({ name: sheetName, added, updated, skipped });
+          sheetResults.push({ name: sheetName, added, skipped });
+
+          // Uvoľni pamäť
+          partRows.length = 0;
         }
 
-        // Refresh grid
+        // Po uložení všetkých častí - načítaj aktívnu časť do pamäte
+        statusEl.innerHTML = '📥 Načítavam aktívnu časť...';
+        await loadWbPart(wbActivePart);
         if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
         populateWeldBookFilterDropdowns();
         wbLocalBackup();
 
-        // Uloženie do Firebase - 5 requestov (jeden na časť)
-        statusEl.innerHTML = '🔥 Ukladám do Firebase...<br><small style="color:#999">0 / 5 častí</small>';
-        var importParts = ['SUL','LIG','DRY','FLA','LHT'];
-        var savedParts = 0;
-        for (var ip = 0; ip < importParts.length; ip++) {
-          var p = importParts[ip];
-          statusEl.innerHTML = '🔥 Ukladám do Firebase...<br><small style="color:#999">' + savedParts + ' / 5 častí (' + p + '...)</small>';
-          await _saveWbPartToFirebase(p).catch(function(e){ console.warn('Part save error:', e); });
-          savedParts++;
-          statusEl.innerHTML = '🔥 Ukladám do Firebase...<br><small style="color:#999">' + savedParts + ' / 5 častí</small>';
-        }
+        // Signal
         if (db) {
           await db.collection('weldbook_signal').doc('latest').set({
             by: window.currentUser ? window.currentUser.username : 'unknown',
-            at: new Date().toISOString(),
-            part: 'ALL',
-            count: weldBookData.length
+            at: new Date().toISOString(), part: 'ALL', count: totalAdded
           }).catch(function(){});
         }
 
