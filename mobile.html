@@ -417,6 +417,7 @@ canvas#mca { display: block; }
           <th style="padding:6px 3px;color:#1e40af">Item 2</th>
           <th style="padding:6px 3px;color:#1e40af">Heat 2</th>
           <th style="padding:6px 3px;color:#0369a1">VT</th>
+          <th style="padding:6px 3px;color:#b45309">RT</th>
         </tr>
       </thead>
       <tbody id="wbBody"></tbody>
@@ -526,6 +527,30 @@ canvas#mca { display: block; }
   <canvas id="scanCanvas" style="display:none"></canvas>
 </div>
 
+<!-- RT modal -->
+<div class="modal-overlay" id="rtModal" style="z-index:3000">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📡 RT — Date of testing</span>
+      <button onclick="closeRtModal()" style="background:none;border:none;font-size:22px;color:#9ca3af;cursor:pointer;padding:0">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="weld-info-box" style="margin-bottom:12px">
+        <div class="weld-info-row"><span class="weld-info-label">Zvar</span><span class="weld-info-val" id="rt_weldNum">-</span></div>
+        <div class="weld-info-row"><span class="weld-info-label">Izometria</span><span class="weld-info-val" id="rt_iso" style="font-size:11px">-</span></div>
+      </div>
+      <label class="modal-label" style="color:#b45309">RT Date of testing</label>
+      <input class="modal-input" id="rt_date" type="date" style="border-color:#fcd34d;font-size:16px">
+      <div class="modal-row" style="margin-top:12px">
+        <button class="btn-secondary" onclick="closeRtModal()">Zrušiť</button>
+        <button class="btn-primary" style="background:#b45309" onclick="saveRtModal()">✅ Uložiť RT dátum</button>
+      </div>
+      <button onclick="clearRtModal()" style="width:100%;margin-top:8px;padding:11px;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">🗑️ Vymazať RT dátum</button>
+    </div>
+  </div>
+</div>
+
 <!-- Fitting / Heat Nr modal -->
 <div class="modal-overlay" id="fittingModal" style="z-index:3000">
   <div class="modal-sheet">
@@ -594,6 +619,7 @@ canvas#mca { display: block; }
         <button class="btn-primary" onclick="saveWbModal()">✅ Uložiť</button>
       </div>
       <button onclick="openFittingModalFromWb()" style="width:100%;margin-top:8px;padding:12px;background:#7c3aed;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">🔩 Fitting / Heat Nr</button>
+      <button onclick="openRtModal()" style="width:100%;margin-top:6px;padding:12px;background:#b45309;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">📡 RT</button>
       <button class="btn-danger" id="wb_remove" onclick="removeWbModal()" style="display:none">🗑️ Odstrániť zvarača</button>
       <button class="btn-danger" onclick="deleteWbRowModal()" style="margin-top:4px;background:#7f1d1d">🗑️ Vymazať zvar</button>
     </div>
@@ -1912,7 +1938,7 @@ function _applyWbFilter() {
 function renderWeldBook(rows) {
   const tbody = document.getElementById('wbBody');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:#9ca3af">Žiadne záznamy</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:#9ca3af">Žiadne záznamy</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map((r,i) => {
@@ -1928,6 +1954,7 @@ function renderWeldBook(rows) {
       <td style="padding:6px 3px;font-size:11px;color:#374151;max-width:65px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.item2||'—'}</td>
       <td style="padding:6px 3px;font-size:11px;font-weight:${r.heatNr2?'700':'400'};color:${r.heatNr2?'#1e40af':'#d1d5db'}">${r.heatNr2||'—'}</td>
       <td style="padding:6px 3px;font-size:11px;font-weight:${r.vtDate?'700':'400'};color:${r.vtDate?'#0369a1':'#d1d5db'}">${r.vtDate||'—'}</td>
+      <td style="padding:6px 3px;font-size:11px;font-weight:${r.rtDate?'700':'400'};color:${r.rtDate?'#b45309':'#d1d5db'}">${r.rtDate||'—'}</td>
     </tr>`;
   }).join('');
 }
@@ -1949,6 +1976,75 @@ function openWbModal(idx) {
   setTimeout(() => document.getElementById('wb_welder').focus(), 300);
 }
 
+
+// ===== RT MODAL =====
+function openRtModal() {
+  if (!currentWbRow) return;
+  var r = currentWbRow.row;
+  document.getElementById('rt_weldNum').textContent = r.weldId || '-';
+  document.getElementById('rt_iso').textContent = (r.isometric||'-').substring(0,40);
+  document.getElementById('rt_date').value = r.rtDate || '';
+  // Default na dnesok ak prazdne
+  if (!r.rtDate) document.getElementById('rt_date').value = today();
+  var m = document.getElementById('rtModal'); if (m) m.classList.add('show');
+}
+
+function closeRtModal() {
+  var m = document.getElementById('rtModal'); if (m) m.classList.remove('show');
+}
+
+async function saveRtModal() {
+  if (!currentWbRow) return;
+  var r = currentWbRow.row;
+  var rtDate = document.getElementById('rt_date').value;
+  if (!rtDate) { showToast('Vyber dátum'); return; }
+  r.rtDate = rtDate;
+  closeRtModal();
+  showToast('Ukladam RT datum...');
+  try {
+    var part = (r.part || '').toUpperCase() || activeWbPart || null;
+    var partRows = weldBookData.filter(function(row){ return !part || (row.part||'').toUpperCase() === part; });
+    if (!partRows.length && weldBookData.length > 0) partRows = weldBookData;
+    if (!partRows.length) { showToast('WB nie je nacitany'); return; }
+    var docId = part ? (part + '_main') : 'weldbook_main';
+    var json = JSON.stringify(partRows), CHUNK = 800*1024, chunks = [];
+    for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
+    await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
+    await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() });
+    if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
+    var _wbF = weldBookData.filter(function(row){ return !activeWbPart || (row.part||'').toUpperCase() === activeWbPart; });
+    renderWeldBook(_wbF);
+    showToast('RT datum ulozeny: ' + rtDate);
+    sendFirebaseNotification('rt_date', (currentUser?currentUser.username:'?') + ' zadal RT datum ' + rtDate + ' pre zvar #' + r.weldId + ' (' + (r.isometric||'') + ')', { weldId: String(r.weldId), rtDate: rtDate });
+  } catch(e) { showToast('Chyba: ' + e.message); }
+}
+
+async function clearRtModal() {
+  if (!confirm('Vymazat RT datum pre tento zvar?')) return;
+  if (!currentWbRow) return;
+  var r = currentWbRow.row;
+  r.rtDate = '';
+  document.getElementById('rt_date').value = '';
+  closeRtModal();
+  showToast('Mazem RT datum...');
+  try {
+    var part = (r.part || '').toUpperCase() || activeWbPart || null;
+    var partRows = weldBookData.filter(function(row){ return !part || (row.part||'').toUpperCase() === part; });
+    if (!partRows.length && weldBookData.length > 0) partRows = weldBookData;
+    if (!partRows.length) { showToast('WB nie je nacitany'); return; }
+    var docId = part ? (part + '_main') : 'weldbook_main';
+    var json = JSON.stringify(partRows), CHUNK = 800*1024, chunks = [];
+    for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
+    await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
+    await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() });
+    if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
+    var _wbF = weldBookData.filter(function(row){ return !activeWbPart || (row.part||'').toUpperCase() === activeWbPart; });
+    renderWeldBook(_wbF);
+    showToast('RT datum vymazany pre zvar #' + r.weldId);
+  } catch(e) { showToast('Chyba: ' + e.message); }
+}
 function closeWbModal() {
   const _el_wbModal_remove = document.getElementById('wbModal'); if (_el_wbModal_remove) _el_wbModal_remove.classList.remove('show');
   currentWbRow = null;
