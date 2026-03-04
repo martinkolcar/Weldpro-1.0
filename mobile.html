@@ -386,6 +386,7 @@ canvas#mca { display: block; }
   <div class="wb-filters">
     <div style="display:flex;gap:8px;margin-bottom:8px">
       <input class="wb-search" id="wbSearch" placeholder="🔍 Hľadaj..." oninput="filterWB()" style="flex:1">
+      <button onclick="openIsoScanner()" style="flex-shrink:0;padding:8px 12px;background:#0ea5e9;color:white;border:none;border-radius:8px;font-size:18px;cursor:pointer" title="Naskenuj izometriu">📷</button>
       <button class="tool-btn green" onclick="openAddWbModal()" style="flex-shrink:0;padding:8px 12px">➕ Pridať</button>
     </div>
     <div class="wb-filters-row">
@@ -462,6 +463,37 @@ canvas#mca { display: block; }
     </div>
   </div>
 </div>
+
+<!-- OCR ISO Scanner modal -->
+<div class="modal-overlay" id="isoScannerModal" style="z-index:3500">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📷 Skenuj izometriu</span>
+      <button onclick="closeIsoScanner()" style="background:none;border:none;font-size:22px;color:#9ca3af;cursor:pointer;padding:0">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="scanPreview" style="display:none;margin-bottom:12px;text-align:center">
+        <img id="scanImg" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid #e5e7eb">
+      </div>
+      <div id="scanStatus" style="text-align:center;padding:20px;color:#6b7280;font-size:14px">
+        Vyber fotku s názvom izometrie
+      </div>
+      <div id="scanResult" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:11px;color:#166534;font-weight:700;margin-bottom:4px">NÁJDENÁ IZOMETRIA:</div>
+        <div id="scanResultText" style="font-size:16px;font-weight:700;color:#15803d"></div>
+      </div>
+      <div id="scanNoMatch" style="display:none;background:#fef9c3;border:1px solid #fde68a;border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:13px;color:#92400e">⚠️ Izometria nenájdená vo WeldBook. Prečítaný text:</div>
+        <div id="scanRawText" style="font-size:12px;color:#78350f;margin-top:4px;word-break:break-all"></div>
+      </div>
+      <input type="file" id="scanFileInput" accept="image/*" capture="environment" style="display:none" onchange="handleScanFile(event)">
+      <button onclick="document.getElementById('scanFileInput').click()" style="width:100%;padding:14px;background:#0ea5e9;color:white;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:8px">📸 Odfotiť / Vybrať obrázok</button>
+      <button id="scanGoBtn" onclick="applyScanResult()" style="display:none;width:100%;padding:13px;background:#059669;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">✅ Otvoriť izometriu</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="scanFileInputBg" accept="image/*" style="display:none">
 
 <!-- Fitting / Heat Nr modal -->
 <div class="modal-overlay" id="fittingModal" style="z-index:3000">
@@ -559,6 +591,7 @@ canvas#mca { display: block; }
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <script>
 // ===== FIREBASE =====
@@ -742,6 +775,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (welderModal) welderModal.addEventListener('click', function(e) { if (e.target === this) closeWelderModal(); });
   const fittingModal = document.getElementById('fittingModal');
   if (fittingModal) fittingModal.addEventListener('click', function(e) { if (e.target === this) closeFittingModal(); });
+  var scannerModal = document.getElementById('isoScannerModal');
+  if (scannerModal) scannerModal.addEventListener('click', function(e) { if (e.target === this) closeIsoScanner(); });
   const wbModal = document.getElementById('wbModal');
   if (wbModal) wbModal.addEventListener('click', function(e) { if (e.target === this) closeWbModal(); });
   const addWbModal = document.getElementById('addWbModal');
@@ -1995,6 +2030,148 @@ function splitIso(fullName) {
 window.addEventListener('resize', () => {
   if (document.getElementById('montazPage').classList.contains('active')) mDraw();
 });
+
+// ===== ISO SCANNER (OCR) =====
+var _scanMatchedIso = null;
+
+function openIsoScanner() {
+  _scanMatchedIso = null;
+  document.getElementById('scanPreview').style.display = 'none';
+  document.getElementById('scanResult').style.display = 'none';
+  document.getElementById('scanNoMatch').style.display = 'none';
+  document.getElementById('scanGoBtn').style.display = 'none';
+  document.getElementById('scanStatus').style.display = 'block';
+  document.getElementById('scanStatus').textContent = 'Vyber fotku s názvom izometrie';
+  document.getElementById('scanFileInput').value = '';
+  var m = document.getElementById('isoScannerModal');
+  if (m) m.classList.add('show');
+}
+
+function closeIsoScanner() {
+  var m = document.getElementById('isoScannerModal');
+  if (m) m.classList.remove('show');
+}
+
+async function handleScanFile(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+
+  // Show preview
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('scanImg').src = e.target.result;
+    document.getElementById('scanPreview').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+
+  document.getElementById('scanResult').style.display = 'none';
+  document.getElementById('scanNoMatch').style.display = 'none';
+  document.getElementById('scanGoBtn').style.display = 'none';
+  document.getElementById('scanStatus').style.display = 'block';
+  document.getElementById('scanStatus').innerHTML = '⏳ Čítam text z obrázka...';
+
+  try {
+    var worker = await Tesseract.createWorker('eng');
+    var result = await worker.recognize(file);
+    await worker.terminate();
+
+    var rawText = result.data.text || '';
+    console.log('OCR raw:', rawText);
+
+    // Extract all "word" tokens, look for iso pattern match
+    var matched = findIsoInText(rawText);
+
+    document.getElementById('scanStatus').style.display = 'none';
+
+    if (matched) {
+      _scanMatchedIso = matched;
+      document.getElementById('scanResultText').textContent = matched;
+      document.getElementById('scanResult').style.display = 'block';
+      document.getElementById('scanGoBtn').style.display = 'block';
+    } else {
+      // Show raw text so user can see what was read
+      document.getElementById('scanRawText').textContent = rawText.replace(/\n/g, ' ').trim().substring(0, 200);
+      document.getElementById('scanNoMatch').style.display = 'block';
+    }
+  } catch(e) {
+    document.getElementById('scanStatus').textContent = '❌ Chyba OCR: ' + e.message;
+    console.error('OCR error:', e);
+  }
+}
+
+function findIsoInText(text) {
+  // Get all available isos from WB dropdown
+  var isoSel = document.getElementById('wbFIso');
+  var availableIsos = [];
+  if (isoSel) {
+    for (var i = 0; i < isoSel.options.length; i++) {
+      var v = isoSel.options[i].value;
+      if (v) availableIsos.push(v);
+    }
+  }
+
+  if (availableIsos.length === 0) return null;
+
+  // Clean OCR text - remove spaces, normalize
+  var cleanText = text.replace(/\s+/g, '').toUpperCase();
+  // Also try with spaces removed from each line separately
+  var lines = text.split('\n').map(function(l){ return l.replace(/\s+/g,'').toUpperCase(); });
+
+  // Try to match each available iso against OCR text
+  // Use suffix matching - skip first segment (e.g. AM58-)
+  for (var j = 0; j < availableIsos.length; j++) {
+    var iso = availableIsos[j];
+    var isoClean = iso.replace(/\s+/g,'').toUpperCase();
+
+    // Direct match
+    if (cleanText.includes(isoClean)) return iso;
+    for (var k = 0; k < lines.length; k++) {
+      if (lines[k].includes(isoClean)) return iso;
+    }
+
+    // Try suffix - skip first segment before first dash
+    var dashIdx = isoClean.indexOf('-');
+    if (dashIdx > 0) {
+      var suffix = isoClean.slice(dashIdx + 1); // e.g. 712-20001-29-40-160C4B
+      if (suffix.length > 5 && cleanText.includes(suffix)) return iso;
+      for (var m2 = 0; m2 < lines.length; m2++) {
+        if (lines[m2].includes(suffix)) return iso;
+      }
+    }
+  }
+
+  // Fuzzy: try partial segment matching (at least 3 dash-segments must match)
+  for (var j2 = 0; j2 < availableIsos.length; j2++) {
+    var iso2 = availableIsos[j2];
+    var segments = iso2.replace(/\s+/g,'').toUpperCase().split('-').filter(function(s){ return s.length > 0; });
+    if (segments.length < 3) continue;
+    var matchCount = 0;
+    for (var s = 0; s < segments.length; s++) {
+      if (segments[s].length > 2 && cleanText.includes(segments[s])) matchCount++;
+    }
+    if (matchCount >= Math.min(3, segments.length - 1)) return iso2;
+  }
+
+  return null;
+}
+
+function applyScanResult() {
+  if (!_scanMatchedIso) return;
+  closeIsoScanner();
+
+  // Set iso filter and load
+  var isoSel = document.getElementById('wbFIso');
+  if (isoSel) {
+    for (var i = 0; i < isoSel.options.length; i++) {
+      if (isoSel.options[i].value === _scanMatchedIso) {
+        isoSel.selectedIndex = i;
+        break;
+      }
+    }
+  }
+  filterWB();
+  showToast('📋 ' + _scanMatchedIso);
+}
 </script>
 </body>
 </html>
