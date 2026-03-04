@@ -466,54 +466,63 @@ canvas#mca { display: block; }
 
 <!-- ISO Live Scanner -->
 <div id="isoScannerOverlay" style="display:none;position:fixed;inset:0;z-index:3500;background:#000;flex-direction:column">
-  <!-- Camera view -->
   <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden">
     <video id="scanVideo" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover"></video>
-    <!-- Dark overlay with cutout via box-shadow -->
-    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
-      <!-- Top dark -->
-      <div style="position:absolute;top:0;left:0;right:0;height:calc(50% - 45px);background:rgba(0,0,0,0.55)"></div>
-      <!-- Bottom dark -->
-      <div style="position:absolute;bottom:0;left:0;right:0;height:calc(50% - 45px);background:rgba(0,0,0,0.55)"></div>
-      <!-- Left dark -->
-      <div style="position:absolute;top:calc(50% - 45px);left:0;width:24px;height:90px;background:rgba(0,0,0,0.55)"></div>
-      <!-- Right dark -->
-      <div style="position:absolute;top:calc(50% - 45px);right:0;width:24px;height:90px;background:rgba(0,0,0,0.55)"></div>
-      <!-- Scanning frame corners -->
-      <div style="position:absolute;width:calc(100% - 48px);height:90px;border:none">
-        <!-- TL -->
-        <div style="position:absolute;top:0;left:0;width:28px;height:28px;border-top:3px solid #0ea5e9;border-left:3px solid #0ea5e9;border-radius:3px 0 0 0"></div>
-        <!-- TR -->
-        <div style="position:absolute;top:0;right:0;width:28px;height:28px;border-top:3px solid #0ea5e9;border-right:3px solid #0ea5e9;border-radius:0 3px 0 0"></div>
-        <!-- BL -->
-        <div style="position:absolute;bottom:0;left:0;width:28px;height:28px;border-bottom:3px solid #0ea5e9;border-left:3px solid #0ea5e9;border-radius:0 0 0 3px"></div>
-        <!-- BR -->
-        <div style="position:absolute;bottom:0;right:0;width:28px;height:28px;border-bottom:3px solid #0ea5e9;border-right:3px solid #0ea5e9;border-radius:0 0 3px 0"></div>
-        <!-- Scan line animation -->
-        <div id="scanLine" style="position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#0ea5e9,transparent);animation:scanAnim 2s linear infinite"></div>
+    <!-- Dark overlay -->
+    <div style="position:absolute;inset:0;pointer-events:none">
+      <div style="position:absolute;top:0;left:0;right:0;height:calc(50% - 40px);background:rgba(0,0,0,0.6)"></div>
+      <div style="position:absolute;bottom:0;left:0;right:0;height:calc(50% - 40px);background:rgba(0,0,0,0.6)"></div>
+      <div style="position:absolute;top:calc(50% - 40px);left:0;width:20px;height:80px;background:rgba(0,0,0,0.6)"></div>
+      <div style="position:absolute;top:calc(50% - 40px);right:0;width:20px;height:80px;background:rgba(0,0,0,0.6)"></div>
+      <!-- Corner brackets -->
+      <div style="position:absolute;top:calc(50% - 40px);left:20px;right:20px;height:80px">
+        <div style="position:absolute;top:0;left:0;width:26px;height:26px;border-top:3px solid #0ea5e9;border-left:3px solid #0ea5e9"></div>
+        <div style="position:absolute;top:0;right:0;width:26px;height:26px;border-top:3px solid #0ea5e9;border-right:3px solid #0ea5e9"></div>
+        <div style="position:absolute;bottom:0;left:0;width:26px;height:26px;border-bottom:3px solid #0ea5e9;border-left:3px solid #0ea5e9"></div>
+        <div style="position:absolute;bottom:0;right:0;width:26px;height:26px;border-bottom:3px solid #0ea5e9;border-right:3px solid #0ea5e9"></div>
       </div>
     </div>
-    <!-- Status bar -->
-    <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 16px;background:rgba(0,0,0,0.6);text-align:center">
-      <div id="scanLiveStatus" style="color:white;font-size:13px;font-weight:500">📖 Namieram na názov izometrie...</div>
-    </div>
-    <!-- Close btn -->
-    <button onclick="closeIsoScanner()" style="position:absolute;top:16px;right:16px;background:rgba(0,0,0,0.5);border:none;color:white;width:40px;height:40px;border-radius:50%;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>
+    <!-- Close -->
+    <button onclick="closeIsoScanner()" style="position:absolute;top:16px;right:16px;background:rgba(0,0,0,0.55);border:none;color:white;width:42px;height:42px;border-radius:50%;font-size:24px;cursor:pointer">×</button>
+    <!-- Hint -->
+    <div style="position:absolute;top:16px;left:0;right:0;text-align:center;color:rgba(255,255,255,0.7);font-size:12px;pointer-events:none">Namieram rámček na text izometrie</div>
   </div>
-  <!-- Result panel -->
-  <div id="scanResultPanel" style="background:white;padding:16px;display:none">
-    <div style="font-size:11px;color:#166534;font-weight:700;margin-bottom:4px">NÁJDENÁ IZOMETRIA:</div>
-    <div id="scanResultText" style="font-size:18px;font-weight:700;color:#15803d;margin-bottom:12px"></div>
-    <div style="display:flex;gap:8px">
-      <button onclick="retryScan()" style="flex:1;padding:12px;background:#f1f5f9;color:#374151;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">🔄 Znova</button>
-      <button onclick="applyScanResult()" style="flex:2;padding:12px;background:#059669;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">✅ Otvoriť izometriu</button>
+  <!-- Snap button + result area -->
+  <div style="background:#111;padding:16px">
+    <!-- Capture button -->
+    <div id="scanCaptureArea">
+      <button onclick="doSnapScan()" style="width:100%;padding:15px;background:#0ea5e9;color:white;border:none;border-radius:12px;font-size:17px;font-weight:700;cursor:pointer;letter-spacing:0.5px">📸 Načítať text</button>
+    </div>
+    <!-- Processing -->
+    <div id="scanProcessing" style="display:none;text-align:center;padding:12px 0;color:#94a3b8;font-size:14px">⏳ Čítam text...</div>
+    <!-- Raw text + iso list -->
+    <div id="scanRawArea" style="display:none;margin-top:10px">
+      <div style="font-size:11px;color:#64748b;margin-bottom:4px">PREČÍTANÝ TEXT:</div>
+      <div id="scanRawText" style="font-size:13px;color:#e2e8f0;background:#1e293b;padding:8px 10px;border-radius:8px;word-break:break-all;min-height:28px;margin-bottom:10px"></div>
+      <div id="scanMatchArea">
+        <!-- Matched iso -->
+        <div id="scanMatchFound" style="display:none">
+          <div style="font-size:11px;color:#4ade80;font-weight:700;margin-bottom:4px">✅ NÁJDENÁ IZOMETRIA:</div>
+          <div id="scanMatchText" style="font-size:16px;font-weight:700;color:#4ade80;margin-bottom:10px"></div>
+          <div style="display:flex;gap:8px">
+            <button onclick="retryScan()" style="flex:1;padding:11px;background:#334155;color:#cbd5e1;border:none;border-radius:10px;font-size:14px;cursor:pointer">🔄 Znova</button>
+            <button onclick="applyScanResult()" style="flex:2;padding:11px;background:#059669;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">✅ Otvoriť</button>
+          </div>
+        </div>
+        <!-- No match - show iso picker -->
+        <div id="scanNoMatchArea" style="display:none">
+          <div style="font-size:11px;color:#f59e0b;margin-bottom:6px">⚠️ Nenájdené - vyber ručne:</div>
+          <select id="scanManualSelect" style="width:100%;padding:10px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;font-size:13px;margin-bottom:8px"></select>
+          <div style="display:flex;gap:8px">
+            <button onclick="retryScan()" style="flex:1;padding:11px;background:#334155;color:#cbd5e1;border:none;border-radius:10px;font-size:14px;cursor:pointer">🔄 Znova</button>
+            <button onclick="applyManualSelect()" style="flex:2;padding:11px;background:#0ea5e9;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">✅ Otvoriť</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
   <canvas id="scanCanvas" style="display:none"></canvas>
 </div>
-<style>
-@keyframes scanAnim { 0%{top:0} 100%{top:calc(100% - 2px)} }
-</style>
 
 <!-- Fitting / Heat Nr modal -->
 <div class="modal-overlay" id="fittingModal" style="z-index:3000">
@@ -2050,17 +2059,16 @@ window.addEventListener('resize', () => {
   if (document.getElementById('montazPage').classList.contains('active')) mDraw();
 });
 
-// ===== ISO LIVE SCANNER =====
+// ===== ISO SCANNER =====
 var _scanMatchedIso = null;
 var _scanStream = null;
 var _scanWorker = null;
-var _scanInterval = null;
-var _scanRunning = false;
 
 function openIsoScanner() {
   _scanMatchedIso = null;
-  document.getElementById('scanResultPanel').style.display = 'none';
-  document.getElementById('scanLiveStatus').textContent = '📖 Namieram na názov izometrie...';
+  document.getElementById('scanCaptureArea').style.display = 'block';
+  document.getElementById('scanProcessing').style.display = 'none';
+  document.getElementById('scanRawArea').style.display = 'none';
   var overlay = document.getElementById('isoScannerOverlay');
   overlay.style.display = 'flex';
   startScanCamera();
@@ -2074,115 +2082,121 @@ function closeIsoScanner() {
 async function startScanCamera() {
   try {
     _scanStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      video: { facingMode: {ideal:'environment'}, width:{ideal:1280}, height:{ideal:720} }
     });
     var video = document.getElementById('scanVideo');
     video.srcObject = _scanStream;
     await video.play();
-
-    // Init Tesseract worker
-    _scanRunning = true;
+    // Pre-init worker on open (faster snap)
     if (!_scanWorker) {
       _scanWorker = await Tesseract.createWorker('eng');
     }
-    // Start scanning loop
-    _scanInterval = setInterval(doScanFrame, 1200);
   } catch(e) {
-    document.getElementById('scanLiveStatus').textContent = '❌ Kamera nedostupná: ' + e.message;
+    showToast('Kamera: ' + e.message);
   }
 }
 
 function stopScanCamera() {
-  _scanRunning = false;
-  if (_scanInterval) { clearInterval(_scanInterval); _scanInterval = null; }
   if (_scanStream) { _scanStream.getTracks().forEach(function(t){ t.stop(); }); _scanStream = null; }
 }
 
-async function doScanFrame() {
-  if (!_scanRunning) return;
+async function doSnapScan() {
   var video = document.getElementById('scanVideo');
-  var canvas = document.getElementById('scanCanvas');
-  if (!video || video.readyState < 2) return;
+  if (!video || video.readyState < 2) { showToast('Kamera nie je pripravena'); return; }
 
-  // Crop only the scanning zone (center strip - same as the bracket area)
+  document.getElementById('scanCaptureArea').style.display = 'none';
+  document.getElementById('scanProcessing').style.display = 'block';
+  document.getElementById('scanRawArea').style.display = 'none';
+
+  // Snap only the bracket zone (center 30% of height)
   var vw = video.videoWidth, vh = video.videoHeight;
-  var cropH = Math.round(vh * 0.22); // 22% of height = bracket zone
+  var cropH = Math.round(vh * 0.28);
   var cropY = Math.round(vh * 0.5 - cropH / 2);
-  canvas.width = vw;
-  canvas.height = cropH;
+  var canvas = document.getElementById('scanCanvas');
+  canvas.width = vw; canvas.height = cropH;
   var ctx = canvas.getContext('2d');
+  // Pre-process: contrast boost
+  ctx.filter = 'contrast(1.6) brightness(1.1) grayscale(1)';
   ctx.drawImage(video, 0, cropY, vw, cropH, 0, 0, vw, cropH);
 
   try {
+    if (!_scanWorker) _scanWorker = await Tesseract.createWorker('eng');
     var result = await _scanWorker.recognize(canvas);
-    var rawText = result.data.text || '';
-    if (!rawText.trim()) return;
+    var rawText = (result.data.text || '').trim();
+
+    document.getElementById('scanProcessing').style.display = 'none';
+    document.getElementById('scanRawArea').style.display = 'block';
+    // Show raw text
+    document.getElementById("scanRawText").textContent = rawText.split("\n").join(" ").trim().substring(0,120) || "(prazdne)";
 
     var matched = findIsoInText(rawText);
     if (matched) {
       _scanMatchedIso = matched;
-      stopScanCamera();
-      document.getElementById('scanLiveStatus').textContent = '✅ Nájdené!';
-      document.getElementById('scanResultText').textContent = matched;
-      document.getElementById('scanResultPanel').style.display = 'block';
+      document.getElementById('scanMatchText').textContent = matched;
+      document.getElementById('scanMatchFound').style.display = 'block';
+      document.getElementById('scanNoMatchArea').style.display = 'none';
     } else {
-      // Show partial feedback - what was read
-      var shortText = rawText.replace(/\n/g,' ').trim().substring(0,60);
-      if (shortText) document.getElementById('scanLiveStatus').textContent = '🔍 ' + shortText;
+      _scanMatchedIso = null;
+      document.getElementById('scanMatchFound').style.display = 'none';
+      document.getElementById('scanNoMatchArea').style.display = 'block';
+      // Populate manual select with all isos
+      var sel = document.getElementById('scanManualSelect');
+      sel.innerHTML = '<option value="">-- vyber izometriu --</option>';
+      var isoSel = document.getElementById('wbFIso');
+      if (isoSel) {
+        for (var i = 0; i < isoSel.options.length; i++) {
+          var v = isoSel.options[i].value;
+          if (v) {
+            var opt = document.createElement('option');
+            opt.value = v; opt.textContent = v;
+            sel.appendChild(opt);
+          }
+        }
+      }
     }
-  } catch(e) { /* ignore frame errors */ }
+    document.getElementById('scanCaptureArea').style.display = 'block';
+  } catch(e) {
+    document.getElementById('scanProcessing').style.display = 'none';
+    document.getElementById('scanCaptureArea').style.display = 'block';
+    showToast('OCR chyba: ' + e.message);
+  }
 }
 
 function retryScan() {
   _scanMatchedIso = null;
-  document.getElementById('scanResultPanel').style.display = 'none';
-  document.getElementById('scanLiveStatus').textContent = '📖 Namieram na názov izometrie...';
-  _scanRunning = true;
-  startScanCamera();
+  document.getElementById('scanRawArea').style.display = 'none';
+  document.getElementById('scanCaptureArea').style.display = 'block';
 }
 
 function findIsoInText(text) {
   var isoSel = document.getElementById('wbFIso');
-  var availableIsos = [];
+  var isos = [];
   if (isoSel) {
     for (var i = 0; i < isoSel.options.length; i++) {
-      var v = isoSel.options[i].value;
-      if (v) availableIsos.push(v);
+      var v = isoSel.options[i].value; if (v) isos.push(v);
     }
   }
-  if (availableIsos.length === 0) return null;
-
-  var cleanText = text.replace(/\s+/g,'').toUpperCase();
-  var lines = text.split('\n').map(function(l){ return l.replace(/\s+/g,'').toUpperCase(); });
-
-  for (var j = 0; j < availableIsos.length; j++) {
-    var iso = availableIsos[j];
-    var isoClean = iso.replace(/\s+/g,'').toUpperCase();
-    if (cleanText.includes(isoClean)) return iso;
-    for (var k = 0; k < lines.length; k++) {
-      if (lines[k].includes(isoClean)) return iso;
-    }
-    // Skip first segment (e.g. AM58-)
-    var dashIdx = isoClean.indexOf('-');
-    if (dashIdx > 0) {
-      var suffix = isoClean.slice(dashIdx + 1);
-      if (suffix.length > 5 && cleanText.includes(suffix)) return iso;
-      for (var m = 0; m < lines.length; m++) {
-        if (lines[m].includes(suffix)) return iso;
-      }
+  if (!isos.length) return null;
+  var clean = text.replace(/\s+/g,'').toUpperCase();
+  var lines = text.split(String.fromCharCode(10)).map(function(l){ return l.replace(/ /g,'').toUpperCase(); });
+  for (var j = 0; j < isos.length; j++) {
+    var ic = isos[j].replace(/\s+/g,'').toUpperCase();
+    if (clean.includes(ic)) return isos[j];
+    for (var k = 0; k < lines.length; k++) if (lines[k].includes(ic)) return isos[j];
+    var di = ic.indexOf('-');
+    if (di > 0) {
+      var suf = ic.slice(di+1);
+      if (suf.length > 5 && clean.includes(suf)) return isos[j];
+      for (var m = 0; m < lines.length; m++) if (lines[m].includes(suf)) return isos[j];
     }
   }
-
-  // Fuzzy: at least 3 segments match
-  for (var j2 = 0; j2 < availableIsos.length; j2++) {
-    var iso2 = availableIsos[j2];
-    var segs = iso2.replace(/\s+/g,'').toUpperCase().split('-').filter(function(s){ return s.length > 1; });
+  // Fuzzy
+  for (var j2 = 0; j2 < isos.length; j2++) {
+    var segs = isos[j2].replace(/\s+/g,'').toUpperCase().split('-').filter(function(s){ return s.length>1; });
     if (segs.length < 3) continue;
     var hits = 0;
-    for (var s = 0; s < segs.length; s++) {
-      if (segs[s].length > 2 && cleanText.includes(segs[s])) hits++;
-    }
-    if (hits >= Math.min(3, segs.length - 1)) return iso2;
+    for (var s = 0; s < segs.length; s++) if (segs[s].length>2 && clean.includes(segs[s])) hits++;
+    if (hits >= Math.min(3, segs.length-1)) return isos[j2];
   }
   return null;
 }
@@ -2191,14 +2205,18 @@ function applyScanResult() {
   if (!_scanMatchedIso) return;
   closeIsoScanner();
   var isoSel = document.getElementById('wbFIso');
-  if (isoSel) {
-    for (var i = 0; i < isoSel.options.length; i++) {
-      if (isoSel.options[i].value === _scanMatchedIso) { isoSel.selectedIndex = i; break; }
-    }
-  }
+  if (isoSel) for (var i=0;i<isoSel.options.length;i++) if(isoSel.options[i].value===_scanMatchedIso){isoSel.selectedIndex=i;break;}
   filterWB();
   showToast('📋 ' + _scanMatchedIso);
 }
+
+function applyManualSelect() {
+  var sel = document.getElementById('scanManualSelect');
+  if (!sel || !sel.value) { showToast('Vyber izometriu'); return; }
+  _scanMatchedIso = sel.value;
+  applyScanResult();
+}
+
 </script>
 </body>
 </html>
