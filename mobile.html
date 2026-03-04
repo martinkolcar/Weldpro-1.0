@@ -2065,6 +2065,7 @@ window.addEventListener('resize', () => {
 var _scanMatchedIso = null;
 var _scanStream = null;
 var _scanWorker = null;
+var _scanIsoCache = []; // cache izometrií pre scanner
 
 function openIsoScanner() {
   _scanMatchedIso = null;
@@ -2074,6 +2075,55 @@ function openIsoScanner() {
   var overlay = document.getElementById('isoScannerOverlay');
   overlay.style.display = 'flex';
   startScanCamera();
+  // Načítaj izometrie do cache
+  loadScanIsoCache();
+}
+
+async function loadScanIsoCache() {
+  // 1. Ak weldBookData má dáta, použi ich
+  if (typeof weldBookData !== 'undefined' && weldBookData.length > 0) {
+    var seen = {};
+    _scanIsoCache = [];
+    for (var i = 0; i < weldBookData.length; i++) {
+      var v = (weldBookData[i].isometric || '').trim();
+      if (v && !seen[v]) { seen[v] = true; _scanIsoCache.push(v); }
+    }
+    return;
+  }
+  // 2. Inak načítaj zo Firebase - všetky party
+  try {
+    var parts = ['SUL','LIG','DRY','FLA','LHT'];
+    var allRows = [];
+    for (var p = 0; p < parts.length; p++) {
+      var docId = parts[p] + '_main';
+      var metaDoc = await db.collection('weldbook').doc(docId).get();
+      if (!metaDoc.exists) continue;
+      var meta = metaDoc.data();
+      if (!meta || !meta.chunks) continue;
+      var cps = [];
+      for (var c = 0; c < meta.chunks; c++) cps.push(db.collection('weldbook').doc(docId).collection('data').doc('c'+c).get());
+      var cds = await Promise.all(cps);
+      var json = cds.filter(function(x){return x.exists;}).map(function(x){return x.data().d;}).join('');
+      if (json) { var rows = JSON.parse(json); allRows = allRows.concat(rows); }
+    }
+    // Also try weldbook_main fallback
+    if (!allRows.length) {
+      var mainDoc = await db.collection('weldbook').doc('weldbook_main').get();
+      if (mainDoc.exists && mainDoc.data().chunks) {
+        var cps2 = [];
+        for (var c2 = 0; c2 < mainDoc.data().chunks; c2++) cps2.push(db.collection('weldbook').doc('weldbook_main').collection('data').doc('c'+c2).get());
+        var cds2 = await Promise.all(cps2);
+        var json2 = cds2.filter(function(x){return x.exists;}).map(function(x){return x.data().d;}).join('');
+        if (json2) allRows = JSON.parse(json2);
+      }
+    }
+    var seen2 = {};
+    _scanIsoCache = [];
+    for (var j = 0; j < allRows.length; j++) {
+      var iso = (allRows[j].isometric || '').trim();
+      if (iso && !seen2[iso]) { seen2[iso] = true; _scanIsoCache.push(iso); }
+    }
+  } catch(e) { console.log('Scan iso cache load error:', e); }
 }
 
 function closeIsoScanner() {
@@ -2228,97 +2278,89 @@ function retryScan() {
 }
 
 function findIsoInText(text) {
-  // Get ALL unique isos from weldBookData (not just filtered dropdown)
-  var isos = [];
-  if (typeof weldBookData !== 'undefined' && weldBookData.length) {
+  // Pouzi cache (nacitanu z Firebase alebo z weldBookData)
+  var isos = _scanIsoCache.length > 0 ? _scanIsoCache : [];
+  // Fallback: weldBookData ak existuje
+  if (!isos.length && typeof weldBookData !== 'undefined' && weldBookData.length) {
     var seen = {};
     for (var i = 0; i < weldBookData.length; i++) {
-      var v = (weldBookData[i].isometric || '').trim();
-      if (v && !seen[v]) { seen[v] = true; isos.push(v); }
-    }
-    isos.sort();
-  }
-  // Fallback to dropdown
-  if (!isos.length) {
-    var isoSel = document.getElementById('wbFIso');
-    if (isoSel) for (var j = 0; j < isoSel.options.length; j++) {
-      var ov = isoSel.options[j].value; if (ov) isos.push(ov);
+      var v = (weldBookData[i].isometric||'').trim();
+      if (v && !seen[v]) { seen[v]=true; isos.push(v); }
     }
   }
   if (!isos.length) return { best: null, top: [] };
 
-  // OCR common character confusions
-  function ocrFix(s) {
+  // OCR opravy - zamen znaky ktore OCR casto zamienuje
+  function fix(s) {
     return s.toUpperCase()
       .replace(/O/g,'0').replace(/[lI]/g,'1').replace(/S/g,'5')
-      .replace(/Z/g,'2').replace(/B/g,'8').replace(/G/g,'6')
-      .replace(/T/g,'1').replace(/A/g,'4').replace(/[^A-Z0-9]/g,'');
+      .replace(/Z/g,'2').replace(/B/g,'8').replace(/[^A-Z0-9]/g,'');
   }
 
-  // Clean OCR text multiple ways
-  var raw = text.toUpperCase();
-  var clean = raw.replace(/\s+/g,'');       // no spaces
-  var cleanF = ocrFix(clean);               // ocr-fixed no spaces
-  // Also try each line
-  var lines = text.split(String.fromCharCode(10)).map(function(l){ return l.replace(/[\s]+/g,'').toUpperCase(); });
-  var linesF = lines.map(ocrFix);
-  // Extract tokens (sequences of alphanumeric 2+ chars)
-  var tokens = (clean.match(/[A-Z0-9]{2,}/g) || []);
-  var tokensF = (cleanF.match(/[A-Z0-9]{2,}/g) || []);
+  // Priprav OCR text rozne sposoby
+  var rawUp = text.toUpperCase();
+  var rawClean = rawUp.replace(/[^A-Z0-9\-]/g,' ').replace(/\s+/g,' ').trim();
+  var rawNoSep = rawUp.replace(/[^A-Z0-9]/g,'');  // bez separatorov
+  var rawFixed = fix(rawNoSep);
+  // Tokeny - dlhe sekvencie alfanumerickych znakov
+  var tokens = (rawUp.match(/[A-Z0-9][A-Z0-9\-]{3,}/g) || []);
 
   var scored = isos.map(function(iso) {
-    var ic = iso.replace(/\s+/g,'').toUpperCase();
-    var icF = ocrFix(ic);
-    var segs = ic.split('-').filter(function(s){ return s.length > 0; });
-    var segsF = segs.map(ocrFix);
+    var ic = iso.toUpperCase();
+    var icNoSep = ic.replace(/[^A-Z0-9]/g,'');
+    var icFixed = fix(icNoSep);
+    var segs = ic.split(/[^A-Z0-9]+/).filter(function(s){ return s.length > 0; });
     var score = 0;
 
-    // 1. Exact full match
-    if (clean.includes(ic) || cleanF.includes(icF)) { score += 2000; return { iso:iso, score:score }; }
-    for (var li = 0; li < lines.length; li++) {
-      if (lines[li].includes(ic) || linesF[li].includes(icF)) { score += 2000; return { iso:iso, score:score }; }
-    }
+    // 1. Presna zhoda (bez separatorov)
+    if (rawNoSep.includes(icNoSep) || rawFixed.includes(icFixed)) return { iso:iso, score:2000 };
 
-    // 2. Suffix match (skip first N segments - e.g. skip plant code "AM58")
-    for (var skip = 1; skip < segs.length; skip++) {
-      var suf = segs.slice(skip).join('');
-      var sufF = ocrFix(suf);
-      var sufDash = segs.slice(skip).join('-');
-      var sufDashF = ocrFix(sufDash);
-      if (suf.length >= 6) {
-        if (clean.includes(suf) || cleanF.includes(sufF)) { score += 1500 - skip*100; break; }
-        for (var li2=0; li2<lines.length; li2++) {
-          if (lines[li2].includes(suf) || linesF[li2].includes(sufF)) { score += 1500-skip*100; break; }
+    // 2. Substring: izometria obsahuje OCR text alebo naopak
+    // Klucom je: OCR cita len CAST izometrie (napr chyba zaciatok alebo koniec)
+    var ocrParts = rawClean.split(' ');
+    for (var oi = 0; oi < ocrParts.length; oi++) {
+      var op = ocrParts[oi].replace(/[^A-Z0-9]/g,'');
+      if (op.length >= 4) {
+        if (icNoSep.includes(op) || fix(icNoSep).includes(fix(op))) {
+          score += op.length * 30; // dlhsi match = vyssie skore
         }
       }
     }
-    if (score > 0) return { iso:iso, score:score };
 
-    // 3. Segment-by-segment scoring
-    var segHits = 0, segTotal = segs.filter(function(s){ return s.length >= 2; }).length;
+    // 3. Segment matching - kolko segmentov izomentrie najdeme v OCR texte
+    var segHits = 0;
     for (var si = 0; si < segs.length; si++) {
-      if (segs[si].length < 2) continue;
-      var seg = segs[si], segF = segsF[si];
-      // Check if this segment appears in any token
-      var found = false;
-      for (var ti = 0; ti < tokens.length; ti++) {
-        if (tokens[ti] === seg || tokensF[ti] === segF ||
-            tokens[ti].includes(seg) || seg.includes(tokens[ti]) ||
-            tokensF[ti].includes(segF) || segF.includes(tokensF[ti])) {
-          found = true; break;
-        }
+      var seg = segs[si];
+      if (seg.length < 2) continue;
+      var segF = fix(seg);
+      if (rawNoSep.includes(seg) || rawFixed.includes(segF)) {
+        segHits += seg.length; // vahy podla dlzky segmentu
       }
-      if (found) segHits++;
     }
-    if (segTotal > 0) score += Math.round((segHits / segTotal) * 800);
+    score += segHits * 15;
+
+    // 4. Token matching - priama zhoda tokenov
+    for (var ti = 0; ti < tokens.length; ti++) {
+      var tok = tokens[ti].replace(/[^A-Z0-9]/g,'');
+      var tokF = fix(tok);
+      if (tok.length < 3) continue;
+      if (icNoSep.includes(tok) || fix(icNoSep).includes(tokF)) {
+        score += tok.length * 20;
+      }
+    }
 
     return { iso:iso, score:score };
   });
 
   scored.sort(function(a,b){ return b.score - a.score; });
-  var top = scored.filter(function(x){ return x.score >= 50; }).slice(0,8);
-  var best = (top.length > 0 && top[0].score >= 800) ? top[0].iso : null;
-  return { best: best, top: top };
+  var top = scored.filter(function(x){ return x.score >= 60; }).slice(0,8);
+  // Auto-best: skore >= 400 alebo jasne najlepsie
+  var best = null;
+  if (top.length > 0) {
+    if (top[0].score >= 400) best = top[0].iso;
+    else if (top.length >= 2 && top[0].score >= top[1].score * 2 && top[0].score >= 150) best = top[0].iso;
+  }
+  return { best:best, top:top };
 }
 
 
