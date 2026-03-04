@@ -8892,7 +8892,8 @@ function initializeWeldBookGrid() {
       console.log('✅ WeldBook AG-Grid initialized!');
     },
     onCellValueChanged: function(params) {
-      params.api.refreshCells();
+      // refreshCells() sposobuje reset pozicie - pouzijeme len refreshCell na jednu bunku
+      params.api.refreshCells({ rowNodes: [params.node], force: false });
       saveWeldBookToStorage();
       console.log('✏️ Bunka upravená, uložené do localStorage');
     }
@@ -9566,10 +9567,7 @@ function startWbRealtimeSync() {
     loadWbPart(wbActivePart).then(function() {
       showWbSyncNotification('✅ WeldBook aktualizovaný (' + weldBookData.length + ' zvarov)', 'success');
       addNotification(msg);
-      if (weldBookGrid && weldBookGrid.api) {
-        weldBookGrid.api.setGridOption('rowData', weldBookData);
-        populateWeldBookFilterDropdowns();
-      }
+      wbSetRowDataKeepFilter(weldBookData);
     });
   });
   wbRealtimeListeners.push(unsubSignal);
@@ -9592,10 +9590,7 @@ function startWbRealtimeSync() {
       if (!chunks.length) return;
       weldBookData = JSON.parse(chunks.join(''));
       wbLocalBackup();
-      if (weldBookGrid && weldBookGrid.api) {
-        weldBookGrid.api.setGridOption('rowData', weldBookData);
-        populateWeldBookFilterDropdowns();
-      }
+      wbSetRowDataKeepFilter(weldBookData);
       var syncMsg = (data.modifiedBy||'?') + ' upravil WeldBook (' + weldBookData.length + ' zvarov)';
       showWbSyncNotification(syncMsg);
       addNotification('📋 ' + syncMsg);
@@ -9603,6 +9598,26 @@ function startWbRealtimeSync() {
   });
   wbRealtimeListeners.push(unsubMain);
   console.log('🔴 WeldBook realtime sync aktívny [' + (wbActivePart||'ALL') + ']');
+}
+
+// Nastav rowData a zachovaj aktívny filter izometrie/partu
+function wbSetRowDataKeepFilter(newData) {
+  weldBookData = newData;
+  var isoSel = document.getElementById('wbFilterIsometric');
+  var partSel = document.getElementById('wbFilterPart');
+  var currentIso = isoSel ? isoSel.value : '';
+  var currentPart = partSel ? partSel.value : '';
+  // Reaplicate filter
+  var filtered = newData.filter(function(row) {
+    if (currentPart && String(row.part||'').trim() !== currentPart) return false;
+    if (currentIso && String(row.isometric||'').trim() !== currentIso) return false;
+    return true;
+  });
+  if (weldBookGrid && weldBookGrid.api) {
+    weldBookGrid.api.setGridOption('rowData', filtered.length > 0 || currentIso || currentPart ? filtered : newData);
+    populateWeldBookFilterDropdowns();
+    updateWeldBookFilterCount(filtered.length > 0 || currentIso || currentPart ? filtered.length : newData.length);
+  }
 }
 
 function stopWbRealtimeSync() {
@@ -10800,11 +10815,30 @@ function addWeldBookRow() {
     rtPercent: '', rtDate: '', rtReport: '', rtResult: '',
     pmpInch: '', andritzInch: '', pressureGroup: '', note: ''
   };
-  
+
+  // Vloz NAD vybratý riadok, ak je nejaký označený
+  var selectedNodes = weldBookGrid.api.getSelectedNodes();
+  if (selectedNodes.length > 0) {
+    var selectedData = selectedNodes[0].data;
+    var idx = weldBookData.findIndex(function(r) {
+      return r === selectedData || (r.isometric === selectedData.isometric && r.weldId === selectedData.weldId && r.sheets === selectedData.sheets);
+    });
+    if (idx >= 0) {
+      // Zdedí izometriu a part z vybraného riadku
+      newRow.isometric = selectedData.isometric || '';
+      newRow.part = selectedData.part || '';
+      weldBookData.splice(idx, 0, newRow);
+      weldBookGrid.api.applyTransaction({ add: [newRow], addIndex: idx });
+      saveWeldBookToStorage();
+      console.log('✅ Pridaný riadok NAD index', idx);
+      return;
+    }
+  }
+  // Fallback - pridaj na koniec
   weldBookData.push(newRow);
   weldBookGrid.api.applyTransaction({ add: [newRow] });
   saveWeldBookToStorage();
-  console.log('✅ Pridaný prázdny riadok');
+  console.log('✅ Pridaný prázdny riadok na koniec');
 }
 
 // ============= ZMAZANIE OZNAČENÝCH RIADKOV =============

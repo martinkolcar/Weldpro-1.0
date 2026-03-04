@@ -1827,7 +1827,8 @@ async function loadWbForPart(part) {
     }
     // Cache
     try { localStorage.setItem('wbCache_'+(part||'ALL'), JSON.stringify(weldBookData)); } catch(e){}
-    renderWeldBook(weldBookData);
+    // Zachovaj aktívny filter - nevolaj renderWeldBook priamo
+    filterWB();
     document.getElementById('wbCount').textContent = weldBookData.length + ' zvarov' + (part ? ' ('+part+')' : '');
   } catch(e) { console.error('WB load part error:', e); }
   finally { isWbLoading = false; } // Uvoľni zámok
