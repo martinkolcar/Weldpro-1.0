@@ -1523,6 +1523,9 @@ async function clearFittingModal() {
   document.getElementById('fit_heat2').value = '';
   window._fittingSource = null;
   closeFittingModal();
+  // Okamzite refresh WB tabulky - data su uz v pamati
+  var _wbFc = weldBookData.filter(function(r){ return !activeWbPart || (r.part||'').toUpperCase() === activeWbPart; });
+  if (_wbFc.length > 0) renderWeldBook(_wbFc);
   showToast('Mazem Heat Nr...');
   try {
     var part = (targetRow.part || '').toUpperCase() || activeWbPart || null;
@@ -1566,6 +1569,9 @@ async function saveFittingModal() {
   if (heat2) targetRow.heatNr2 = heat2;
   window._fittingSource = null;
   closeFittingModal();
+  // Okamzite refresh WB tabulky - data su uz v pamati
+  var _wbF = weldBookData.filter(function(r){ return !activeWbPart || (r.part||'').toUpperCase() === activeWbPart; });
+  if (_wbF.length > 0) renderWeldBook(_wbF);
   showToast('Ukladam Heat Nr...');
   try {
     var part = (targetRow.part || '').toUpperCase() || activeWbPart || null;
