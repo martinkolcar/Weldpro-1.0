@@ -1793,7 +1793,33 @@ function saveAddWbModal() {
 async function loadWeldBook() {
   try {
     await loadWbForPart(document.getElementById('wbFPart').value || null);
+    startWbSignalListener();
   } catch(e) { console.error('WB load error:', e); }
+}
+
+var _wbSignalUnsub = null;
+function startWbSignalListener() {
+  if (_wbSignalUnsub) return; // uz bezi
+  if (!db) return;
+  var initialLoad = true;
+  setTimeout(function(){ initialLoad = false; }, 3000);
+  _wbSignalUnsub = db.collection('weldbook_signal').doc('latest').onSnapshot(function(doc) {
+    if (!doc.exists || initialLoad) return;
+    var data = doc.data();
+    // Ignoruj vlastne zmeny
+    if (data.sessionId && data.sessionId === window._mobileSessionId) return;
+    // Ignoruj stary signal (>60s)
+    var age = Date.now() - (data.at ? new Date(data.at).getTime() : 0);
+    if (age > 60000) return;
+    // Ignoruj ak zmenena ina cast ako aktivna
+    var changedPart = (data.part && data.part !== 'ALL') ? data.part.toUpperCase() : null;
+    if (changedPart && activeWbPart && changedPart !== activeWbPart) return;
+    // Nacitaj aktualizaciu - zachovaj filter
+    console.log('📡 WB signal od', data.by, '- nacitavam...');
+    loadWbForPart(activeWbPart).then(function() {
+      showToast('🔄 WB aktualizovaný (' + data.by + ')');
+    });
+  });
 }
 
 async function loadWbForPart(part) {
@@ -1999,47 +2025,27 @@ async function saveRtModal() {
   if (!rtDate) { showToast('Vyber dátum'); return; }
   r.rtDate = rtDate;
   closeRtModal();
-  showToast('Ukladam RT datum...');
+  showToast('Ukladám RT dátum...');
   try {
-    var part = (r.part || '').toUpperCase() || activeWbPart || null;
-    var partRows = weldBookData.filter(function(row){ return !part || (row.part||'').toUpperCase() === part; });
-    if (!partRows.length && weldBookData.length > 0) partRows = weldBookData;
-    if (!partRows.length) { showToast('WB nie je nacitany'); return; }
-    var docId = part ? (part + '_main') : 'weldbook_main';
-    var json = JSON.stringify(partRows), CHUNK = 800*1024, chunks = [];
-    for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
-    await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
-    await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() });
-    if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-    await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
+    await _directWbSave(r);
     filterWB();
-    showToast('RT datum ulozeny: ' + rtDate);
+    showToast('✅ RT dátum: ' + rtDate);
     sendFirebaseNotification('rt_date', (currentUser?currentUser.username:'?') + ' zadal RT datum ' + rtDate + ' pre zvar #' + r.weldId + ' (' + (r.isometric||'') + ')', { weldId: String(r.weldId), rtDate: rtDate });
   } catch(e) { showToast('Chyba: ' + e.message); }
 }
 
 async function clearRtModal() {
-  if (!confirm('Vymazat RT datum pre tento zvar?')) return;
+  if (!confirm('Vymazať RT dátum pre tento zvar?')) return;
   if (!currentWbRow) return;
   var r = currentWbRow.row;
   r.rtDate = '';
   document.getElementById('rt_date').value = '';
   closeRtModal();
-  showToast('Mazem RT datum...');
+  showToast('Mažem RT dátum...');
   try {
-    var part = (r.part || '').toUpperCase() || activeWbPart || null;
-    var partRows = weldBookData.filter(function(row){ return !part || (row.part||'').toUpperCase() === part; });
-    if (!partRows.length && weldBookData.length > 0) partRows = weldBookData;
-    if (!partRows.length) { showToast('WB nie je nacitany'); return; }
-    var docId = part ? (part + '_main') : 'weldbook_main';
-    var json = JSON.stringify(partRows), CHUNK = 800*1024, chunks = [];
-    for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
-    await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
-    await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() });
-    if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-    await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
+    await _directWbSave(r);
     filterWB();
-    showToast('RT datum vymazany pre zvar #' + r.weldId);
+    showToast('🗑️ RT dátum vymazaný: zvar #' + r.weldId);
   } catch(e) { showToast('Chyba: ' + e.message); }
 }
 function closeWbModal() {
@@ -2081,12 +2087,13 @@ async function _directWbSave(targetRow) {
   var partRows = weldBookData.filter(function(r){ return !part || (r.part||'').toUpperCase() === part; });
   if (partRows.length === 0 && weldBookData.length > 0) partRows = weldBookData;
   if (!partRows.length) { showToast('⚠️ WB nie je načítaný'); return; }
+  if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
   var docId = part ? (part + '_main') : 'weldbook_main';
   var json = JSON.stringify(partRows), CHUNK = 800*1024, chunks = [];
   for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
   await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
-  await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() });
-  if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+  // sessionId v metadatach - PC unsubMain listener ho ignoruje (vlastna zmena)
+  await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString(), sessionId:window._mobileSessionId });
   await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
 }
 
