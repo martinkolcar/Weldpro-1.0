@@ -511,7 +511,7 @@ canvas#mca { display: block; }
         </div>
         <!-- No match - show iso picker -->
         <div id="scanNoMatchArea" style="display:none">
-          <div style="font-size:11px;color:#f59e0b;margin-bottom:6px">⚠️ Nenájdené - vyber ručne:</div>
+          <div style="font-size:11px;color:#f59e0b;margin-bottom:6px">⚠️ Nenájdená presná zhoda – vyber zo zoznamu (⭐ = najlepšia zhoda):</div>
           <select id="scanManualSelect" style="width:100%;padding:10px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;font-size:13px;margin-bottom:8px"></select>
           <div style="display:flex;gap:8px">
             <button onclick="retryScan()" style="flex:1;padding:11px;background:#334155;color:#cbd5e1;border:none;border-radius:10px;font-size:14px;cursor:pointer">🔄 Znova</button>
@@ -687,6 +687,7 @@ let mctx = null;
 // ===== UTILS =====
 function showToast(msg, duration=2000) {
   const t = document.getElementById('toast');
+  if (!t) { console.log('Toast:', msg); return; }
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), duration);
@@ -736,7 +737,7 @@ function doLogout() {
 }
 
 async function showApp() {
-  document.getElementById('loginPage').classList.add('hidden');
+  var _lp1=document.getElementById('loginPage'); if(_lp1)_lp1.classList.add('hidden');
   document.getElementById('mainHeader').style.display = 'flex';
   document.getElementById('bottomNav').style.display = 'flex';
   document.getElementById('headerUser').textContent = '👤 ' + currentUser.username;
@@ -831,7 +832,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     localStorage.removeItem('mobileUser');
   }
   // Zobraz login
-  document.getElementById('loginPage').classList.remove('hidden');
+  var _lp2=document.getElementById('loginPage'); if(_lp2)_lp2.classList.remove('hidden');
 });
 
 // ===== NAVIGATION =====
@@ -2056,7 +2057,7 @@ function splitIso(fullName) {
 
 // ===== RESIZE =====
 window.addEventListener('resize', () => {
-  if (document.getElementById('montazPage').classList.contains('active')) mDraw();
+  var _mp=document.getElementById('montazPage'); if(_mp&&_mp.classList.contains('active')) mDraw();
 });
 
 // ===== ISO SCANNER =====
@@ -2151,30 +2152,48 @@ async function doSnapScan() {
     // Show raw text
     document.getElementById("scanRawText").textContent = rawText.split("\n").join(" ").trim().substring(0,120) || "(prazdne)";
 
-    var matched = findIsoInText(rawText);
-    if (matched) {
-      _scanMatchedIso = matched;
-      document.getElementById('scanMatchText').textContent = matched;
+    var matchResult = findIsoInText(rawText);
+    var sel = document.getElementById('scanManualSelect');
+    sel.innerHTML = '<option value="">-- vyber izometriu --</option>';
+
+    if (matchResult.best) {
+      // Best match found - preselect it but still show all top matches
+      _scanMatchedIso = matchResult.best;
+      document.getElementById('scanMatchText').textContent = matchResult.best;
       document.getElementById('scanMatchFound').style.display = 'block';
       document.getElementById('scanNoMatchArea').style.display = 'none';
     } else {
       _scanMatchedIso = null;
       document.getElementById('scanMatchFound').style.display = 'none';
       document.getElementById('scanNoMatchArea').style.display = 'block';
-      // Populate manual select with all isos
-      var sel = document.getElementById('scanManualSelect');
-      sel.innerHTML = '<option value="">-- vyber izometriu --</option>';
-      var isoSel = document.getElementById('wbFIso');
-      if (isoSel) {
-        for (var i = 0; i < isoSel.options.length; i++) {
-          var v = isoSel.options[i].value;
-          if (v) {
-            var opt = document.createElement('option');
-            opt.value = v; opt.textContent = v;
-            sel.appendChild(opt);
-          }
+    }
+
+    // Always populate select - top scored first, then rest
+    var topIsos = matchResult.top.map(function(x){ return x.iso; });
+    var isoSel = document.getElementById('wbFIso');
+    // Add top matches first (with score indicator)
+    for (var ti = 0; ti < topIsos.length; ti++) {
+      var opt = document.createElement('option');
+      opt.value = topIsos[ti];
+      opt.textContent = (ti === 0 ? '⭐ ' : '  ') + topIsos[ti];
+      if (ti === 0 && !matchResult.best) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    // Separator + rest
+    if (topIsos.length > 0 && isoSel && isoSel.options.length > topIsos.length + 1) {
+      var sep = document.createElement('option'); sep.disabled = true; sep.textContent = '── ostatné ──'; sel.appendChild(sep);
+    }
+    if (isoSel) {
+      for (var i = 0; i < isoSel.options.length; i++) {
+        var v = isoSel.options[i].value;
+        if (v && topIsos.indexOf(v) === -1) {
+          var opt2 = document.createElement('option'); opt2.value = v; opt2.textContent = v; sel.appendChild(opt2);
         }
       }
+    }
+    // If top matches but no "best" - show select with top preselected
+    if (!matchResult.best && matchResult.top.length > 0) {
+      document.getElementById('scanNoMatchArea').style.display = 'block';
     }
     document.getElementById('scanCaptureArea').style.display = 'block';
   } catch(e) {
@@ -2198,30 +2217,52 @@ function findIsoInText(text) {
       var v = isoSel.options[i].value; if (v) isos.push(v);
     }
   }
-  if (!isos.length) return null;
-  var clean = text.replace(/\s+/g,'').toUpperCase();
-  var lines = text.split(String.fromCharCode(10)).map(function(l){ return l.replace(/ /g,'').toUpperCase(); });
-  for (var j = 0; j < isos.length; j++) {
-    var ic = isos[j].replace(/\s+/g,'').toUpperCase();
-    if (clean.includes(ic)) return isos[j];
-    for (var k = 0; k < lines.length; k++) if (lines[k].includes(ic)) return isos[j];
-    var di = ic.indexOf('-');
-    if (di > 0) {
-      var suf = ic.slice(di+1);
-      if (suf.length > 5 && clean.includes(suf)) return isos[j];
-      for (var m = 0; m < lines.length; m++) if (lines[m].includes(suf)) return isos[j];
+  if (!isos.length) return { best: null, top: [] };
+
+  var clean = text.replace(/\s/g,'').toUpperCase();
+
+  function ocrFix(s) {
+    return s.toUpperCase().replace(/O/g,'0').replace(/[lI]/g,'1').replace(/S/g,'5').replace(/Z/g,'2').replace(/B/g,'8');
+  }
+  var cleanFixed = ocrFix(clean);
+  var ocrTokens = clean.match(/[A-Z0-9]{2,}/g) || [];
+  var ocrTokensFixed = cleanFixed.match(/[A-Z0-9]{2,}/g) || [];
+
+  var scored = isos.map(function(iso) {
+    var ic = iso.replace(/\s/g,'').toUpperCase();
+    var icFixed = ocrFix(ic);
+    var segs = ic.split('-').filter(function(s){ return s.length > 0; });
+    var score = 0;
+
+    if (clean.includes(ic) || cleanFixed.includes(icFixed)) score += 1000;
+
+    for (var skip = 1; skip < segs.length; skip++) {
+      var suffix = segs.slice(skip).join('');
+      var suffixFixed = ocrFix(suffix);
+      if (suffix.length >= 4) {
+        if (clean.includes(suffix) || cleanFixed.includes(suffixFixed)) score += 500 - skip * 50;
+      }
     }
-  }
-  // Fuzzy
-  for (var j2 = 0; j2 < isos.length; j2++) {
-    var segs = isos[j2].replace(/\s+/g,'').toUpperCase().split('-').filter(function(s){ return s.length>1; });
-    if (segs.length < 3) continue;
-    var hits = 0;
-    for (var s = 0; s < segs.length; s++) if (segs[s].length>2 && clean.includes(segs[s])) hits++;
-    if (hits >= Math.min(3, segs.length-1)) return isos[j2];
-  }
-  return null;
+
+    for (var s2 = 0; s2 < segs.length; s2++) {
+      var seg = segs[s2], segf = ocrFix(seg);
+      if (seg.length < 2) continue;
+      for (var t = 0; t < ocrTokens.length; t++) {
+        if (ocrTokens[t] === seg || ocrTokens[t].includes(seg) || seg.includes(ocrTokens[t]) ||
+            ocrTokensFixed[t] === segf || ocrTokensFixed[t].includes(segf) || segf.includes(ocrTokensFixed[t])) {
+          score += seg.length * 10; break;
+        }
+      }
+    }
+    return { iso: iso, score: score };
+  });
+
+  scored.sort(function(a,b){ return b.score - a.score; });
+  var top = scored.filter(function(x){ return x.score > 0; }).slice(0,5);
+  var best = (top.length > 0 && top[0].score >= 60) ? top[0].iso : null;
+  return { best: best, top: top };
 }
+
 
 function applyScanResult() {
   if (!_scanMatchedIso) return;
