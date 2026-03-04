@@ -9375,10 +9375,12 @@ async function _saveWbPartToFirebase(part) {
   }));
 
   // Potom metadata
+  if (!window._pcSessionId) window._pcSessionId = 'pc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   await db.collection('weldbook').doc(docId).set({
     type: 'part', part: part || 'ALL', chunks: chunks.length, count: partRows.length,
     modifiedBy: window.currentUser ? window.currentUser.username : 'unknown',
-    date: new Date().toISOString()
+    date: new Date().toISOString(),
+    sessionId: window._pcSessionId
   });
 
   console.log('🔥 WeldBook [' + (part||'ALL') + '] uložený:', partRows.length, 'zvarov,', chunks.length, 'chunkov');
@@ -9406,13 +9408,15 @@ async function _saveWbToFirebase() {
     await _saveWbPartToFirebase(part);
   }
 
-  // Signal - informuj ostatných
+  // Signal - informuj ostatných (sessionId = ignoruj vlastné zmeny)
   var savedPart = partsToSave.length === 1 ? partsToSave[0] : 'ALL';
+  if (!window._pcSessionId) window._pcSessionId = 'pc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   await db.collection('weldbook_signal').doc('latest').set({
     by: window.currentUser ? window.currentUser.username : 'unknown',
     at: new Date().toISOString(),
     part: savedPart,
-    count: weldBookData.length
+    count: weldBookData.length,
+    sessionId: window._pcSessionId
   });
 }
 
