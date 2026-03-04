@@ -1631,8 +1631,7 @@ async function clearFittingModal() {
   window._fittingSource = null;
   closeFittingModal();
   // Okamzite refresh WB tabulky - data su uz v pamati
-  var _wbFc = weldBookData.filter(function(r){ return !activeWbPart || (r.part||'').toUpperCase() === activeWbPart; });
-  if (_wbFc.length > 0) renderWeldBook(_wbFc);
+  filterWB();
   showToast('Mazem Heat Nr...');
   try {
     var part = (targetRow.part || '').toUpperCase() || activeWbPart || null;
@@ -1677,8 +1676,7 @@ async function saveFittingModal() {
   window._fittingSource = null;
   closeFittingModal();
   // Okamzite refresh WB tabulky - data su uz v pamati
-  var _wbF = weldBookData.filter(function(r){ return !activeWbPart || (r.part||'').toUpperCase() === activeWbPart; });
-  if (_wbF.length > 0) renderWeldBook(_wbF);
+  filterWB();
   showToast('Ukladam Heat Nr...');
   try {
     var part = (targetRow.part || '').toUpperCase() || activeWbPart || null;
@@ -2014,8 +2012,7 @@ async function saveRtModal() {
     await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() });
     if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
     await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
-    var _wbF = weldBookData.filter(function(row){ return !activeWbPart || (row.part||'').toUpperCase() === activeWbPart; });
-    renderWeldBook(_wbF);
+    filterWB();
     showToast('RT datum ulozeny: ' + rtDate);
     sendFirebaseNotification('rt_date', (currentUser?currentUser.username:'?') + ' zadal RT datum ' + rtDate + ' pre zvar #' + r.weldId + ' (' + (r.isometric||'') + ')', { weldId: String(r.weldId), rtDate: rtDate });
   } catch(e) { showToast('Chyba: ' + e.message); }
@@ -2041,8 +2038,7 @@ async function clearRtModal() {
     await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() });
     if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
     await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
-    var _wbF = weldBookData.filter(function(row){ return !activeWbPart || (row.part||'').toUpperCase() === activeWbPart; });
-    renderWeldBook(_wbF);
+    filterWB();
     showToast('RT datum vymazany pre zvar #' + r.weldId);
   } catch(e) { showToast('Chyba: ' + e.message); }
 }
@@ -2066,8 +2062,7 @@ function saveWbModal() {
   showToast('💾 Ukladám...');
   // Direct save - rovnaky sposob ako saveFittingModal (bezpecny)
   _directWbSave(r).then(() => {
-    var _wbF = weldBookData.filter(function(row){ return !activeWbPart || (row.part||'').toUpperCase() === activeWbPart; });
-    renderWeldBook(_wbF);
+    filterWB();
     if (welder) {
       showToast('✅ Uložené: zvar #' + r.weldId + ' → ' + welder);
       sendFirebaseNotification('welder_assigned',
@@ -2106,8 +2101,7 @@ function removeWbModal() {
   closeWbModal();
   showToast('💾 Odstraňujem...');
   _directWbSave(r).then(function() {
-    var _wbF = weldBookData.filter(function(row){ return !activeWbPart || (row.part||'').toUpperCase() === activeWbPart; });
-    renderWeldBook(_wbF);
+    filterWB();
     showToast('🗑️ Zvarač odstránený: zvar #' + weldId);
     sendFirebaseNotification('welder_removed',
       '❌ Zvarač odznačený na zvare #' + weldId + ' (' + iso + ')',
