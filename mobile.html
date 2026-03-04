@@ -467,7 +467,7 @@ canvas#mca { display: block; }
 <!-- ISO Live Scanner -->
 <div id="isoScannerOverlay" style="display:none;position:fixed;inset:0;z-index:3500;background:#000;flex-direction:column">
   <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden">
-    <video id="scanVideo" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover"></video>
+    <video id="scanVideo" autoplay playsinline muted style="width:100%;height:100%;object-fit:contain;background:#000"></video>
     <!-- Dark overlay -->
     <div style="position:absolute;inset:0;pointer-events:none">
       <div style="position:absolute;top:0;left:0;right:0;height:calc(50% - 40px);background:rgba(0,0,0,0.6)"></div>
@@ -475,7 +475,7 @@ canvas#mca { display: block; }
       <div style="position:absolute;top:calc(50% - 40px);left:0;width:20px;height:80px;background:rgba(0,0,0,0.6)"></div>
       <div style="position:absolute;top:calc(50% - 40px);right:0;width:20px;height:80px;background:rgba(0,0,0,0.6)"></div>
       <!-- Corner brackets -->
-      <div style="position:absolute;top:calc(50% - 40px);left:20px;right:20px;height:80px">
+      <div id="scanBracket" style="position:absolute;top:calc(50% - 40px);left:20px;right:20px;height:80px">
         <div style="position:absolute;top:0;left:0;width:26px;height:26px;border-top:3px solid #0ea5e9;border-left:3px solid #0ea5e9"></div>
         <div style="position:absolute;top:0;right:0;width:26px;height:26px;border-top:3px solid #0ea5e9;border-right:3px solid #0ea5e9"></div>
         <div style="position:absolute;bottom:0;left:0;width:26px;height:26px;border-bottom:3px solid #0ea5e9;border-left:3px solid #0ea5e9"></div>
@@ -2108,16 +2108,38 @@ async function doSnapScan() {
   document.getElementById('scanProcessing').style.display = 'block';
   document.getElementById('scanRawArea').style.display = 'none';
 
-  // Snap only the bracket zone (center 30% of height)
+  // object-fit:contain - video letterboxed inside its container
+  // getBoundingClientRect gives us the rendered video element box
+  var bracket = document.getElementById('scanBracket');
+  var vRect = video.getBoundingClientRect();
+  var bRect = bracket.getBoundingClientRect();
   var vw = video.videoWidth, vh = video.videoHeight;
-  var cropH = Math.round(vh * 0.28);
-  var cropY = Math.round(vh * 0.5 - cropH / 2);
+
+  // With contain: video is scaled uniformly to fit, with black bars on sides or top/bottom
+  var dispW = vRect.width, dispH = vRect.height;
+  var scale = Math.min(dispW / vw, dispH / vh);  // contain = smaller scale
+  var rendW = vw * scale, rendH = vh * scale;
+  // Black bar offsets (letterbox/pillarbox)
+  var barX = (dispW - rendW) / 2;
+  var barY = (dispH - rendH) / 2;
+
+  // Map bracket screen coords to video coords
+  var bx = Math.round(((bRect.left - vRect.left) - barX) / scale);
+  var by = Math.round(((bRect.top  - vRect.top)  - barY) / scale);
+  var bw = Math.round(bRect.width  / scale);
+  var bh = Math.round(bRect.height / scale);
+
+  // Clamp
+  bx = Math.max(0, Math.min(bx, vw - 1));
+  by = Math.max(0, Math.min(by, vh - 1));
+  bw = Math.min(bw, vw - bx);
+  bh = Math.min(bh, vh - by);
+
   var canvas = document.getElementById('scanCanvas');
-  canvas.width = vw; canvas.height = cropH;
+  canvas.width = bw; canvas.height = bh;
   var ctx = canvas.getContext('2d');
-  // Pre-process: contrast boost
-  ctx.filter = 'contrast(1.6) brightness(1.1) grayscale(1)';
-  ctx.drawImage(video, 0, cropY, vw, cropH, 0, 0, vw, cropH);
+  ctx.filter = 'contrast(1.8) brightness(1.15) grayscale(1)';
+  ctx.drawImage(video, bx, by, bw, bh, 0, 0, bw, bh);
 
   try {
     if (!_scanWorker) _scanWorker = await Tesseract.createWorker('eng');
