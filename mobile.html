@@ -464,36 +464,56 @@ canvas#mca { display: block; }
   </div>
 </div>
 
-<!-- OCR ISO Scanner modal -->
-<div class="modal-overlay" id="isoScannerModal" style="z-index:3500">
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center">
-      <span>📷 Skenuj izometriu</span>
-      <button onclick="closeIsoScanner()" style="background:none;border:none;font-size:22px;color:#9ca3af;cursor:pointer;padding:0">×</button>
+<!-- ISO Live Scanner -->
+<div id="isoScannerOverlay" style="display:none;position:fixed;inset:0;z-index:3500;background:#000;flex-direction:column">
+  <!-- Camera view -->
+  <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden">
+    <video id="scanVideo" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover"></video>
+    <!-- Dark overlay with cutout via box-shadow -->
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
+      <!-- Top dark -->
+      <div style="position:absolute;top:0;left:0;right:0;height:calc(50% - 45px);background:rgba(0,0,0,0.55)"></div>
+      <!-- Bottom dark -->
+      <div style="position:absolute;bottom:0;left:0;right:0;height:calc(50% - 45px);background:rgba(0,0,0,0.55)"></div>
+      <!-- Left dark -->
+      <div style="position:absolute;top:calc(50% - 45px);left:0;width:24px;height:90px;background:rgba(0,0,0,0.55)"></div>
+      <!-- Right dark -->
+      <div style="position:absolute;top:calc(50% - 45px);right:0;width:24px;height:90px;background:rgba(0,0,0,0.55)"></div>
+      <!-- Scanning frame corners -->
+      <div style="position:absolute;width:calc(100% - 48px);height:90px;border:none">
+        <!-- TL -->
+        <div style="position:absolute;top:0;left:0;width:28px;height:28px;border-top:3px solid #0ea5e9;border-left:3px solid #0ea5e9;border-radius:3px 0 0 0"></div>
+        <!-- TR -->
+        <div style="position:absolute;top:0;right:0;width:28px;height:28px;border-top:3px solid #0ea5e9;border-right:3px solid #0ea5e9;border-radius:0 3px 0 0"></div>
+        <!-- BL -->
+        <div style="position:absolute;bottom:0;left:0;width:28px;height:28px;border-bottom:3px solid #0ea5e9;border-left:3px solid #0ea5e9;border-radius:0 0 0 3px"></div>
+        <!-- BR -->
+        <div style="position:absolute;bottom:0;right:0;width:28px;height:28px;border-bottom:3px solid #0ea5e9;border-right:3px solid #0ea5e9;border-radius:0 0 3px 0"></div>
+        <!-- Scan line animation -->
+        <div id="scanLine" style="position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#0ea5e9,transparent);animation:scanAnim 2s linear infinite"></div>
+      </div>
     </div>
-    <div class="modal-body">
-      <div id="scanPreview" style="display:none;margin-bottom:12px;text-align:center">
-        <img id="scanImg" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid #e5e7eb">
-      </div>
-      <div id="scanStatus" style="text-align:center;padding:20px;color:#6b7280;font-size:14px">
-        Vyber fotku s názvom izometrie
-      </div>
-      <div id="scanResult" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;margin-bottom:12px">
-        <div style="font-size:11px;color:#166534;font-weight:700;margin-bottom:4px">NÁJDENÁ IZOMETRIA:</div>
-        <div id="scanResultText" style="font-size:16px;font-weight:700;color:#15803d"></div>
-      </div>
-      <div id="scanNoMatch" style="display:none;background:#fef9c3;border:1px solid #fde68a;border-radius:10px;padding:12px;margin-bottom:12px">
-        <div style="font-size:13px;color:#92400e">⚠️ Izometria nenájdená vo WeldBook. Prečítaný text:</div>
-        <div id="scanRawText" style="font-size:12px;color:#78350f;margin-top:4px;word-break:break-all"></div>
-      </div>
-      <input type="file" id="scanFileInput" accept="image/*" capture="environment" style="display:none" onchange="handleScanFile(event)">
-      <button onclick="document.getElementById('scanFileInput').click()" style="width:100%;padding:14px;background:#0ea5e9;color:white;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:8px">📸 Odfotiť / Vybrať obrázok</button>
-      <button id="scanGoBtn" onclick="applyScanResult()" style="display:none;width:100%;padding:13px;background:#059669;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">✅ Otvoriť izometriu</button>
+    <!-- Status bar -->
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 16px;background:rgba(0,0,0,0.6);text-align:center">
+      <div id="scanLiveStatus" style="color:white;font-size:13px;font-weight:500">📖 Namieram na názov izometrie...</div>
+    </div>
+    <!-- Close btn -->
+    <button onclick="closeIsoScanner()" style="position:absolute;top:16px;right:16px;background:rgba(0,0,0,0.5);border:none;color:white;width:40px;height:40px;border-radius:50%;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>
+  </div>
+  <!-- Result panel -->
+  <div id="scanResultPanel" style="background:white;padding:16px;display:none">
+    <div style="font-size:11px;color:#166534;font-weight:700;margin-bottom:4px">NÁJDENÁ IZOMETRIA:</div>
+    <div id="scanResultText" style="font-size:18px;font-weight:700;color:#15803d;margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="retryScan()" style="flex:1;padding:12px;background:#f1f5f9;color:#374151;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">🔄 Znova</button>
+      <button onclick="applyScanResult()" style="flex:2;padding:12px;background:#059669;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">✅ Otvoriť izometriu</button>
     </div>
   </div>
+  <canvas id="scanCanvas" style="display:none"></canvas>
 </div>
-<input type="file" id="scanFileInputBg" accept="image/*" style="display:none">
+<style>
+@keyframes scanAnim { 0%{top:0} 100%{top:calc(100% - 2px)} }
+</style>
 
 <!-- Fitting / Heat Nr modal -->
 <div class="modal-overlay" id="fittingModal" style="z-index:3000">
@@ -775,8 +795,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (welderModal) welderModal.addEventListener('click', function(e) { if (e.target === this) closeWelderModal(); });
   const fittingModal = document.getElementById('fittingModal');
   if (fittingModal) fittingModal.addEventListener('click', function(e) { if (e.target === this) closeFittingModal(); });
-  var scannerModal = document.getElementById('isoScannerModal');
-  if (scannerModal) scannerModal.addEventListener('click', function(e) { if (e.target === this) closeIsoScanner(); });
+  // ISO scanner overlay - close on background click handled inline
   const wbModal = document.getElementById('wbModal');
   if (wbModal) wbModal.addEventListener('click', function(e) { if (e.target === this) closeWbModal(); });
   const addWbModal = document.getElementById('addWbModal');
@@ -2031,76 +2050,98 @@ window.addEventListener('resize', () => {
   if (document.getElementById('montazPage').classList.contains('active')) mDraw();
 });
 
-// ===== ISO SCANNER (OCR) =====
+// ===== ISO LIVE SCANNER =====
 var _scanMatchedIso = null;
+var _scanStream = null;
+var _scanWorker = null;
+var _scanInterval = null;
+var _scanRunning = false;
 
 function openIsoScanner() {
   _scanMatchedIso = null;
-  document.getElementById('scanPreview').style.display = 'none';
-  document.getElementById('scanResult').style.display = 'none';
-  document.getElementById('scanNoMatch').style.display = 'none';
-  document.getElementById('scanGoBtn').style.display = 'none';
-  document.getElementById('scanStatus').style.display = 'block';
-  document.getElementById('scanStatus').textContent = 'Vyber fotku s názvom izometrie';
-  document.getElementById('scanFileInput').value = '';
-  var m = document.getElementById('isoScannerModal');
-  if (m) m.classList.add('show');
+  document.getElementById('scanResultPanel').style.display = 'none';
+  document.getElementById('scanLiveStatus').textContent = '📖 Namieram na názov izometrie...';
+  var overlay = document.getElementById('isoScannerOverlay');
+  overlay.style.display = 'flex';
+  startScanCamera();
 }
 
 function closeIsoScanner() {
-  var m = document.getElementById('isoScannerModal');
-  if (m) m.classList.remove('show');
+  stopScanCamera();
+  document.getElementById('isoScannerOverlay').style.display = 'none';
 }
 
-async function handleScanFile(event) {
-  var file = event.target.files[0];
-  if (!file) return;
-
-  // Show preview
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    document.getElementById('scanImg').src = e.target.result;
-    document.getElementById('scanPreview').style.display = 'block';
-  };
-  reader.readAsDataURL(file);
-
-  document.getElementById('scanResult').style.display = 'none';
-  document.getElementById('scanNoMatch').style.display = 'none';
-  document.getElementById('scanGoBtn').style.display = 'none';
-  document.getElementById('scanStatus').style.display = 'block';
-  document.getElementById('scanStatus').innerHTML = '⏳ Čítam text z obrázka...';
-
+async function startScanCamera() {
   try {
-    var worker = await Tesseract.createWorker('eng');
-    var result = await worker.recognize(file);
-    await worker.terminate();
+    _scanStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    var video = document.getElementById('scanVideo');
+    video.srcObject = _scanStream;
+    await video.play();
 
-    var rawText = result.data.text || '';
-    console.log('OCR raw:', rawText);
-
-    // Extract all "word" tokens, look for iso pattern match
-    var matched = findIsoInText(rawText);
-
-    document.getElementById('scanStatus').style.display = 'none';
-
-    if (matched) {
-      _scanMatchedIso = matched;
-      document.getElementById('scanResultText').textContent = matched;
-      document.getElementById('scanResult').style.display = 'block';
-      document.getElementById('scanGoBtn').style.display = 'block';
-    } else {
-      // Show raw text so user can see what was read
-      document.getElementById('scanRawText').textContent = rawText.replace(/\n/g, ' ').trim().substring(0, 200);
-      document.getElementById('scanNoMatch').style.display = 'block';
+    // Init Tesseract worker
+    _scanRunning = true;
+    if (!_scanWorker) {
+      _scanWorker = await Tesseract.createWorker('eng');
     }
+    // Start scanning loop
+    _scanInterval = setInterval(doScanFrame, 1200);
   } catch(e) {
-    document.getElementById('scanStatus').textContent = '❌ Chyba OCR: ' + e.message;
-    console.error('OCR error:', e);
+    document.getElementById('scanLiveStatus').textContent = '❌ Kamera nedostupná: ' + e.message;
   }
 }
 
+function stopScanCamera() {
+  _scanRunning = false;
+  if (_scanInterval) { clearInterval(_scanInterval); _scanInterval = null; }
+  if (_scanStream) { _scanStream.getTracks().forEach(function(t){ t.stop(); }); _scanStream = null; }
+}
+
+async function doScanFrame() {
+  if (!_scanRunning) return;
+  var video = document.getElementById('scanVideo');
+  var canvas = document.getElementById('scanCanvas');
+  if (!video || video.readyState < 2) return;
+
+  // Crop only the scanning zone (center strip - same as the bracket area)
+  var vw = video.videoWidth, vh = video.videoHeight;
+  var cropH = Math.round(vh * 0.22); // 22% of height = bracket zone
+  var cropY = Math.round(vh * 0.5 - cropH / 2);
+  canvas.width = vw;
+  canvas.height = cropH;
+  var ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, cropY, vw, cropH, 0, 0, vw, cropH);
+
+  try {
+    var result = await _scanWorker.recognize(canvas);
+    var rawText = result.data.text || '';
+    if (!rawText.trim()) return;
+
+    var matched = findIsoInText(rawText);
+    if (matched) {
+      _scanMatchedIso = matched;
+      stopScanCamera();
+      document.getElementById('scanLiveStatus').textContent = '✅ Nájdené!';
+      document.getElementById('scanResultText').textContent = matched;
+      document.getElementById('scanResultPanel').style.display = 'block';
+    } else {
+      // Show partial feedback - what was read
+      var shortText = rawText.replace(/\n/g,' ').trim().substring(0,60);
+      if (shortText) document.getElementById('scanLiveStatus').textContent = '🔍 ' + shortText;
+    }
+  } catch(e) { /* ignore frame errors */ }
+}
+
+function retryScan() {
+  _scanMatchedIso = null;
+  document.getElementById('scanResultPanel').style.display = 'none';
+  document.getElementById('scanLiveStatus').textContent = '📖 Namieram na názov izometrie...';
+  _scanRunning = true;
+  startScanCamera();
+}
+
 function findIsoInText(text) {
-  // Get all available isos from WB dropdown
   var isoSel = document.getElementById('wbFIso');
   var availableIsos = [];
   if (isoSel) {
@@ -2109,64 +2150,50 @@ function findIsoInText(text) {
       if (v) availableIsos.push(v);
     }
   }
-
   if (availableIsos.length === 0) return null;
 
-  // Clean OCR text - remove spaces, normalize
-  var cleanText = text.replace(/\s+/g, '').toUpperCase();
-  // Also try with spaces removed from each line separately
+  var cleanText = text.replace(/\s+/g,'').toUpperCase();
   var lines = text.split('\n').map(function(l){ return l.replace(/\s+/g,'').toUpperCase(); });
 
-  // Try to match each available iso against OCR text
-  // Use suffix matching - skip first segment (e.g. AM58-)
   for (var j = 0; j < availableIsos.length; j++) {
     var iso = availableIsos[j];
     var isoClean = iso.replace(/\s+/g,'').toUpperCase();
-
-    // Direct match
     if (cleanText.includes(isoClean)) return iso;
     for (var k = 0; k < lines.length; k++) {
       if (lines[k].includes(isoClean)) return iso;
     }
-
-    // Try suffix - skip first segment before first dash
+    // Skip first segment (e.g. AM58-)
     var dashIdx = isoClean.indexOf('-');
     if (dashIdx > 0) {
-      var suffix = isoClean.slice(dashIdx + 1); // e.g. 712-20001-29-40-160C4B
+      var suffix = isoClean.slice(dashIdx + 1);
       if (suffix.length > 5 && cleanText.includes(suffix)) return iso;
-      for (var m2 = 0; m2 < lines.length; m2++) {
-        if (lines[m2].includes(suffix)) return iso;
+      for (var m = 0; m < lines.length; m++) {
+        if (lines[m].includes(suffix)) return iso;
       }
     }
   }
 
-  // Fuzzy: try partial segment matching (at least 3 dash-segments must match)
+  // Fuzzy: at least 3 segments match
   for (var j2 = 0; j2 < availableIsos.length; j2++) {
     var iso2 = availableIsos[j2];
-    var segments = iso2.replace(/\s+/g,'').toUpperCase().split('-').filter(function(s){ return s.length > 0; });
-    if (segments.length < 3) continue;
-    var matchCount = 0;
-    for (var s = 0; s < segments.length; s++) {
-      if (segments[s].length > 2 && cleanText.includes(segments[s])) matchCount++;
+    var segs = iso2.replace(/\s+/g,'').toUpperCase().split('-').filter(function(s){ return s.length > 1; });
+    if (segs.length < 3) continue;
+    var hits = 0;
+    for (var s = 0; s < segs.length; s++) {
+      if (segs[s].length > 2 && cleanText.includes(segs[s])) hits++;
     }
-    if (matchCount >= Math.min(3, segments.length - 1)) return iso2;
+    if (hits >= Math.min(3, segs.length - 1)) return iso2;
   }
-
   return null;
 }
 
 function applyScanResult() {
   if (!_scanMatchedIso) return;
   closeIsoScanner();
-
-  // Set iso filter and load
   var isoSel = document.getElementById('wbFIso');
   if (isoSel) {
     for (var i = 0; i < isoSel.options.length; i++) {
-      if (isoSel.options[i].value === _scanMatchedIso) {
-        isoSel.selectedIndex = i;
-        break;
-      }
+      if (isoSel.options[i].value === _scanMatchedIso) { isoSel.selectedIndex = i; break; }
     }
   }
   filterWB();
