@@ -9699,7 +9699,7 @@ function showWbSyncNotification(msg, type) {
 }
 
 // ============= EXPORT DO EXCEL =============
-function exportWeldBookExcel() {
+async function exportWeldBookExcel() {
   if (!weldBookGrid || !weldBookGrid.api) {
     alert('❌ WeldBook nie je otvorený!');
     return;
@@ -9779,8 +9779,28 @@ function exportWeldBookExcel() {
       'Note'                 // AT
     ];
     
+    // Načítaj VŠETKY časti z Firebase pre kompletný export
+    var allData = [];
+    var knownParts = ['SUL','LIG','DRY','FLA','LHT'];
+    for (var pi = 0; pi < knownParts.length; pi++) {
+      var p = knownParts[pi];
+      try {
+        var pDoc = await db.collection('weldbook').doc(p + '_main').get();
+        if (pDoc.exists) {
+          var pMeta = pDoc.data();
+          var pCps = [];
+          for (var pci = 0; pci < (pMeta.chunks||1); pci++)
+            pCps.push(db.collection('weldbook').doc(p + '_main').collection('data').doc('c'+pci).get());
+          var pCds = await Promise.all(pCps);
+          var pJson = pCds.filter(function(c){return c.exists;}).map(function(c){return c.data().d;}).join('');
+          if (pJson) allData = allData.concat(JSON.parse(pJson));
+        }
+      } catch(e) { console.warn('Export load ' + p + ':', e); }
+    }
+    if (!allData.length) allData = weldBookData; // fallback
+
     // DÁTA
-    var dataRows = weldBookData.map(function(row) {
+    var dataRows = allData.map(function(row) {
       return [
         row.isometric || '',           // A
         row.sheets || '',              // B
@@ -9895,7 +9915,7 @@ function exportWeldBookExcel() {
     console.log('✅ Excel vytvorený:', filename);
     alert('✅ WeldBook exportovaný do Excel!\n\n' +
           'Súbor: ' + filename + '\n' +
-          'Záznamy: ' + weldBookData.length + '\n\n' +
+          'Záznamy: ' + allData.length + '\n\n' +
           '💾 Dáta sú aj zálohované v prehliadači.');
     
   } catch (err) {
@@ -10340,7 +10360,10 @@ function importAllPartsExcel() {
 
           const ws = workbook.Sheets[sheetName];
           const colMapping = ALL_SHEET_MAPS[sheetName];
-          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+          // Odstran hidden flag zo vsetkych riadkov - aby filter v Exceli nevynechal riadky
+          if (ws['!rows']) { ws['!rows'].forEach(function(r){ if(r) r.hidden = false; }); }
+          // Citaj VSETKY riadky (skipHidden:false pre novšie verzie SheetJS)
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, skipHidden: false });
 
           // Nájdi header riadok
           let headerRowIdx = 2;
@@ -10351,7 +10374,36 @@ function importAllPartsExcel() {
           let added = 0, updated = 0, skipped = 0;
           const dataRows = rows.slice(headerRowIdx + 1);
 
-          // Buduj len dáta tejto časti
+          // Načítaj existujúce dáta z Firebase - zachovaj ručne doplnené polia
+          statusEl.innerHTML = '📥 Načítavam existujúce dáta <strong>' + sheetName + '</strong>...';
+          let existingRows = [];
+          try {
+            const existingDoc = await db.collection('weldbook').doc(sheetName + '_main').get();
+            if (existingDoc.exists) {
+              const eMeta = existingDoc.data();
+              const eCps = [];
+              for (let ei = 0; ei < (eMeta.chunks||1); ei++)
+                eCps.push(db.collection('weldbook').doc(sheetName + '_main').collection('data').doc('c'+ei).get());
+              const eCds = await Promise.all(eCps);
+              const eJson = eCds.filter(c=>c.exists).map(c=>c.data().d).join('');
+              if (eJson) existingRows = JSON.parse(eJson);
+            }
+          } catch(e) { console.warn('Existing load error:', e); }
+
+          // Index existujúcich riadkov pre rýchle vyhľadávanie
+          const existingIndex = {};
+          existingRows.forEach(function(r) {
+            const key = String(r.weldId||'').trim() + '||' + String(r.isometric||'').trim();
+            existingIndex[key] = r;
+          });
+
+          // Polia chránené pred prepísaním Excelom - doplnené ručne v programe
+          const protectedFields = ['welderId','dateWelding','heatNr1','heatNr2','certNr1','certNr2',
+            'item1','item2','vtDate','vtPercent','vtReport','vtResult',
+            'ptDate','ptPercent','ptReport','ptResult',
+            'rtDate','rtPercent','rtReport','rtResult','note'];
+
+          // Buduj merged dáta
           const partRows = [];
           dataRows.forEach(function(row) {
             if (!row || row.every(c => c === '' || c === null || c === undefined)) return;
@@ -10367,8 +10419,18 @@ function importAllPartsExcel() {
               }
             });
             if (!obj.weldId || obj.weldId === '' || obj.weldId === '0') { skipped++; return; }
+            // Merguj s existujúcim - zachovaj chránené polia
+            const key = String(obj.weldId||'').trim() + '||' + String(obj.isometric||'').trim();
+            const existing = existingIndex[key];
+            if (existing) {
+              protectedFields.forEach(function(f) {
+                if (existing[f] !== undefined && existing[f] !== '') obj[f] = existing[f];
+              });
+              updated++;
+            } else {
+              added++;
+            }
             partRows.push(obj);
-            added++;
           });
 
           // Ulož túto časť priamo do Firebase bez toho aby sme ju pridávali do weldBookData
