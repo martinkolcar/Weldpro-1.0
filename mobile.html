@@ -2056,22 +2056,24 @@ function saveWbModal() {
   const item1 = document.getElementById('wb_item1').value.trim();
   const item2 = document.getElementById('wb_item2').value.trim();
   const vtdate = document.getElementById('wb_vtdate').value;
-  if (!welder) { showToast('⚠️ Zadaj Welder ID'); return; }
   const r = currentWbRow.row;
-  r.welderId = welder;
-  r.dateWelding = date;
+  if (welder) { r.welderId = welder; r.dateWelding = date; }
   r.item1 = item1;
   r.item2 = item2;
-  r.vtDate = vtdate; // uloz vzdy - aj prazdne (vymazanie)
+  r.vtDate = vtdate;
   closeWbModal();
   showToast('💾 Ukladám...');
   saveWeldBookToFirebase().then(() => {
     filterWB();
-    showToast('✅ Uložené: zvar #' + r.weldId + ' → ' + welder);
-    sendFirebaseNotification('welder_assigned',
-      '✅ ' + welder + ' priradený k zvaru #' + r.weldId + ' (' + (r.isometric||'?') + ')',
-      { weldId: String(r.weldId), welder, iso: r.isometric||'' }
-    );
+    if (welder) {
+      showToast('✅ Uložené: zvar #' + r.weldId + ' → ' + welder);
+      sendFirebaseNotification('welder_assigned',
+        '✅ ' + welder + ' priradený k zvaru #' + r.weldId + ' (' + (r.isometric||'?') + ')',
+        { weldId: String(r.weldId), welder, iso: r.isometric||'' }
+      );
+    } else {
+      showToast('✅ Uložené: zvar #' + r.weldId);
+    }
   });
 }
 
