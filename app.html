@@ -9571,6 +9571,7 @@ function startWbRealtimeSync() {
     loadWbPart(wbActivePart).then(function() {
       showWbSyncNotification('✅ WeldBook aktualizovaný (' + weldBookData.length + ' zvarov)', 'success');
       addNotification(msg);
+      // wbSetRowDataKeepFilter zachova filter a pozíciu
       wbSetRowDataKeepFilter(weldBookData);
     });
   });
@@ -9582,6 +9583,7 @@ function startWbRealtimeSync() {
     if (initialLoad) { initialLoad = false; return; }
     if (!doc.exists) return;
     var data = doc.data();
+    // Ignoruj vlastne PC zmeny
     if (data.sessionId && data.sessionId === mySessionId) return;
 
     var chunkCount = data.chunks || 1;
@@ -9592,10 +9594,30 @@ function startWbRealtimeSync() {
     Promise.all(chunkPromises).then(function(chunkDocs) {
       var chunks = chunkDocs.filter(function(c){ return c.exists; }).map(function(c){ return c.data().d; });
       if (!chunks.length) return;
-      weldBookData = JSON.parse(chunks.join(''));
+      var newData = JSON.parse(chunks.join(''));
       wbLocalBackup();
-      wbSetRowDataKeepFilter(weldBookData);
-      var syncMsg = (data.modifiedBy||'?') + ' upravil WeldBook (' + weldBookData.length + ' zvarov)';
+      // SOFT UPDATE - aktualizuj len zmenene riadky v pamati, nezmen grid pozíciu
+      var changed = 0;
+      newData.forEach(function(newRow) {
+        var idx = weldBookData.findIndex(function(r) {
+          return String(r.weldId||'') === String(newRow.weldId||'') &&
+                 String(r.isometric||'') === String(newRow.isometric||'');
+        });
+        if (idx >= 0) {
+          // Aktualizuj existujuci riadok in-place
+          Object.assign(weldBookData[idx], newRow);
+          changed++;
+        } else {
+          // Novy riadok - pridaj
+          weldBookData.push(newRow);
+          changed++;
+        }
+      });
+      if (changed > 0 && weldBookGrid && weldBookGrid.api) {
+        // refreshCells nezrusí filter ani pozíciu
+        weldBookGrid.api.refreshCells({ force: true });
+      }
+      var syncMsg = (data.modifiedBy||'?') + ' upravil WeldBook (' + changed + ' zmien)';
       showWbSyncNotification(syncMsg);
       addNotification('📋 ' + syncMsg);
     }).catch(function(e){ console.error('WB sync error:', e); });
@@ -9604,23 +9626,34 @@ function startWbRealtimeSync() {
   console.log('🔴 WeldBook realtime sync aktívny [' + (wbActivePart||'ALL') + ']');
 }
 
-// Nastav rowData a zachovaj aktívny filter izometrie/partu
+// Nastav rowData a zachovaj aktívny filter + scroll pozíciu
 function wbSetRowDataKeepFilter(newData) {
   weldBookData = newData;
   var isoSel = document.getElementById('wbFilterIsometric');
   var partSel = document.getElementById('wbFilterPart');
   var currentIso = isoSel ? isoSel.value : '';
   var currentPart = partSel ? partSel.value : '';
-  // Reaplicate filter
   var filtered = newData.filter(function(row) {
     if (currentPart && String(row.part||'').trim() !== currentPart) return false;
     if (currentIso && String(row.isometric||'').trim() !== currentIso) return false;
     return true;
   });
+  var displayData = (filtered.length > 0 || currentIso || currentPart) ? filtered : newData;
   if (weldBookGrid && weldBookGrid.api) {
-    weldBookGrid.api.setGridOption('rowData', filtered.length > 0 || currentIso || currentPart ? filtered : newData);
-    populateWeldBookFilterDropdowns();
-    updateWeldBookFilterCount(filtered.length > 0 || currentIso || currentPart ? filtered.length : newData.length);
+    // applyTransaction zachová scroll pozíciu na rozdiel od setGridOption('rowData')
+    var existingRows = [];
+    weldBookGrid.api.forEachNode(function(node){ if(node.data) existingRows.push(node.data); });
+    var existingIndex = {};
+    existingRows.forEach(function(r,i){ existingIndex[String(r.weldId||'')+'||'+String(r.isometric||'')] = i; });
+    var toAdd = [], toUpdate = [];
+    displayData.forEach(function(r) {
+      var key = String(r.weldId||'')+'||'+String(r.isometric||'');
+      if (existingIndex[key] !== undefined) toUpdate.push(r);
+      else toAdd.push(r);
+    });
+    if (toUpdate.length) weldBookGrid.api.applyTransaction({ update: toUpdate });
+    if (toAdd.length) weldBookGrid.api.applyTransaction({ add: toAdd });
+    updateWeldBookFilterCount(displayData.length);
   }
 }
 
@@ -9799,114 +9832,56 @@ async function exportWeldBookExcel() {
     }
     if (!allData.length) allData = weldBookData; // fallback
 
-    // DÁTA
-    var dataRows = allData.map(function(row) {
+    // Helper - konvertuj riadok na Excel row
+    function rowToArr(row) {
       return [
-        row.isometric || '',           // A
-        row.sheets || '',              // B
-        row.ped || '',                 // C
-        row.rev || '',                 // D
-        row.pipeClass || '',           // E
-        row.weldId || '',              // F
-        row.item1 || '',               // G
-        row.heatNr1 || '',             // H
-        row.certNr1 || '',             // I
-        row.dimension1 || '',          // J
-        row.thickness1 || '',          // K
-        row.material1 || '',           // L
-        row.matGroup1 || '',           // M
-        row.item2 || '',               // N
-        row.heatNr2 || '',             // O
-        row.certNr2 || '',             // P
-        row.dimension2 || '',          // Q
-        row.thickness2 || '',          // R
-        row.material2 || '',           // S
-        row.matGroup2 || '',           // T
-        row.wps || '',                 // U
-        row.wpqr || '',                // V
-        row.weldingMethod || '',       // W
-        row.jointType || '',           // X
-        row.weldingType || '',         // Y
-        row.weldingGas || '',          // Z
-        row.heatNrWeld || '',          // AA
-        row.certNrWeld || '',          // AB
-        row.welderId || '',            // AC
-        row.dateWelding || '',         // AD
-        row.vtPercent || '',           // AE
-        row.vtDate || '',              // AF
-        row.vtReport || '',            // AG
-        row.vtResult || '',            // AH
-        row.ptPercent || '',           // AI
-        row.ptDate || '',              // AJ
-        row.ptReport || '',            // AK
-        row.ptResult || '',            // AL
-        row.rtPercent || '',           // AM
-        row.rtDate || '',              // AN
-        row.rtReport || '',            // AO
-        row.rtResult || '',            // AP
-        row.pmpInch || '',             // AQ
-        row.andritzInch || '',         // AR
-        row.pressureGroup || '',       // AS
-        row.note || ''                 // AT
+        row.isometric || '', row.sheets || '', row.ped || '', row.rev || '', row.pipeClass || '', row.weldId || '',
+        row.item1 || '', row.heatNr1 || '', row.certNr1 || '', row.dimension1 || '', row.thickness1 || '', row.material1 || '', row.matGroup1 || '',
+        row.item2 || '', row.heatNr2 || '', row.certNr2 || '', row.dimension2 || '', row.thickness2 || '', row.material2 || '', row.matGroup2 || '',
+        row.wps || '', row.wpqr || '', row.weldingMethod || '', row.jointType || '', row.weldingType || '', row.weldingGas || '',
+        row.heatNrWeld || '', row.certNrWeld || '', row.welderId || '', row.dateWelding || '',
+        row.vtPercent || '', row.vtDate || '', row.vtReport || '', row.vtResult || '',
+        row.ptPercent || '', row.ptDate || '', row.ptReport || '', row.ptResult || '',
+        row.rtPercent || '', row.rtDate || '', row.rtReport || '', row.rtResult || '',
+        row.pmpInch || '', row.andritzInch || '', row.pressureGroup || '', row.note || ''
       ];
-    });
-    
-    // Vytvor worksheet
-    var wsData = [headerRow2].concat(dataRows);  // Začni s row 2 (row 1 pridáme manuálne)
-    var ws = XLSX.utils.aoa_to_sheet(wsData);
-    
-    // Nastav šírky stĺpcov
-    ws['!cols'] = [
-      { wch: 25 },  // Isometric
-      { wch: 8 },   // Sheets
-      { wch: 8 },   // PED
-      { wch: 8 },   // REV
-      { wch: 12 },  // Pipe Class
-      { wch: 10 },  // Weld ID
-      { wch: 15 },  // Item 1
-      { wch: 12 },  // Heat nr 1
-      { wch: 15 },  // Cert nr 1
-      { wch: 12 },  // Dimension 1
-      { wch: 12 },  // Thickness 1
-      { wch: 12 },  // Material 1
-      { wch: 12 },  // Mat Group 1
-      { wch: 15 },  // Item 2
-      { wch: 12 },  // Heat nr 2
-      { wch: 15 },  // Cert nr 2
-      { wch: 12 },  // Dimension 2
-      { wch: 12 },  // Thickness 2
-      { wch: 12 },  // Material 2
-      { wch: 12 },  // Mat Group 2
-      { wch: 12 },  // WPS
-      { wch: 12 },  // WPQR
-      { wch: 15 },  // Welding method
-      { wch: 12 },  // Joint type
-      { wch: 12 },  // Welding type
-      { wch: 12 },  // Welding gas
-      { wch: 12 },  // Heat nr weld
-      { wch: 15 },  // Cert nr weld
-      { wch: 12 },  // Welder ID
-      { wch: 12 },  // Date welding
-      { wch: 12 },  // VT %
-      { wch: 12 },  // VT date
-      { wch: 12 },  // VT report
-      { wch: 12 },  // VT result
-      { wch: 12 },  // PT %
-      { wch: 12 },  // PT date
-      { wch: 12 },  // PT report
-      { wch: 12 },  // PT result
-      { wch: 12 },  // RT %
-      { wch: 12 },  // RT date
-      { wch: 12 },  // RT report
-      { wch: 12 },  // RT result
-      { wch: 12 },  // PMP inch
-      { wch: 12 },  // Andritz inch
-      { wch: 15 },  // Pressure group
-      { wch: 20 }   // Note
+    }
+
+    var colWidths = [
+      {wch:25},{wch:8},{wch:8},{wch:8},{wch:12},{wch:10},
+      {wch:15},{wch:12},{wch:15},{wch:12},{wch:12},{wch:12},{wch:12},
+      {wch:15},{wch:12},{wch:15},{wch:12},{wch:12},{wch:12},{wch:12},
+      {wch:12},{wch:12},{wch:15},{wch:12},{wch:12},{wch:12},
+      {wch:12},{wch:15},{wch:12},{wch:12},
+      {wch:12},{wch:12},{wch:12},{wch:12},
+      {wch:12},{wch:12},{wch:12},{wch:12},
+      {wch:12},{wch:12},{wch:12},{wch:12},
+      {wch:12},{wch:12},{wch:15},{wch:20}
     ];
+
+    // Vytvor sheet pre každú časť zvlášť
+    var knownPartsExport = ['SUL','LIG','DRY','FLA','LHT'];
+    var sheetsCreated = 0;
+    knownPartsExport.forEach(function(p) {
+      var partData = allData.filter(function(r){ return (r.part||'').toUpperCase() === p; });
+      if (!partData.length) return;
+      var dataRows = partData.map(rowToArr);
     
-    // Pridaj worksheet do workbook
-    XLSX.utils.book_append_sheet(wb, ws, 'WeldBook');
+      // Vytvor worksheet pre tento part
+      var wsData = [headerRow2].concat(dataRows);
+      var ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws['!cols'] = colWidths;
+      XLSX.utils.book_append_sheet(wb, ws, p);
+      sheetsCreated++;
+    });
+
+    // Fallback - ak ziadny part nema data, uloz vsetko do jedneho sheetu
+    if (sheetsCreated === 0) {
+      var wsData = [headerRow2].concat(allData.map(rowToArr));
+      var ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws['!cols'] = colWidths;
+      XLSX.utils.book_append_sheet(wb, ws, 'WeldBook');
+    }
     
     // STIAHNI SÚBOR
     var filename = 'WeldBook_' + new Date().toISOString().slice(0, 10) + '.xlsx';
