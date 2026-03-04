@@ -2168,31 +2168,35 @@ async function doSnapScan() {
       document.getElementById('scanNoMatchArea').style.display = 'block';
     }
 
-    // Always populate select - top scored first, then rest
+    // Populate select: top scored first, then all others from weldBookData
     var topIsos = matchResult.top.map(function(x){ return x.iso; });
-    var isoSel = document.getElementById('wbFIso');
-    // Add top matches first (with score indicator)
+    // Top matches
     for (var ti = 0; ti < topIsos.length; ti++) {
       var opt = document.createElement('option');
       opt.value = topIsos[ti];
-      opt.textContent = (ti === 0 ? '⭐ ' : '  ') + topIsos[ti];
+      opt.textContent = (ti === 0 ? '⭐ ' : (ti+1)+'. ') + topIsos[ti];
       if (ti === 0 && !matchResult.best) opt.selected = true;
       sel.appendChild(opt);
     }
-    // Separator + rest
-    if (topIsos.length > 0 && isoSel && isoSel.options.length > topIsos.length + 1) {
-      var sep = document.createElement('option'); sep.disabled = true; sep.textContent = '── ostatné ──'; sel.appendChild(sep);
+    // Separator + all remaining isos from weldBookData
+    var allIsos = [];
+    if (typeof weldBookData !== 'undefined') {
+      var seen2 = {};
+      for (var wi = 0; wi < weldBookData.length; wi++) {
+        var wv = (weldBookData[wi].isometric || '').trim();
+        if (wv && !seen2[wv]) { seen2[wv] = true; allIsos.push(wv); }
+      }
+      allIsos.sort();
     }
-    if (isoSel) {
-      for (var i = 0; i < isoSel.options.length; i++) {
-        var v = isoSel.options[i].value;
-        if (v && topIsos.indexOf(v) === -1) {
-          var opt2 = document.createElement('option'); opt2.value = v; opt2.textContent = v; sel.appendChild(opt2);
+    if (allIsos.length > topIsos.length) {
+      var sep = document.createElement('option'); sep.disabled = true; sep.textContent = '── všetky izometrie ──'; sel.appendChild(sep);
+      for (var ai = 0; ai < allIsos.length; ai++) {
+        if (topIsos.indexOf(allIsos[ai]) === -1) {
+          var opt2 = document.createElement('option'); opt2.value = allIsos[ai]; opt2.textContent = allIsos[ai]; sel.appendChild(opt2);
         }
       }
     }
-    // If top matches but no "best" - show select with top preselected
-    if (!matchResult.best && matchResult.top.length > 0) {
+    if (!matchResult.best) {
       document.getElementById('scanNoMatchArea').style.display = 'block';
     }
     document.getElementById('scanCaptureArea').style.display = 'block';
@@ -2210,56 +2214,96 @@ function retryScan() {
 }
 
 function findIsoInText(text) {
-  var isoSel = document.getElementById('wbFIso');
+  // Get ALL unique isos from weldBookData (not just filtered dropdown)
   var isos = [];
-  if (isoSel) {
-    for (var i = 0; i < isoSel.options.length; i++) {
-      var v = isoSel.options[i].value; if (v) isos.push(v);
+  if (typeof weldBookData !== 'undefined' && weldBookData.length) {
+    var seen = {};
+    for (var i = 0; i < weldBookData.length; i++) {
+      var v = (weldBookData[i].isometric || '').trim();
+      if (v && !seen[v]) { seen[v] = true; isos.push(v); }
+    }
+    isos.sort();
+  }
+  // Fallback to dropdown
+  if (!isos.length) {
+    var isoSel = document.getElementById('wbFIso');
+    if (isoSel) for (var j = 0; j < isoSel.options.length; j++) {
+      var ov = isoSel.options[j].value; if (ov) isos.push(ov);
     }
   }
   if (!isos.length) return { best: null, top: [] };
 
-  var clean = text.replace(/\s/g,'').toUpperCase();
-
+  // OCR common character confusions
   function ocrFix(s) {
-    return s.toUpperCase().replace(/O/g,'0').replace(/[lI]/g,'1').replace(/S/g,'5').replace(/Z/g,'2').replace(/B/g,'8');
+    return s.toUpperCase()
+      .replace(/O/g,'0').replace(/[lI]/g,'1').replace(/S/g,'5')
+      .replace(/Z/g,'2').replace(/B/g,'8').replace(/G/g,'6')
+      .replace(/T/g,'1').replace(/A/g,'4').replace(/[^A-Z0-9]/g,'');
   }
-  var cleanFixed = ocrFix(clean);
-  var ocrTokens = clean.match(/[A-Z0-9]{2,}/g) || [];
-  var ocrTokensFixed = cleanFixed.match(/[A-Z0-9]{2,}/g) || [];
+
+  // Clean OCR text multiple ways
+  var raw = text.toUpperCase();
+  var clean = raw.replace(/\s+/g,'');       // no spaces
+  var cleanF = ocrFix(clean);               // ocr-fixed no spaces
+  // Also try each line
+  var lines = text.split(String.fromCharCode(10)).map(function(l){ return l.replace(/[\s]+/g,'').toUpperCase(); });
+  var linesF = lines.map(ocrFix);
+  // Extract tokens (sequences of alphanumeric 2+ chars)
+  var tokens = (clean.match(/[A-Z0-9]{2,}/g) || []);
+  var tokensF = (cleanF.match(/[A-Z0-9]{2,}/g) || []);
 
   var scored = isos.map(function(iso) {
-    var ic = iso.replace(/\s/g,'').toUpperCase();
-    var icFixed = ocrFix(ic);
+    var ic = iso.replace(/\s+/g,'').toUpperCase();
+    var icF = ocrFix(ic);
     var segs = ic.split('-').filter(function(s){ return s.length > 0; });
+    var segsF = segs.map(ocrFix);
     var score = 0;
 
-    if (clean.includes(ic) || cleanFixed.includes(icFixed)) score += 1000;
-
-    for (var skip = 1; skip < segs.length; skip++) {
-      var suffix = segs.slice(skip).join('');
-      var suffixFixed = ocrFix(suffix);
-      if (suffix.length >= 4) {
-        if (clean.includes(suffix) || cleanFixed.includes(suffixFixed)) score += 500 - skip * 50;
-      }
+    // 1. Exact full match
+    if (clean.includes(ic) || cleanF.includes(icF)) { score += 2000; return { iso:iso, score:score }; }
+    for (var li = 0; li < lines.length; li++) {
+      if (lines[li].includes(ic) || linesF[li].includes(icF)) { score += 2000; return { iso:iso, score:score }; }
     }
 
-    for (var s2 = 0; s2 < segs.length; s2++) {
-      var seg = segs[s2], segf = ocrFix(seg);
-      if (seg.length < 2) continue;
-      for (var t = 0; t < ocrTokens.length; t++) {
-        if (ocrTokens[t] === seg || ocrTokens[t].includes(seg) || seg.includes(ocrTokens[t]) ||
-            ocrTokensFixed[t] === segf || ocrTokensFixed[t].includes(segf) || segf.includes(ocrTokensFixed[t])) {
-          score += seg.length * 10; break;
+    // 2. Suffix match (skip first N segments - e.g. skip plant code "AM58")
+    for (var skip = 1; skip < segs.length; skip++) {
+      var suf = segs.slice(skip).join('');
+      var sufF = ocrFix(suf);
+      var sufDash = segs.slice(skip).join('-');
+      var sufDashF = ocrFix(sufDash);
+      if (suf.length >= 6) {
+        if (clean.includes(suf) || cleanF.includes(sufF)) { score += 1500 - skip*100; break; }
+        for (var li2=0; li2<lines.length; li2++) {
+          if (lines[li2].includes(suf) || linesF[li2].includes(sufF)) { score += 1500-skip*100; break; }
         }
       }
     }
-    return { iso: iso, score: score };
+    if (score > 0) return { iso:iso, score:score };
+
+    // 3. Segment-by-segment scoring
+    var segHits = 0, segTotal = segs.filter(function(s){ return s.length >= 2; }).length;
+    for (var si = 0; si < segs.length; si++) {
+      if (segs[si].length < 2) continue;
+      var seg = segs[si], segF = segsF[si];
+      // Check if this segment appears in any token
+      var found = false;
+      for (var ti = 0; ti < tokens.length; ti++) {
+        if (tokens[ti] === seg || tokensF[ti] === segF ||
+            tokens[ti].includes(seg) || seg.includes(tokens[ti]) ||
+            tokensF[ti].includes(segF) || segF.includes(tokensF[ti])) {
+          found = true; break;
+        }
+      }
+      if (found) segHits++;
+    }
+    if (segTotal > 0) score += Math.round((segHits / segTotal) * 800);
+
+    return { iso:iso, score:score };
   });
 
   scored.sort(function(a,b){ return b.score - a.score; });
-  var top = scored.filter(function(x){ return x.score > 0; }).slice(0,5);
-  var best = (top.length > 0 && top[0].score >= 60) ? top[0].iso : null;
+  var top = scored.filter(function(x){ return x.score >= 50; }).slice(0,8);
+  var best = (top.length > 0 && top[0].score >= 800) ? top[0].iso : null;
   return { best: best, top: top };
 }
 
