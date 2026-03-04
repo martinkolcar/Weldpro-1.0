@@ -416,6 +416,7 @@ canvas#mca { display: block; }
           <th style="padding:6px 3px;color:#7c3aed">Heat 1</th>
           <th style="padding:6px 3px;color:#1e40af">Item 2</th>
           <th style="padding:6px 3px;color:#1e40af">Heat 2</th>
+          <th style="padding:6px 3px;color:#0369a1">VT</th>
         </tr>
       </thead>
       <tbody id="wbBody"></tbody>
@@ -574,9 +575,24 @@ canvas#mca { display: block; }
       <input class="modal-input" id="wb_welder" placeholder="Zadaj Welder ID..." autocapitalize="characters">
       <label class="modal-label">Dátum zvárania</label>
       <input class="modal-input" id="wb_date" type="date">
-      <div class="modal-row">
+      <!-- Item 1 / Item 2 editable -->
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <div style="flex:1">
+          <label class="modal-label" style="color:#7c3aed">Item 1</label>
+          <input class="modal-input" id="wb_item1" placeholder="napr. Pipe, Elbow..." style="border-color:#ddd6fe">
+        </div>
+        <div style="flex:1">
+          <label class="modal-label" style="color:#1e40af">Item 2</label>
+          <input class="modal-input" id="wb_item2" placeholder="napr. T-piece..." style="border-color:#bfdbfe">
+        </div>
+      </div>
+      <!-- VT date -->
+      <label class="modal-label" style="color:#0369a1;margin-top:8px">VT dátum (date of testing)</label>
+      <input class="modal-input" id="wb_vtdate" type="date" style="border-color:#bae6fd">
+      <div class="modal-row" style="margin-top:10px">
         <button class="btn-secondary" onclick="closeWbModal()">Zrušiť</button>
         <button class="btn-primary" onclick="saveWbModal()">✅ Uložiť</button>
+      </div>
       <button onclick="openFittingModalFromWb()" style="width:100%;margin-top:8px;padding:12px;background:#7c3aed;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">🔩 Fitting / Heat Nr</button>
       <button class="btn-danger" id="wb_remove" onclick="removeWbModal()" style="display:none">🗑️ Odstrániť zvarača</button>
       <button class="btn-danger" onclick="deleteWbRowModal()" style="margin-top:4px;background:#7f1d1d">🗑️ Vymazať zvar</button>
@@ -1896,7 +1912,7 @@ function _applyWbFilter() {
 function renderWeldBook(rows) {
   const tbody = document.getElementById('wbBody');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9ca3af">Žiadne záznamy</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:#9ca3af">Žiadne záznamy</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map((r,i) => {
@@ -1911,6 +1927,7 @@ function renderWeldBook(rows) {
       <td style="padding:6px 3px;font-size:11px;font-weight:${r.heatNr1?'700':'400'};color:${r.heatNr1?'#7c3aed':'#d1d5db'}">${r.heatNr1||'—'}</td>
       <td style="padding:6px 3px;font-size:11px;color:#374151;max-width:65px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.item2||'—'}</td>
       <td style="padding:6px 3px;font-size:11px;font-weight:${r.heatNr2?'700':'400'};color:${r.heatNr2?'#1e40af':'#d1d5db'}">${r.heatNr2||'—'}</td>
+      <td style="padding:6px 3px;font-size:11px;font-weight:${r.dateVT?'700':'400'};color:${r.dateVT?'#0369a1':'#d1d5db'}">${r.dateVT||'—'}</td>
     </tr>`;
   }).join('');
 }
@@ -1924,7 +1941,9 @@ function openWbModal(idx) {
   document.getElementById('wb_sheet').textContent = r.sheets || 1;
   document.getElementById('wb_welder').value = r.welderId || '';
   document.getElementById('wb_date').value = r.dateWelding || today();
-  // Zobraz tlačidlo Odstrániť len ak má zvarača
+  document.getElementById('wb_item1').value = r.item1 || '';
+  document.getElementById('wb_item2').value = r.item2 || '';
+  document.getElementById('wb_vtdate').value = r.dateVT || '';
   document.getElementById('wb_remove').style.display = (r.welderId && r.welderId.trim()) ? 'block' : 'none';
   const _el_wbModal_add = document.getElementById('wbModal'); if (_el_wbModal_add) _el_wbModal_add.classList.add('show');
   setTimeout(() => document.getElementById('wb_welder').focus(), 300);
@@ -1938,10 +1957,16 @@ function closeWbModal() {
 function saveWbModal() {
   const welder = document.getElementById('wb_welder').value.trim();
   const date = document.getElementById('wb_date').value;
+  const item1 = document.getElementById('wb_item1').value.trim();
+  const item2 = document.getElementById('wb_item2').value.trim();
+  const vtdate = document.getElementById('wb_vtdate').value;
   if (!welder) { showToast('⚠️ Zadaj Welder ID'); return; }
   const r = currentWbRow.row;
   r.welderId = welder;
   r.dateWelding = date;
+  if (item1) r.item1 = item1;
+  if (item2) r.item2 = item2;
+  if (vtdate) r.dateVT = vtdate;
   closeWbModal();
   showToast('💾 Ukladám...');
   saveWeldBookToFirebase().then(() => {
