@@ -498,7 +498,8 @@ canvas#mca { display: block; }
     <!-- Raw text + iso list -->
     <div id="scanRawArea" style="display:none;margin-top:10px">
       <div style="font-size:11px;color:#64748b;margin-bottom:4px">PREČÍTANÝ TEXT:</div>
-      <div id="scanRawText" style="font-size:13px;color:#e2e8f0;background:#1e293b;padding:8px 10px;border-radius:8px;word-break:break-all;min-height:28px;margin-bottom:10px"></div>
+      <div id="scanRawText" style="font-size:13px;color:#e2e8f0;background:#1e293b;padding:8px 10px;border-radius:8px;word-break:break-all;min-height:28px;margin-bottom:6px"></div>
+      <div id="scanDebugInfo" style="font-size:10px;color:#64748b;background:#0f172a;padding:6px 8px;border-radius:6px;margin-bottom:8px;word-break:break-all"></div>
       <div id="scanMatchArea">
         <!-- Matched iso -->
         <div id="scanMatchFound" style="display:none">
@@ -2152,6 +2153,19 @@ async function doSnapScan() {
     // Show raw text
     document.getElementById("scanRawText").textContent = rawText.split("\n").join(" ").trim().substring(0,120) || "(prazdne)";
 
+
+    // DEBUG: ukaz sample isos a clean OCR
+    var dbgIsos = [];
+    if (typeof weldBookData !== 'undefined') {
+      var dbgSeen = {};
+      for (var di = 0; di < weldBookData.length && dbgIsos.length < 3; di++) {
+        var dv = (weldBookData[di].isometric||'').trim();
+        if (dv && !dbgSeen[dv]) { dbgSeen[dv]=true; dbgIsos.push(dv); }
+      }
+    }
+    var cleanDbg = rawText.replace(/\s/g,'').toUpperCase().substring(0,80);
+    var dbgEl = document.getElementById('scanDebugInfo');
+    if (dbgEl) dbgEl.textContent = 'WB(' + (typeof weldBookData!=='undefined'?weldBookData.length:0) + '): ' + dbgIsos.join(' | ') + ' || OCR: ' + cleanDbg;
     var matchResult = findIsoInText(rawText);
     var sel = document.getElementById('scanManualSelect');
     sel.innerHTML = '<option value="">-- vyber izometriu --</option>';
