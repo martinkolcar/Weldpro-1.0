@@ -1674,7 +1674,7 @@ async function saveFittingModal() {
 
 function removeWelderModal() {
   const { weld, wbEntry } = currentWeldForModal;
-  if (wbEntry) { wbEntry.welderId = ''; wbEntry.dateWelding = ''; }
+  if (wbEntry) { wbEntry.welderId = ''; wbEntry.dateWelding = ''; wbEntry.vtDate = ''; }
   mDraw();
   closeWelderModal();
   saveWeldBookToFirebase().then(() => {
@@ -1927,7 +1927,7 @@ function renderWeldBook(rows) {
       <td style="padding:6px 3px;font-size:11px;font-weight:${r.heatNr1?'700':'400'};color:${r.heatNr1?'#7c3aed':'#d1d5db'}">${r.heatNr1||'—'}</td>
       <td style="padding:6px 3px;font-size:11px;color:#374151;max-width:65px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.item2||'—'}</td>
       <td style="padding:6px 3px;font-size:11px;font-weight:${r.heatNr2?'700':'400'};color:${r.heatNr2?'#1e40af':'#d1d5db'}">${r.heatNr2||'—'}</td>
-      <td style="padding:6px 3px;font-size:11px;font-weight:${r.dateVT?'700':'400'};color:${r.dateVT?'#0369a1':'#d1d5db'}">${r.dateVT||'—'}</td>
+      <td style="padding:6px 3px;font-size:11px;font-weight:${r.vtDate?'700':'400'};color:${r.vtDate?'#0369a1':'#d1d5db'}">${r.vtDate||'—'}</td>
     </tr>`;
   }).join('');
 }
@@ -1943,7 +1943,7 @@ function openWbModal(idx) {
   document.getElementById('wb_date').value = r.dateWelding || today();
   document.getElementById('wb_item1').value = r.item1 || '';
   document.getElementById('wb_item2').value = r.item2 || '';
-  document.getElementById('wb_vtdate').value = r.dateVT || '';
+  document.getElementById('wb_vtdate').value = r.vtDate || '';
   document.getElementById('wb_remove').style.display = (r.welderId && r.welderId.trim()) ? 'block' : 'none';
   const _el_wbModal_add = document.getElementById('wbModal'); if (_el_wbModal_add) _el_wbModal_add.classList.add('show');
   setTimeout(() => document.getElementById('wb_welder').focus(), 300);
@@ -1964,9 +1964,9 @@ function saveWbModal() {
   const r = currentWbRow.row;
   r.welderId = welder;
   r.dateWelding = date;
-  if (item1) r.item1 = item1;
-  if (item2) r.item2 = item2;
-  if (vtdate) r.dateVT = vtdate;
+  r.item1 = item1;
+  r.item2 = item2;
+  r.vtDate = vtdate; // uloz vzdy - aj prazdne (vymazanie)
   closeWbModal();
   showToast('💾 Ukladám...');
   saveWeldBookToFirebase().then(() => {
@@ -1986,6 +1986,7 @@ function removeWbModal() {
   const iso = r.isometric || '';
   r.welderId = '';
   r.dateWelding = '';
+  r.vtDate = '';
   closeWbModal();
   showToast('💾 Odstraňujem...');
   saveWeldBookToFirebase().then(() => {
