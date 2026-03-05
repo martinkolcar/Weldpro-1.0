@@ -8591,6 +8591,7 @@ function openWeldBook() {
   content += '<button onclick="deleteSelectedWeldBookRows()" style="padding:10px 20px;background:#ef4444;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🗑️ Zmazať označené</button>';
   content += '<button onclick="cleanWeldBook()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🧹 Vyčistiť orphaned</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
+  content += '<button onclick="repairFirebaseChunk()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fca5a5" title="Opraví poškodený JSON chunk vo Firebase">🔧 Opraviť Firebase LIG</button>';
   content += '<button onclick="recoverWbFromCache()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fbbf24" title="Obnov dáta z lokálnej cache prehliadača a oprav Firebase">🚑 Obnov z cache</button>';
   content += '<button onclick="importJSONProjects()" style="padding:10px 20px;background:#667eea;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z JSON</button>';
   content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu (1 časť)</button>';
@@ -9361,6 +9362,96 @@ function wbLocalLoad(part) {
     }
   } catch(e) {}
   return null;
+}
+
+// Oprav poškodený JSON chunk vo Firebase pre LIG
+async function repairFirebaseChunk() {
+  if (!db) { alert('Firebase nie je pripojený'); return; }
+  var part = 'LIG';
+  var docId = 'LIG_main';
+  alert('🔧 Čítam Firebase chunks pre LIG...\n\nPočkaj, toto môže chvíľu trvať.');
+  try {
+    var metaDoc = await db.collection('weldbook').doc(docId).get();
+    if (!metaDoc.exists) { alert('❌ LIG_main dokument neexistuje vo Firebase!'); return; }
+    var meta = metaDoc.data();
+    var chunkCount = meta.chunks || 1;
+    console.log('LIG chunks:', chunkCount);
+
+    // Načítaj všetky chunky raw
+    var rawChunks = [];
+    for (var ci = 0; ci < chunkCount; ci++) {
+      var cd = await db.collection('weldbook').doc(docId).collection('data').doc('c'+ci).get();
+      rawChunks.push(cd.exists ? (cd.data().d || '') : '');
+      console.log('Chunk c'+ci+':', cd.exists ? cd.data().d.length + ' znakov' : 'CHÝBA');
+    }
+
+    var joined = rawChunks.join('');
+    console.log('Joined length:', joined.length);
+
+    // Pokús sa parsovať
+    var parsed = null;
+    try {
+      parsed = JSON.parse(joined);
+      alert('✅ JSON je OK! ' + parsed.length + ' zvarov.\n\nŽiadna oprava potrebná.');
+      return;
+    } catch(e) {
+      console.log('Parse error:', e.message);
+    }
+
+    // JSON je poškodený - skús opraviť
+    // Nájdi poslednú platnú ] a oreź
+    var fixed = null;
+    // Metóda 1: oreź na posledný kompletný objekt
+    var lastBrace = joined.lastIndexOf('}');
+    if (lastBrace > 0) {
+      var attempt = joined.substring(0, lastBrace + 1) + ']';
+      // Ak nezačína [, pridaj
+      if (!attempt.trim().startsWith('[')) attempt = '[' + attempt;
+      try { fixed = JSON.parse(attempt); console.log('Oprava 1 uspešná:', fixed.length, 'zvarov'); } catch(e2) { console.log('Oprava 1 zlyhala'); }
+    }
+
+    // Metóda 2: parsuj po objektoch
+    if (!fixed) {
+      try {
+        var objects = [];
+        var depth = 0, start = -1, inStr = false, escape = false;
+        for (var i = 0; i < joined.length; i++) {
+          var ch = joined[i];
+          if (escape) { escape = false; continue; }
+          if (ch === '\\' && inStr) { escape = true; continue; }
+          if (ch === '"') { inStr = !inStr; continue; }
+          if (inStr) continue;
+          if (ch === '{') { if (depth === 0) start = i; depth++; }
+          else if (ch === '}') { depth--; if (depth === 0 && start >= 0) { try { objects.push(JSON.parse(joined.substring(start, i+1))); } catch(ep){} start = -1; } }
+        }
+        if (objects.length > 0) { fixed = objects; console.log('Oprava 2 uspešná:', fixed.length, 'zvarov'); }
+      } catch(e3) { console.log('Oprava 2 zlyhala'); }
+    }
+
+    if (!fixed || fixed.length === 0) {
+      alert('❌ Nepodarilo sa opraviť JSON.\n\nPočet načítaných zvarov: 0\n\nSkús Import z Excelu na obnovu dát.');
+      return;
+    }
+
+    if (!confirm('✅ Oprava úspešná!\n\nNačítaných zvarov: ' + fixed.length + '\n\nUložiť opravené dáta do Firebase?')) return;
+
+    // Ulož opravené dáta
+    var json = JSON.stringify(fixed), CHUNK = 800*1024, chunks = [];
+    for (var j = 0; j < json.length; j += CHUNK) chunks.push(json.slice(j, j + CHUNK));
+    await Promise.all(chunks.map(function(c, i) { return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d: c}); }));
+    await db.collection('weldbook').doc(docId).set({ type:'part', part:'LIG', chunks:chunks.length, count:fixed.length, modifiedBy:'repair', date:new Date().toISOString() });
+
+    alert('✅ LIG opravený a uložený!\n\n' + fixed.length + ' zvarov obnovených.\n\nZatvor a otvor WeldBook znova.');
+    weldBookData = fixed;
+    wbLocalBackup();
+    if (weldBookGrid && weldBookGrid.api) {
+      weldBookGrid.api.setGridOption('rowData', weldBookData);
+      populateWeldBookFilterDropdowns();
+    }
+  } catch(e) {
+    alert('❌ Chyba: ' + e.message);
+    console.error('Repair error:', e);
+  }
 }
 
 // Obnov dáta z localStorage cache a oprav Firebase
