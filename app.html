@@ -8591,6 +8591,7 @@ function openWeldBook() {
   content += '<button onclick="deleteSelectedWeldBookRows()" style="padding:10px 20px;background:#ef4444;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🗑️ Zmazať označené</button>';
   content += '<button onclick="cleanWeldBook()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🧹 Vyčistiť orphaned</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
+  content += '<button onclick="showWbNotifDebug()" style="padding:10px 20px;background:#0369a1;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔍 Ukáž históriu zmien</button>';
   content += '<button onclick="recoverFromNotifications()" style="padding:10px 20px;background:#7c3aed;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #a78bfa" title="Rekonštruuj zmeny z histórie notifikácií">📋 Obnov z histórie</button>';
   content += '<button onclick="repairFirebaseChunk()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fca5a5" title="Opraví poškodený JSON chunk vo Firebase">🔧 Opraviť Firebase LIG</button>';
   content += '<button onclick="recoverWbFromCache()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fbbf24" title="Obnov dáta z lokálnej cache prehliadača a oprav Firebase">🚑 Obnov z cache</button>';
@@ -9365,42 +9366,68 @@ function wbLocalLoad(part) {
   return null;
 }
 
+async function showWbNotifDebug() {
+  if (!db) { alert('Firebase nie je pripojený'); return; }
+  try {
+    var snap = await db.collection('notifications').orderBy('at','desc').limit(50).get();
+    var lines = [];
+    snap.forEach(function(d){
+      var n = d.data();
+      if (['welder_assigned','welder_removed','fitting','fitting_clear','rt_date','vt_date'].indexOf(n.type) >= 0) {
+        lines.push((n.at||'').substring(0,16).replace('T',' ') + ' | ' + n.type + ' | weldId:' + (n.weldId||'?') + ' | iso:' + (n.iso||'?') + ' | by:' + (n.by||'?') + ' | ' + (n.message||'').substring(0,60));
+      }
+    });
+    if (!lines.length) { alert('Žiadne WB zmeny v histórii.'); return; }
+    alert('Posledných ' + lines.length + ' WB zmien:\n\n' + lines.join('\n'));
+  } catch(e) { alert('Chyba: ' + e.message); }
+}
+
 // Rekonštruuj zmeny z histórie notifikácií a aplikuj na weldBookData
 async function recoverFromNotifications() {
   if (!db) { alert('Firebase nie je pripojený'); return; }
   alert('📋 Čítam históriu zmien...\n\nToto môže chvíľu trvať.');
   try {
-    // Načítaj všetky notifikácie za posledných 7 dní
-    var since = new Date(Date.now() - 7*24*60*60*1000).toISOString();
     var snap = await db.collection('notifications').orderBy('at','asc').get();
-    var notifs = [];
-    snap.forEach(function(d){ var n=d.data(); if(n.at >= since) notifs.push(n); });
-
-    // Filtruj len WB akcie
-    var wbActions = notifs.filter(function(n){
-      return ['welder_assigned','welder_removed','fitting','fitting_clear','rt_date','vt_date'].indexOf(n.type) >= 0;
+    var wbActions = [];
+    snap.forEach(function(d){
+      var n = d.data();
+      if (['welder_assigned','welder_removed','fitting','fitting_clear','rt_date','vt_date'].indexOf(n.type) >= 0)
+        wbActions.push(n);
     });
 
     if (!wbActions.length) { alert('Žiadne WB zmeny v histórii.'); return; }
 
-    // Zobraź čo nájdeme
-    var summary = {};
-    wbActions.forEach(function(n){
-      var key = n.weldId || '?';
-      if (!summary[key]) summary[key] = [];
-      summary[key].push(n.type + ' (' + (n.at||'').substring(0,16).replace('T',' ') + ' - ' + n.by + ')');
-    });
-    var lines = Object.keys(summary).map(function(k){ return 'Zvar #'+k+': '+summary[k].join(', '); });
-    var msg = 'Nájdených ' + wbActions.length + ' zmien na ' + lines.length + ' zvaroch:\n\n' + lines.slice(0,30).join('\n') + (lines.length>30?'\n...('+lines.length+' celkom)':'');
+    // Ukaž čo notifikácie obsahujú - debug
+    var sample = wbActions.slice(0,5).map(function(n){
+      return JSON.stringify(n);
+    }).join('\n\n');
+    alert('Ukážka notifikácií (' + wbActions.length + ' celkom):\n\n' + sample + '\n\nPokračovať s obnovou?');
 
-    if (!confirm(msg + '\n\nAplikovať na aktuálne načítaný WeldBook?')) return;
+    if (!confirm('Aplikovať ' + wbActions.length + ' zmien na aktuálny WeldBook?')) return;
 
-    // Aplikuj zmeny na weldBookData
-    var applied = 0;
+    var applied = 0, notFound = 0;
     wbActions.forEach(function(n) {
       if (!n.weldId) return;
-      var row = weldBookData.find(function(r){ return String(r.weldId||'') === String(n.weldId); });
-      if (!row) return;
+      // Hľadaj podľa weldId + iso (ak je v notifikácii)
+      var row = null;
+      if (n.iso) {
+        row = weldBookData.find(function(r){
+          return String(r.weldId||'') === String(n.weldId) &&
+                 String(r.isometric||'') === String(n.iso);
+        });
+      }
+      // Fallback - len weldId (môže byť viac zhodných)
+      if (!row) {
+        var matches = weldBookData.filter(function(r){ return String(r.weldId||'') === String(n.weldId); });
+        if (matches.length === 1) row = matches[0];
+        // Ak viac zhodných - skús podľa part z notifikácie
+        if (!row && matches.length > 1 && n.part) {
+          row = matches.find(function(r){ return (r.part||'').toUpperCase() === n.part.toUpperCase(); });
+        }
+        if (!row && matches.length > 1) row = matches[0]; // posledný fallback
+      }
+      if (!row) { notFound++; return; }
+
       if (n.type === 'welder_assigned') {
         if (n.welder) { row.welderId = n.welder; applied++; }
         if (n.date) row.dateWelding = n.date;
@@ -9418,16 +9445,14 @@ async function recoverFromNotifications() {
       }
     });
 
-    alert('✅ Aplikovaných ' + applied + ' zmien!\n\nUkladám do Firebase...');
-
-    // Ulož
+    if (!confirm('✅ Aplikovaných ' + applied + ' zmien, nenájdených ' + notFound + '.\n\nUložiť do Firebase?')) return;
     await _saveWbPartToFirebase(wbActivePart);
     wbLocalBackup();
     if (weldBookGrid && weldBookGrid.api) {
       weldBookGrid.api.setGridOption('rowData', weldBookData);
       populateWeldBookFilterDropdowns();
     }
-    alert('✅ Hotovo! Skontroluj dáta.');
+    alert('✅ Hotovo!');
   } catch(e) {
     alert('❌ Chyba: ' + e.message);
     console.error('Recovery from notifs error:', e);
