@@ -8591,6 +8591,7 @@ function openWeldBook() {
   content += '<button onclick="deleteSelectedWeldBookRows()" style="padding:10px 20px;background:#ef4444;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🗑️ Zmazať označené</button>';
   content += '<button onclick="cleanWeldBook()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🧹 Vyčistiť orphaned</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
+  content += '<button onclick="applyHardcodedRecovery()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #6ee7b7" title="Aplikuj zmeny z 5.3.2026 podľa zvončeka">✅ Obnov zmeny 5.3.2026</button>';
   content += '<button onclick="showWbNotifDebug()" style="padding:10px 20px;background:#0369a1;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔍 Ukáž históriu zmien</button>';
   content += '<button onclick="recoverFromNotifications()" style="padding:10px 20px;background:#7c3aed;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #a78bfa" title="Rekonštruuj zmeny z histórie notifikácií">📋 Obnov z histórie</button>';
   content += '<button onclick="repairFirebaseChunk()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fca5a5" title="Opraví poškodený JSON chunk vo Firebase">🔧 Opraviť Firebase LIG</button>';
@@ -9366,6 +9367,36 @@ function wbLocalLoad(part) {
   return null;
 }
 
+async function applyHardcodedRecovery() {
+  var CHANGES = [{"iso":"GA-720-20135-1-100-10H1A","weldId":"15","welder":"JA"},{"iso":"GA-720-20135-1-100-10H1A","weldId":"3","welder":"JA"},{"iso":"GA-720-20135-1-100-10H1A","weldId":"4","welder":"JA"},{"iso":"GA-720-20135-1-100-10H1A","weldId":"8","welder":"JA"},{"iso":"GAT-712-20057-6-150-10H2A","weldId":"12","welder":"MR12"},{"iso":"GAT-712-20057-6-150-10H2A","weldId":"2","welder":"MR12"},{"iso":"GAT-712-20057-6-150-10H2A","weldId":"3","welder":"MR12"},{"iso":"GAT-712-20057-6-150-10H2A","weldId":"4","welder":"MR12"},{"iso":"GAT-712-20057-6-150-10H2A","weldId":"5","welder":"MR12","rtDate":"2026-03-05"},{"iso":"GAT-712-20057-6-150-10H2A","weldId":"6","welder":"MR12"},{"iso":"GAT-712-20057-6-150-10H2A","weldId":"7","welder":"MR12"},{"iso":"GAT-712-20057-6-150-10H2A","weldId":"8","welder":"MR12"},{"iso":"GCO2-720-20001-2-150-10H2A","weldId":"10","welder":"MR13"},{"iso":"GCO2-720-20001-2-150-10H2A","weldId":"11","welder":"MR13"},{"iso":"GCO2-720-20001-2-150-10H2A","weldId":"12","welder":"MR13"},{"iso":"GCO2-720-20001-2-150-10H2A","weldId":"13","welder":"MR13"},{"iso":"GCO2-720-20001-2-150-10H2A","weldId":"14","welder":"MR13"},{"iso":"GCO2-720-20001-2-150-10H2A","weldId":"15","welder":"MR13"},{"iso":"GCO2-720-20001-2-150-10H2A","weldId":"16","welder":"MR13"},{"iso":"GCO2-720-20001-2-150-10H2A","weldId":"17","welder":"MR13"},{"iso":"GCO2-720-20001-2-150-10H2A","weldId":"18","welder":"MR13"},{"iso":"GCO2-720-20001-2-150-10H2A","weldId":"2","welder":"MR13","rtDate":"2026-03-05"},{"iso":"GCO2-720-20001-2-150-10H2A","weldId":"20","welder":"MR13"},{"iso":"GCO2-720-20001-2-150-10H2A","weldId":"5","welder":"MR13"},{"iso":"GCO2-720-20001-2-150-10H2A","weldId":"6","welder":"MR13"},{"iso":"GCO2-720-20001-2-150-10H2A","weldId":"8","welder":"MR13"},{"iso":"GCO2-720-20001-2-150-10H2A","weldId":"9","welder":"MR13"},{"iso":"GKD-716-20187-1-150-10H2A","weldId":"10","welder":"MA2"},{"iso":"GKD-716-20187-1-150-10H2A","weldId":"12","welder":"MA2"},{"iso":"GKD-716-20187-1-150-10H2A","weldId":"13","welder":"MA2"},{"iso":"GKD-716-20187-1-150-10H2A","weldId":"14","welder":"MA2","rtDate":"2026-03-05"},{"iso":"GKD-716-20187-1-150-10H2A","weldId":"17","welder":"MA2"},{"iso":"GKD-716-20187-1-150-10H2A","weldId":"6","welder":"MA2"},{"iso":"GKD-716-20187-1-150-10H2A","weldId":"7","welder":"MA2"},{"iso":"GKD-716-20187-1-150-10H2A","weldId":"8","welder":"MA2"},{"iso":"KY-716-20195-1-100-10H1A","weldId":"1","welder":"MA3"},{"iso":"KY-716-20195-1-100-10H1A","weldId":"10","welder":"MA3"},{"iso":"KY-716-20195-1-100-10H1A","weldId":"11","welder":"MA3"},{"iso":"KY-716-20195-1-100-10H1A","weldId":"12","welder":"MA3"},{"iso":"KY-716-20195-1-100-10H1A","weldId":"14","welder":"MA3"},{"iso":"KY-716-20195-1-100-10H1A","weldId":"15","welder":"MA3"},{"iso":"KY-716-20195-1-100-10H1A","weldId":"16","welder":"MA3"},{"iso":"KY-716-20195-1-100-10H1A","weldId":"18","welder":"MA3","rtDate":"2026-03-05"},{"iso":"KY-716-20195-1-100-10H1A","weldId":"2","welder":"MA3"},{"iso":"KY-716-20195-1-100-10H1A","weldId":"26","welder":"MA3"},{"iso":"KY-716-20195-1-100-10H1A","weldId":"4","welder":"MA3"},{"iso":"KY-716-20195-1-100-10H1A","weldId":"6","welder":"MA3"},{"iso":"KY-716-20195-1-100-10H1A","weldId":"7","welder":"MA3"},{"iso":"KY-716-20195-1-100-10H1A","weldId":"8","welder":"MA3"},{"iso":"LIS-720-20069-6-50-10H2A","weldId":"11","welder":"MR12","rtDate":"2026-03-05"},{"iso":"LIS-720-20097-9-300-16H2A","weldId":"10","welder":"MR14","rtDate":"2026-03-05"},{"iso":"LIS-720-20097-9-300-16H2A","weldId":"9","welder":"MR14"},{"iso":"LIS-720-20139-1-150-10H2A","weldId":"1","welder":"MR12"},{"iso":"LIS-720-20139-1-150-10H2A","weldId":"10","welder":"MR12"},{"iso":"LIS-720-20139-1-150-10H2A","weldId":"12","welder":"MR12"},{"iso":"LIS-720-20139-1-150-10H2A","weldId":"14","welder":"MR12"},{"iso":"LIS-720-20139-1-150-10H2A","weldId":"19","welder":"MR12"},{"iso":"LIS-720-20139-1-150-10H2A","weldId":"2","welder":"MR12"},{"iso":"LIS-720-20139-1-150-10H2A","weldId":"20","welder":"MR12"},{"iso":"LIS-720-20139-1-150-10H2A","weldId":"21","welder":"MR12"},{"iso":"LIS-720-20139-1-150-10H2A","weldId":"29","welder":"MR12"},{"iso":"LIS-720-20139-1-150-10H2A","weldId":"30","welder":"MR12"},{"iso":"LIS-720-20139-1-150-10H2A","weldId":"31","welder":"MR12"},{"iso":"LIS-720-20139-1-150-10H2A","weldId":"32","welder":"MR12"},{"iso":"LIS-720-20139-1-150-10H2A","weldId":"33","welder":"MR12"},{"iso":"LIS-720-20139-1-150-10H2A","weldId":"6","welder":"MR12"},{"iso":"LIS-720-20139-1-150-10H2A","weldId":"7","welder":"MR12"},{"iso":"VVM-720-20125-8-50-25H2A","weldId":"3","welder":"MR11"},{"iso":"VVM-720-20127-1-150-10H2A","weldId":"2","welder":"MR11"},{"iso":"VVM-720-20127-1-150-10H2A","weldId":"2A","welder":"MR11"},{"iso":"VVM-720-20127-1-150-10H2A","weldId":"4","welder":"MR11","rtDate":"2026-03-05"},{"iso":"VVM-720-20127-1-150-10H2A","weldId":"5","welder":"MR11"},{"iso":"VVM-720-20127-1-150-10H2A","weldId":"6","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"1","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"10","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"11","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"14","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"15","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"16","rtDate":"2026-03-04"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"19","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"2","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"21","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"22","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"23","welder":"MR11","rtDate":"2026-03-01"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"26","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"27","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"28","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"29","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"30","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"31","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"32","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"33","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"35","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"36","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"37","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"8","welder":"MR11"},{"iso":"VVM-720-20128-8-150-16H2A","weldId":"9","welder":"MR11"}];
+
+  var applied = 0, notFound = 0;
+  CHANGES.forEach(function(c) {
+    var row = weldBookData.find(function(r) {
+      return String(r.weldId||'') === String(c.weldId) &&
+             String(r.isometric||'') === String(c.iso);
+    });
+    if (!row) { notFound++; return; }
+    if (c.welder) row.welderId = c.welder;
+    if (c.rtDate) row.rtDate = c.rtDate;
+    applied++;
+  });
+
+  if (!confirm('✅ Aplikovaných ' + applied + ' zmien, nenájdených ' + notFound + '.\n\nUložiť do Firebase?')) return;
+  try {
+    // Ulož všetky dotknuté časti
+    var parts = [...new Set(weldBookData.map(function(r){return (r.part||'').toUpperCase();}).filter(Boolean))];
+    for (var pi = 0; pi < parts.length; pi++) {
+      await _saveWbPartToFirebase(parts[pi]);
+    }
+    wbLocalBackup();
+    if (weldBookGrid && weldBookGrid.api) {
+      weldBookGrid.api.refreshCells({force:true});
+    }
+    alert('✅ Hotovo! Zmeny uložené.');
+  } catch(e) { alert('Chyba pri ukladaní: ' + e.message); }
+}
+
 async function showWbNotifDebug() {
   if (!db) { alert('Firebase nie je pripojený'); return; }
   try {
@@ -9408,13 +9439,24 @@ async function recoverFromNotifications() {
     var applied = 0, notFound = 0;
     wbActions.forEach(function(n) {
       if (!n.weldId) return;
-      // Extrahuj izometriu z message poľa ak iso nie je priamo v notifikácii
-      // Format: "... pre zvar #10 (LIS-720-20097-...)" alebo "priradený k zvaru #26 (KY-716-...)"
+      // Extrahuj izometriu - skús viacero polí
       var isoFromMsg = null;
       if (n.iso && n.iso !== '?') {
         isoFromMsg = n.iso;
-      } else if (n.message) {
-        var mMatch = n.message.match(/\(([A-Z0-9][A-Z0-9\-\.]{5,})\)/);
+      }
+      // project pole: "FLA_PIPE ISOMETRIC,ÅL3-710-20049-1-50-10C1B_FLA" -> vytiahni ISO časť
+      if (!isoFromMsg && n.project) {
+        var projParts = n.project.split(',');
+        if (projParts.length > 1) {
+          // Posledná časť po čiarke, orezaj suffix ako _FLA, _LIG atd
+          isoFromMsg = projParts[projParts.length-1].replace(/_[A-Z]{2,4}$/, '').trim();
+        } else {
+          isoFromMsg = n.project.replace(/_[A-Z]{2,4}$/, '').trim();
+        }
+      }
+      // message pole: "... pre zvar #10 (LIS-720-20097-...)"
+      if (!isoFromMsg && n.message) {
+        var mMatch = n.message.match(/\(([A-Z][A-Z0-9\-\.]{4,})\)/);
         if (mMatch) isoFromMsg = mMatch[1];
       }
       // Hľadaj podľa weldId + iso
