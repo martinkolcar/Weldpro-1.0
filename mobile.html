@@ -551,6 +551,26 @@ canvas#mca { display: block; }
   </div>
 </div>
 
+<!-- Heat Nr OCR Scanner modal -->
+<div class="modal-overlay" id="heatScannerModal" style="z-index:4000;background:rgba(0,0,0,0.92)">
+  <div style="position:relative;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center">
+    <div style="position:absolute;top:16px;left:0;right:0;text-align:center;color:white;font-size:14px;font-weight:600;z-index:2">
+      📷 Namiř na Heat Nr a stlač Skenuj
+    </div>
+    <video id="heatScanVideo" autoplay playsinline muted style="width:100%;max-height:60vh;object-fit:contain;background:#000"></video>
+    <!-- Targeting box -->
+    <div style="position:absolute;width:80%;height:70px;border:3px solid #0ea5e9;border-radius:8px;box-shadow:0 0 0 2000px rgba(0,0,0,0.4);pointer-events:none" id="heatScanBox"></div>
+    <!-- Result preview -->
+    <div id="heatScanResult" style="position:absolute;bottom:140px;left:16px;right:16px;background:rgba(0,0,0,0.8);color:#34d399;font-size:18px;font-weight:700;text-align:center;padding:12px;border-radius:10px;min-height:44px;display:none"></div>
+    <!-- Buttons -->
+    <div style="position:absolute;bottom:32px;left:0;right:0;display:flex;gap:12px;padding:0 16px">
+      <button onclick="closeHeatScanner()" style="flex:1;padding:14px;background:#374151;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600">Zrušiť</button>
+      <button onclick="captureHeat()" id="heatScanBtn" style="flex:2;padding:14px;background:#0ea5e9;color:white;border:none;border-radius:12px;font-size:15px;font-weight:700">📷 Skenuj</button>
+      <button onclick="confirmHeat()" id="heatConfirmBtn" style="flex:2;padding:14px;background:#059669;color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;display:none">✅ Použiť</button>
+    </div>
+  </div>
+</div>
+
 <!-- Fitting / Heat Nr modal -->
 <div class="modal-overlay" id="fittingModal" style="z-index:3000">
   <div class="modal-sheet">
@@ -568,13 +588,19 @@ canvas#mca { display: block; }
         <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px">ITEM 1</div>
         <div style="font-size:13px;color:#374151;margin-bottom:8px">Názov: <b id="fit_item1name" style="color:#166534">-</b></div>
         <label class="modal-label">Heat Nr 1</label>
-        <input class="modal-input" id="fit_heat1" placeholder="Zadaj Heat Nr..." autocapitalize="characters">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="modal-input" id="fit_heat1" placeholder="Zadaj Heat Nr..." autocapitalize="characters" style="flex:1;margin-bottom:0">
+          <button onclick="openHeatScanner('fit_heat1')" style="flex-shrink:0;width:44px;height:44px;background:#0ea5e9;color:white;border:none;border-radius:10px;font-size:20px;cursor:pointer">📷</button>
+        </div>
       </div>
       <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px;margin-bottom:12px">
         <div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:8px">ITEM 2</div>
         <div style="font-size:13px;color:#374151;margin-bottom:8px">Názov: <b id="fit_item2name" style="color:#1e40af">-</b></div>
         <label class="modal-label">Heat Nr 2</label>
-        <input class="modal-input" id="fit_heat2" placeholder="Zadaj Heat Nr..." autocapitalize="characters">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="modal-input" id="fit_heat2" placeholder="Zadaj Heat Nr..." autocapitalize="characters" style="flex:1;margin-bottom:0">
+          <button onclick="openHeatScanner('fit_heat2')" style="flex-shrink:0;width:44px;height:44px;background:#0ea5e9;color:white;border:none;border-radius:10px;font-size:20px;cursor:pointer">📷</button>
+        </div>
       </div>
       <div class="modal-row">
         <button class="btn-secondary" onclick="closeFittingModal()">Zrušiť</button>
@@ -2210,6 +2236,92 @@ var _scanMatchedIso = null;
 var _scanStream = null;
 var _scanWorker = null;
 var _scanIsoCache = []; // cache izometrií pre scanner
+
+// ===== HEAT NR OCR SCANNER =====
+var _heatScanTargetInput = null;
+var _heatScanStream = null;
+var _heatScanWorker = null;
+var _heatScannedText = null;
+
+async function openHeatScanner(inputId) {
+  _heatScanTargetInput = inputId;
+  _heatScannedText = null;
+  var modal = document.getElementById('heatScannerModal');
+  var result = document.getElementById('heatScanResult');
+  var confirmBtn = document.getElementById('heatConfirmBtn');
+  var scanBtn = document.getElementById('heatScanBtn');
+  if (result) { result.style.display = 'none'; result.textContent = ''; }
+  if (confirmBtn) confirmBtn.style.display = 'none';
+  if (scanBtn) scanBtn.style.display = 'block';
+  if (modal) modal.classList.add('show');
+  try {
+    _heatScanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width:{ideal:1280}, height:{ideal:720} } });
+    var video = document.getElementById('heatScanVideo');
+    video.srcObject = _heatScanStream;
+  } catch(e) { showToast('Kamera: ' + e.message); closeHeatScanner(); }
+}
+
+function closeHeatScanner() {
+  var modal = document.getElementById('heatScannerModal');
+  if (modal) modal.classList.remove('show');
+  if (_heatScanStream) { _heatScanStream.getTracks().forEach(function(t){ t.stop(); }); _heatScanStream = null; }
+  var video = document.getElementById('heatScanVideo');
+  if (video) video.srcObject = null;
+}
+
+async function captureHeat() {
+  var video = document.getElementById('heatScanVideo');
+  var box = document.getElementById('heatScanBox');
+  var scanBtn = document.getElementById('heatScanBtn');
+  var result = document.getElementById('heatScanResult');
+  if (!video || !video.videoWidth) { showToast('Kamera nie je pripravená'); return; }
+  if (scanBtn) scanBtn.textContent = '⏳ Skenujem...';
+
+  // Crop presne na targeting box
+  var vRect = video.getBoundingClientRect();
+  var bRect = box.getBoundingClientRect();
+  var vw = video.videoWidth, vh = video.videoHeight;
+  var dispW = vRect.width, dispH = vRect.height;
+  var scale = Math.min(dispW/vw, dispH/vh);
+  var rendW = vw*scale, rendH = vh*scale;
+  var barX = (dispW-rendW)/2, barY = (dispH-rendH)/2;
+  var sx = Math.max(0, (bRect.left - vRect.left - barX) / scale);
+  var sy = Math.max(0, (bRect.top  - vRect.top  - barY) / scale);
+  var sw = Math.min(vw - sx, bRect.width / scale);
+  var sh = Math.min(vh - sy, bRect.height / scale);
+
+  var canvas = document.createElement('canvas');
+  canvas.width = sw; canvas.height = sh;
+  canvas.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+
+  try {
+    if (!_heatScanWorker) {
+      showToast('Načítavam OCR...');
+      _heatScanWorker = await Tesseract.createWorker('eng');
+      await _heatScanWorker.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-/ ' });
+    }
+    var ocr = await _heatScanWorker.recognize(canvas);
+    var raw = ocr.data.text.trim().toUpperCase().replace(/[^A-Z0-9\-\/]/g, ' ').replace(/\s+/g, ' ').trim();
+    _heatScannedText = raw;
+
+    if (result) {
+      result.textContent = raw || '(nič nerozpoznané)';
+      result.style.display = 'block';
+      result.style.color = raw ? '#34d399' : '#f87171';
+    }
+    var confirmBtn = document.getElementById('heatConfirmBtn');
+    if (raw && confirmBtn) { confirmBtn.style.display = 'block'; if(scanBtn) scanBtn.style.display = 'none'; }
+  } catch(e) { showToast('OCR chyba: ' + e.message); }
+  if (scanBtn) scanBtn.textContent = '📷 Skenuj';
+}
+
+function confirmHeat() {
+  if (_heatScannedText && _heatScanTargetInput) {
+    var input = document.getElementById(_heatScanTargetInput);
+    if (input) input.value = _heatScannedText;
+  }
+  closeHeatScanner();
+}
 
 function openIsoScanner() {
   _scanMatchedIso = null;
