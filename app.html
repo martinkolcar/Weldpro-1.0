@@ -8591,6 +8591,7 @@ function openWeldBook() {
   content += '<button onclick="deleteSelectedWeldBookRows()" style="padding:10px 20px;background:#ef4444;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🗑️ Zmazať označené</button>';
   content += '<button onclick="cleanWeldBook()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🧹 Vyčistiť orphaned</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
+  content += '<button onclick="recoverWbFromCache()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fbbf24" title="Obnov dáta z lokálnej cache prehliadača a oprav Firebase">🚑 Obnov z cache</button>';
   content += '<button onclick="importJSONProjects()" style="padding:10px 20px;background:#667eea;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z JSON</button>';
   content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu (1 časť)</button>';
   content += '<button onclick="importAllPartsExcel()" style="padding:10px 20px;background:#0d9488;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import VŠETKY časti</button>';
@@ -9331,14 +9332,26 @@ function wbLocalBackup() {
   try {
     var part = wbActivePart || 'ALL';
     localStorage.setItem('wbIndex_' + part, JSON.stringify(weldBookData));
+    localStorage.setItem('weldBookData_' + part, JSON.stringify(weldBookData)); // aj starý kľúč
   } catch(e) {}
 }
 
 function wbLocalLoad(part) {
   try {
-    var key = 'weldBookData_' + (part || 'ALL');
-    var saved = localStorage.getItem(key);
-    if (saved) return JSON.parse(saved);
+    // Skús všetky možné kľúče
+    var keys = [
+      'wbIndex_' + (part||'ALL'),
+      'weldBookData_' + (part||'ALL'),
+      'wbIndex_' + (part||'').toUpperCase(),
+      'weldBookData_' + (part||'').toUpperCase()
+    ];
+    for (var ki = 0; ki < keys.length; ki++) {
+      var saved = localStorage.getItem(keys[ki]);
+      if (saved) {
+        var parsed = JSON.parse(saved);
+        if (parsed && parsed.length > 0) return parsed;
+      }
+    }
     // Fallback na starý kľúč
     var old = localStorage.getItem('weldBookData');
     if (old) {
@@ -9348,6 +9361,46 @@ function wbLocalLoad(part) {
     }
   } catch(e) {}
   return null;
+}
+
+// Obnov dáta z localStorage cache a oprav Firebase
+async function recoverWbFromCache() {
+  var parts = ['SUL','LIG','DRY','FLA','LHT','ALL'];
+  var found = {};
+  parts.forEach(function(p) {
+    var keys = ['wbIndex_'+p, 'weldBookData_'+p, 'wbIndex_'+p.toLowerCase(), 'weldBookData_'+p.toLowerCase()];
+    keys.forEach(function(k) {
+      var s = localStorage.getItem(k);
+      if (s) { try { var d = JSON.parse(s); if (d && d.length > 0 && !found[p]) { found[p] = d; } } catch(e){} }
+    });
+  });
+
+  var summary = Object.keys(found).map(function(p){ return p+': '+found[p].length+' zvarov'; }).join('\n');
+  if (!summary) { alert('❌ Žiadne dáta v cache prehliadača!'); return; }
+
+  if (!confirm('🚑 Nájdené v cache:\n\n' + summary + '\n\nObnoviť do Firebase?')) return;
+
+  var total = 0;
+  for (var p in found) {
+    if (p === 'ALL') continue;
+    var rows = found[p];
+    try {
+      var docId = p + '_main';
+      var json = JSON.stringify(rows), CHUNK = 800*1024, chunks = [];
+      for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
+      await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
+      await db.collection('weldbook').doc(docId).set({ type:'part', part:p, chunks:chunks.length, count:rows.length, modifiedBy:'recovery', date:new Date().toISOString() });
+      total += rows.length;
+      console.log('✅ Recovery ' + p + ':', rows.length, 'zvarov');
+    } catch(e) { console.error('Recovery error ' + p + ':', e); }
+  }
+  alert('✅ Obnova dokončená!\n\nObnovených: ' + total + ' zvarov\n\nNačítaj WeldBook znova.');
+  // Načítaj aktívnu časť
+  await loadWbPart(wbActivePart);
+  if (weldBookGrid && weldBookGrid.api) {
+    weldBookGrid.api.setGridOption('rowData', weldBookData);
+    populateWeldBookFilterDropdowns();
+  }
 }
 
 // Ulož konkrétnu časť do Firebase
