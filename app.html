@@ -2206,9 +2206,10 @@ heatNr1:'',certNr1:'',dimension1:'',thickness1:'',material1:'',matGroup1:'',
 heatNr2:'',certNr2:'',dimension2:'',thickness2:'',material2:'',matGroup2:'',
 wps:'',wpqr:'',weldingMethod:'',jointType:'',weldingType:'',weldingGas:'',
 heatNrWeld:'',certNrWeld:'',welderId:'',dateWelding:'',
-vtPercent:'',vtDate:'',vtReport:'',vtResult:'',
-ptPercent:'',ptDate:'',ptReport:'',ptResult:'',
-rtPercent:'',rtDate:'',rtReport:'',rtResult:'',
+vtPercent:'',vtDate:'',vtReport:'',vtResult:'',vtDefect:'',vtAddInfo:'',vtRepairDate:'',vtRepairResult:'',vtRepairAddInfo:'',
+ptPercent:'',ptDate:'',ptReport:'',ptResult:'',ptDefect:'',ptAddInfo:'',ptRepairDate:'',ptRepairResult:'',ptRepairAddInfo:'',
+rtPercent:'',rtDate:'',rtReport:'',rtResult:'',rtDefect:'',rtAddInfo:'',rtRepairDate:'',rtRepairResult:'',rtRepairAddInfo:'',
+inchWeld:'',prefabPlanned:'',prefabWelded:'',installPlanned:'',installWelded:'',
 pmpInch:'',andritzInch:'',pressureGroup:'',note:''
 });
 
@@ -2744,9 +2745,10 @@ heatNr1: '', certNr1: '', dimension1: '', thickness1: '', material1: '', matGrou
 heatNr2: '', certNr2: '', dimension2: '', thickness2: '', material2: '', matGroup2: '',
 wps: '', wpqr: '', weldingMethod: '', jointType: '', weldingType: '', weldingGas: '',
 heatNrWeld: '', certNrWeld: '', welderId: '', dateWelding: '',
-vtPercent: '', vtDate: '', vtReport: '', vtResult: '',
-ptPercent: '', ptDate: '', ptReport: '', ptResult: '',
-rtPercent: '', rtDate: '', rtReport: '', rtResult: '',
+vtPercent:'',vtDate:'',vtReport:'',vtResult:'',vtDefect:'',vtAddInfo:'',vtRepairDate:'',vtRepairResult:'',vtRepairAddInfo:'',
+ptPercent:'',ptDate:'',ptReport:'',ptResult:'',ptDefect:'',ptAddInfo:'',ptRepairDate:'',ptRepairResult:'',ptRepairAddInfo:'',
+rtPercent:'',rtDate:'',rtReport:'',rtResult:'',rtDefect:'',rtAddInfo:'',rtRepairDate:'',rtRepairResult:'',rtRepairAddInfo:'',
+inchWeld:'',prefabPlanned:'',prefabWelded:'',installPlanned:'',installWelded:'',
 pmpInch: '', andritzInch: '', pressureGroup: '', note: ''
 });
 pt=null;
@@ -2792,9 +2794,10 @@ heatNr1: '', certNr1: '', dimension1: '', thickness1: '', material1: '', matGrou
 heatNr2: '', certNr2: '', dimension2: '', thickness2: '', material2: '', matGroup2: '',
 wps: '', wpqr: '', weldingMethod: '', jointType: '', weldingType: '', weldingGas: '',
 heatNrWeld: '', certNrWeld: '', welderId: '', dateWelding: '',
-vtPercent: '', vtDate: '', vtReport: '', vtResult: '',
-ptPercent: '', ptDate: '', ptReport: '', ptResult: '',
-rtPercent: '', rtDate: '', rtReport: '', rtResult: '',
+vtPercent:'',vtDate:'',vtReport:'',vtResult:'',vtDefect:'',vtAddInfo:'',vtRepairDate:'',vtRepairResult:'',vtRepairAddInfo:'',
+ptPercent:'',ptDate:'',ptReport:'',ptResult:'',ptDefect:'',ptAddInfo:'',ptRepairDate:'',ptRepairResult:'',ptRepairAddInfo:'',
+rtPercent:'',rtDate:'',rtReport:'',rtResult:'',rtDefect:'',rtAddInfo:'',rtRepairDate:'',rtRepairResult:'',rtRepairAddInfo:'',
+inchWeld:'',prefabPlanned:'',prefabWelded:'',installPlanned:'',installWelded:'',
 pmpInch: '', andritzInch: '', pressureGroup: '', note: ''
 });
 pt=null;
@@ -4355,9 +4358,10 @@ heatNr1: '', certNr1: '', dimension1: '', thickness1: '', material1: '', matGrou
 heatNr2: '', certNr2: '', dimension2: '', thickness2: '', material2: '', matGroup2: '',
 wps: '', wpqr: '', weldingMethod: '', jointType: '', weldingType: '', weldingGas: '',
 heatNrWeld: '', certNrWeld: '', welderId: '', dateWelding: '',
-vtPercent: '', vtDate: '', vtReport: '', vtResult: '',
-ptPercent: '', ptDate: '', ptReport: '', ptResult: '',
-rtPercent: '', rtDate: '', rtReport: '', rtResult: '',
+vtPercent:'',vtDate:'',vtReport:'',vtResult:'',vtDefect:'',vtAddInfo:'',vtRepairDate:'',vtRepairResult:'',vtRepairAddInfo:'',
+ptPercent:'',ptDate:'',ptReport:'',ptResult:'',ptDefect:'',ptAddInfo:'',ptRepairDate:'',ptRepairResult:'',ptRepairAddInfo:'',
+rtPercent:'',rtDate:'',rtReport:'',rtResult:'',rtDefect:'',rtAddInfo:'',rtRepairDate:'',rtRepairResult:'',rtRepairAddInfo:'',
+inchWeld:'',prefabPlanned:'',prefabWelded:'',installPlanned:'',installWelded:'',
 pmpInch: '', andritzInch: '', pressureGroup: '', note: ''
 };
 
@@ -5288,9 +5292,10 @@ heatNr1:'',certNr1:'',dimension1:'',thickness1:'',material1:'',matGroup1:'',
 heatNr2:'',certNr2:'',dimension2:'',thickness2:'',material2:'',matGroup2:'',
 wps:'',wpqr:'',weldingMethod:'',jointType:'',weldingType:'',weldingGas:'',
 heatNrWeld:'',certNrWeld:'',welderId:'',dateWelding:'',
-vtPercent:'',vtDate:'',vtReport:'',vtResult:'',
-ptPercent:'',ptDate:'',ptReport:'',ptResult:'',
-rtPercent:'',rtDate:'',rtReport:'',rtResult:'',
+vtPercent:'',vtDate:'',vtReport:'',vtResult:'',vtDefect:'',vtAddInfo:'',vtRepairDate:'',vtRepairResult:'',vtRepairAddInfo:'',
+ptPercent:'',ptDate:'',ptReport:'',ptResult:'',ptDefect:'',ptAddInfo:'',ptRepairDate:'',ptRepairResult:'',ptRepairAddInfo:'',
+rtPercent:'',rtDate:'',rtReport:'',rtResult:'',rtDefect:'',rtAddInfo:'',rtRepairDate:'',rtRepairResult:'',rtRepairAddInfo:'',
+inchWeld:'',prefabPlanned:'',prefabWelded:'',installPlanned:'',installWelded:'',
 pmpInch:'',andritzInch:'',pressureGroup:'',note:''
 });
 
@@ -8856,25 +8861,43 @@ function initializeWeldBookGrid() {
     
     // VT INSPECTION
     { headerName: 'VT inspection %', field: 'vtPercent', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Date of testing', field: 'vtDate', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'VT Date of testing', field: 'vtDate', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
     { headerName: 'VT report', field: 'vtReport', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
     { headerName: 'VT result', field: 'vtResult', width: 110, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    
+    { headerName: 'VT defect [mm]', field: 'vtDefect', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'VT Add. Info', field: 'vtAddInfo', width: 150, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'VT repair date', field: 'vtRepairDate', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'VT repair result', field: 'vtRepairResult', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'VT repair Add. Info', field: 'vtRepairAddInfo', width: 160, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+
     // PT INSPECTION
     { headerName: 'PT inspection %', field: 'ptPercent', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Date of testing', field: 'ptDate', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'PT Date of testing', field: 'ptDate', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
     { headerName: 'PT report', field: 'ptReport', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
     { headerName: 'PT result', field: 'ptResult', width: 110, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    
+    { headerName: 'PT defect [mm]', field: 'ptDefect', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'PT Add. Info', field: 'ptAddInfo', width: 150, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'PT repair date', field: 'ptRepairDate', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'PT repair result', field: 'ptRepairResult', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'PT repair Add. Info', field: 'ptRepairAddInfo', width: 160, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+
     // RT INSPECTION
     { headerName: 'RT inspection %', field: 'rtPercent', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Date of testing', field: 'rtDate', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'RT Date of testing', field: 'rtDate', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
     { headerName: 'RT report', field: 'rtReport', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
     { headerName: 'RT result', field: 'rtResult', width: 110, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    
+    { headerName: 'RT defect [mm]', field: 'rtDefect', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'RT Add. Info', field: 'rtAddInfo', width: 150, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'RT repair date', field: 'rtRepairDate', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'RT repair result', field: 'rtRepairResult', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'RT repair Add. Info', field: 'rtRepairAddInfo', width: 160, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+
     // PROGRESS
-    { headerName: 'PMP Montex Inch', field: 'pmpInch', width: 150, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Andritz Inch', field: 'andritzInch', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'Inch/Weld', field: 'inchWeld', width: 110, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'Prefab Planned', field: 'prefabPlanned', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'Prefab Welded', field: 'prefabWelded', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'Install Planned', field: 'installPlanned', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'Install Welded', field: 'installWelded', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
     { headerName: 'Pressure test group', field: 'pressureGroup', width: 170, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
     { headerName: 'Note', field: 'note', width: 200, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } }
   ];
@@ -10032,52 +10055,16 @@ async function exportWeldBookExcel() {
     
     // HEADER - Riadok 2 (podstĺpce)
     var headerRow2 = [
-      'Isometric',           // A
-      'Sheets',              // B
-      'PED',                 // C
-      'REV.',                // D
-      'Pipe Class',          // E
-      'Weld ID',             // F
-      'Welded Item 1',       // G
-      'Heat nr. 1',          // H
-      'Certificate nr. 1',   // I
-      'Dimension 1',         // J
-      'Wall thickness 1',    // K
-      'Material 1',          // L
-      'Mat. Group 1',        // M
-      'Welded Item 2',       // N
-      'Heat nr. 2',          // O
-      'Certificate nr. 2',   // P
-      'Dimension 2',         // Q
-      'Wall thickness 2',    // R
-      'Material 2',          // S
-      'Mat. Group 2',        // T
-      'WPS',                 // U
-      'WPQR',                // V
-      'Welding method',      // W
-      'Type of joint',       // X
-      'Type of welding',     // Y
-      'Welding gas',         // Z
-      'Heat nr.',            // AA
-      'Certificate nr.',     // AB
-      'Welder ID',           // AC
-      'Date of welding',     // AD
-      'VT inspection %',     // AE
-      'Date of testing',     // AF
-      'VT report',           // AG
-      'VT result',           // AH
-      'PT inspection %',     // AI
-      'Date of testing',     // AJ
-      'PT report',           // AK
-      'PT result',           // AL
-      'RT inspection %',     // AM
-      'Date of testing',     // AN
-      'RT report',           // AO
-      'RT result',           // AP
-      'PMP Montex Inch',     // AQ
-      'Andritz Inch',        // AR
-      'Pressure test group', // AS
-      'Note'                 // AT
+      'Isometric','Sheets','PED','REV.','Pipe Class','Weld ID',
+      'Welded Item 1','Heat nr. 1','Certificate nr. 1','Dimension 1','Wall thickness 1','Material 1','Mat. Group 1',
+      'Welded Item 2','Heat nr. 2','Certificate nr. 2','Dimension 2','Wall thickness 2','Material 2','Mat. Group 2',
+      'WPS','WPQR','Welding method','Type of joint','Type of welding','Welding gas',
+      'Heat nr.','Certificate nr.','Welder ID','Date of welding',
+      'VT inspection %','VT Date of testing','VT report','VT result','VT defect lenght [mm]','VT Additional Information','VT repair date','VT repair result','VT repair Additional Information',
+      'PT inspection %','PT Date of testing','PT report','PT result','PT defect lenght [mm]','PT Additional Information','PT repair date','PT repair result','PT repair Additional Information',
+      'RT inspection %','RT Date of testing','RT report','RT result','RT defect lenght [mm]','RT Additional Information','RT repair date','RT repair result','RT repair Additional Information',
+      'Inch/Weld','Prefab Planned','Prefab Welded','Install Planned','Install Welded',
+      'Pressure test group','Note'
     ];
     
     // Načítaj VŠETKY časti z Firebase pre kompletný export
@@ -10103,15 +10090,16 @@ async function exportWeldBookExcel() {
     // Helper - konvertuj riadok na Excel row
     function rowToArr(row) {
       return [
-        row.isometric || '', row.sheets || '', row.ped || '', row.rev || '', row.pipeClass || '', row.weldId || '',
-        row.item1 || '', row.heatNr1 || '', row.certNr1 || '', row.dimension1 || '', row.thickness1 || '', row.material1 || '', row.matGroup1 || '',
-        row.item2 || '', row.heatNr2 || '', row.certNr2 || '', row.dimension2 || '', row.thickness2 || '', row.material2 || '', row.matGroup2 || '',
-        row.wps || '', row.wpqr || '', row.weldingMethod || '', row.jointType || '', row.weldingType || '', row.weldingGas || '',
-        row.heatNrWeld || '', row.certNrWeld || '', row.welderId || '', row.dateWelding || '',
-        row.vtPercent || '', row.vtDate || '', row.vtReport || '', row.vtResult || '',
-        row.ptPercent || '', row.ptDate || '', row.ptReport || '', row.ptResult || '',
-        row.rtPercent || '', row.rtDate || '', row.rtReport || '', row.rtResult || '',
-        row.pmpInch || '', row.andritzInch || '', row.pressureGroup || '', row.note || ''
+        row.isometric||'', row.sheets||'', row.ped||'', row.rev||'', row.pipeClass||'', row.weldId||'',
+        row.item1||'', row.heatNr1||'', row.certNr1||'', row.dimension1||'', row.thickness1||'', row.material1||'', row.matGroup1||'',
+        row.item2||'', row.heatNr2||'', row.certNr2||'', row.dimension2||'', row.thickness2||'', row.material2||'', row.matGroup2||'',
+        row.wps||'', row.wpqr||'', row.weldingMethod||'', row.jointType||'', row.weldingType||'', row.weldingGas||'',
+        row.heatNrWeld||'', row.certNrWeld||'', row.welderId||'', row.dateWelding||'',
+        row.vtPercent||'', row.vtDate||'', row.vtReport||'', row.vtResult||'', row.vtDefect||'', row.vtAddInfo||'', row.vtRepairDate||'', row.vtRepairResult||'', row.vtRepairAddInfo||'',
+        row.ptPercent||'', row.ptDate||'', row.ptReport||'', row.ptResult||'', row.ptDefect||'', row.ptAddInfo||'', row.ptRepairDate||'', row.ptRepairResult||'', row.ptRepairAddInfo||'',
+        row.rtPercent||'', row.rtDate||'', row.rtReport||'', row.rtResult||'', row.rtDefect||'', row.rtAddInfo||'', row.rtRepairDate||'', row.rtRepairResult||'', row.rtRepairAddInfo||'',
+        row.inchWeld||'', row.prefabPlanned||'', row.prefabWelded||'', row.installPlanned||'', row.installWelded||'',
+        row.pressureGroup||'', row.note||''
       ];
     }
 
@@ -10532,9 +10520,9 @@ function importAllPartsExcel() {
       17:'item2', 18:'heatNr2', 19:'certNr2', 20:'dimension2', 21:'thickness2', 22:'material2', 23:'matGroup2',
       24:'wps', 25:'wpqr', 26:'weldingMethod', 27:'jointType', 28:'weldingType', 29:'weldingGas',
       30:'heatNrWeld', 31:'certNrWeld', 32:'welderId', 33:'dateWelding',
-      34:'vtPercent', 35:'vtDate', 36:'vtReport', 37:'vtResult', 38:'vtDefect', 39:'vtInfo', 40:'vtRepairDate', 41:'vtRepairResult',
-      43:'ptPercent', 44:'ptDate', 45:'ptReport', 46:'ptResult', 47:'ptDefect', 48:'ptInfo', 49:'ptRepairDate', 50:'ptRepairResult',
-      52:'rtPercent', 53:'rtDate', 54:'rtReport', 55:'rtResult', 56:'rtDefect', 57:'rtInfo', 58:'rtRepairDate', 59:'rtRepairResult',
+      34:'vtPercent', 35:'vtDate', 36:'vtReport', 37:'vtResult', 38:'vtDefect', 39:'vtAddInfo', 40:'vtRepairDate', 41:'vtRepairResult', 42:'vtRepairAddInfo',
+      43:'ptPercent', 44:'ptDate', 45:'ptReport', 46:'ptResult', 47:'ptDefect', 48:'ptAddInfo', 49:'ptRepairDate', 50:'ptRepairResult', 51:'ptRepairAddInfo',
+      52:'rtPercent', 53:'rtDate', 54:'rtReport', 55:'rtResult', 56:'rtDefect', 57:'rtAddInfo', 58:'rtRepairDate', 59:'rtRepairResult', 60:'rtRepairAddInfo',
       61:'inchWeld', 62:'prefabPlanned', 63:'prefabWelded', 64:'installPlanned', 65:'installWelded',
     },
     'LIG': {
@@ -10543,9 +10531,9 @@ function importAllPartsExcel() {
       13:'item2', 14:'heatNr2', 15:'certNr2', 16:'dimension2', 17:'thickness2', 18:'material2', 19:'matGroup2',
       20:'wps', 21:'wpqr', 22:'weldingMethod', 23:'jointType', 24:'weldingType', 25:'weldingGas',
       26:'heatNrWeld', 27:'certNrWeld', 28:'welderId', 29:'dateWelding',
-      30:'vtPercent', 31:'vtDate', 32:'vtReport', 33:'vtResult', 34:'vtDefect', 35:'vtInfo', 36:'vtRepairDate', 37:'vtRepairResult',
-      39:'ptPercent', 40:'ptDate', 41:'ptReport', 42:'ptResult', 43:'ptDefect', 44:'ptInfo', 45:'ptRepairDate', 46:'ptRepairResult',
-      48:'rtPercent', 49:'rtDate', 50:'rtReport', 51:'rtResult', 52:'rtDefect', 53:'rtInfo', 54:'rtRepairDate', 55:'rtRepairResult',
+      30:'vtPercent', 31:'vtDate', 32:'vtReport', 33:'vtResult', 34:'vtDefect', 35:'vtAddInfo', 36:'vtRepairDate', 37:'vtRepairResult', 38:'vtRepairAddInfo',
+      39:'ptPercent', 40:'ptDate', 41:'ptReport', 42:'ptResult', 43:'ptDefect', 44:'ptAddInfo', 45:'ptRepairDate', 46:'ptRepairResult', 47:'ptRepairAddInfo',
+      48:'rtPercent', 49:'rtDate', 50:'rtReport', 51:'rtResult', 52:'rtDefect', 53:'rtAddInfo', 54:'rtRepairDate', 55:'rtRepairResult', 56:'rtRepairAddInfo',
       57:'inchWeld', 58:'prefabPlanned', 59:'prefabWelded', 60:'installPlanned', 61:'installWelded',
     },
     'DRY': {
@@ -10554,9 +10542,9 @@ function importAllPartsExcel() {
       15:'item2', 16:'heatNr2', 17:'certNr2', 18:'dimension2', 19:'thickness2', 20:'material2', 21:'matGroup2',
       22:'wps', 23:'wpqr', 24:'weldingMethod', 25:'jointType', 26:'weldingType', 27:'weldingGas',
       28:'heatNrWeld', 29:'certNrWeld', 30:'welderId', 31:'dateWelding',
-      32:'vtPercent', 33:'vtDate', 34:'vtReport', 35:'vtResult', 36:'vtDefect', 37:'vtInfo', 38:'vtRepairDate', 39:'vtRepairResult',
-      41:'ptPercent', 42:'ptDate', 43:'ptReport', 44:'ptResult', 45:'ptDefect', 46:'ptInfo', 47:'ptRepairDate', 48:'ptRepairResult',
-      50:'rtPercent', 51:'rtDate', 52:'rtReport', 53:'rtResult', 54:'rtDefect', 55:'rtInfo', 56:'rtRepairDate', 57:'rtRepairResult',
+      32:'vtPercent', 33:'vtDate', 34:'vtReport', 35:'vtResult', 36:'vtDefect', 37:'vtAddInfo', 38:'vtRepairDate', 39:'vtRepairResult', 40:'vtRepairAddInfo',
+      41:'ptPercent', 42:'ptDate', 43:'ptReport', 44:'ptResult', 45:'ptDefect', 46:'ptAddInfo', 47:'ptRepairDate', 48:'ptRepairResult', 49:'ptRepairAddInfo',
+      50:'rtPercent', 51:'rtDate', 52:'rtReport', 53:'rtResult', 54:'rtDefect', 55:'rtAddInfo', 56:'rtRepairDate', 57:'rtRepairResult', 58:'rtRepairAddInfo',
       59:'inchWeld', 60:'prefabPlanned', 61:'prefabWelded', 62:'installPlanned', 63:'installWelded',
     },
   };
@@ -10746,9 +10734,9 @@ function importWeldBookExcel(){
       17:'item2', 18:'heatNr2', 19:'certNr2', 20:'dimension2', 21:'thickness2', 22:'material2', 23:'matGroup2',
       24:'wps', 25:'wpqr', 26:'weldingMethod', 27:'jointType', 28:'weldingType', 29:'weldingGas',
       30:'heatNrWeld', 31:'certNrWeld', 32:'welderId', 33:'dateWelding',
-      34:'vtPercent', 35:'vtDate', 36:'vtReport', 37:'vtResult', 38:'vtDefect', 39:'vtInfo', 40:'vtRepairDate', 41:'vtRepairResult',
-      43:'ptPercent', 44:'ptDate', 45:'ptReport', 46:'ptResult', 47:'ptDefect', 48:'ptInfo', 49:'ptRepairDate', 50:'ptRepairResult',
-      52:'rtPercent', 53:'rtDate', 54:'rtReport', 55:'rtResult', 56:'rtDefect', 57:'rtInfo', 58:'rtRepairDate', 59:'rtRepairResult',
+      34:'vtPercent', 35:'vtDate', 36:'vtReport', 37:'vtResult', 38:'vtDefect', 39:'vtAddInfo', 40:'vtRepairDate', 41:'vtRepairResult', 42:'vtRepairAddInfo',
+      43:'ptPercent', 44:'ptDate', 45:'ptReport', 46:'ptResult', 47:'ptDefect', 48:'ptAddInfo', 49:'ptRepairDate', 50:'ptRepairResult', 51:'ptRepairAddInfo',
+      52:'rtPercent', 53:'rtDate', 54:'rtReport', 55:'rtResult', 56:'rtDefect', 57:'rtAddInfo', 58:'rtRepairDate', 59:'rtRepairResult', 60:'rtRepairAddInfo',
       61:'inchWeld', 62:'prefabPlanned', 63:'prefabWelded', 64:'installPlanned', 65:'installWelded',
     },
     'LIG': {
@@ -10757,9 +10745,9 @@ function importWeldBookExcel(){
       13:'item2', 14:'heatNr2', 15:'certNr2', 16:'dimension2', 17:'thickness2', 18:'material2', 19:'matGroup2',
       20:'wps', 21:'wpqr', 22:'weldingMethod', 23:'jointType', 24:'weldingType', 25:'weldingGas',
       26:'heatNrWeld', 27:'certNrWeld', 28:'welderId', 29:'dateWelding',
-      30:'vtPercent', 31:'vtDate', 32:'vtReport', 33:'vtResult', 34:'vtDefect', 35:'vtInfo', 36:'vtRepairDate', 37:'vtRepairResult',
-      39:'ptPercent', 40:'ptDate', 41:'ptReport', 42:'ptResult', 43:'ptDefect', 44:'ptInfo', 45:'ptRepairDate', 46:'ptRepairResult',
-      48:'rtPercent', 49:'rtDate', 50:'rtReport', 51:'rtResult', 52:'rtDefect', 53:'rtInfo', 54:'rtRepairDate', 55:'rtRepairResult',
+      30:'vtPercent', 31:'vtDate', 32:'vtReport', 33:'vtResult', 34:'vtDefect', 35:'vtAddInfo', 36:'vtRepairDate', 37:'vtRepairResult', 38:'vtRepairAddInfo',
+      39:'ptPercent', 40:'ptDate', 41:'ptReport', 42:'ptResult', 43:'ptDefect', 44:'ptAddInfo', 45:'ptRepairDate', 46:'ptRepairResult', 47:'ptRepairAddInfo',
+      48:'rtPercent', 49:'rtDate', 50:'rtReport', 51:'rtResult', 52:'rtDefect', 53:'rtAddInfo', 54:'rtRepairDate', 55:'rtRepairResult', 56:'rtRepairAddInfo',
       57:'inchWeld', 58:'prefabPlanned', 59:'prefabWelded', 60:'installPlanned', 61:'installWelded',
     },
     'DRY': {
@@ -10768,9 +10756,9 @@ function importWeldBookExcel(){
       15:'item2', 16:'heatNr2', 17:'certNr2', 18:'dimension2', 19:'thickness2', 20:'material2', 21:'matGroup2',
       22:'wps', 23:'wpqr', 24:'weldingMethod', 25:'jointType', 26:'weldingType', 27:'weldingGas',
       28:'heatNrWeld', 29:'certNrWeld', 30:'welderId', 31:'dateWelding',
-      32:'vtPercent', 33:'vtDate', 34:'vtReport', 35:'vtResult', 36:'vtDefect', 37:'vtInfo', 38:'vtRepairDate', 39:'vtRepairResult',
-      41:'ptPercent', 42:'ptDate', 43:'ptReport', 44:'ptResult', 45:'ptDefect', 46:'ptInfo', 47:'ptRepairDate', 48:'ptRepairResult',
-      50:'rtPercent', 51:'rtDate', 52:'rtReport', 53:'rtResult', 54:'rtDefect', 55:'rtInfo', 56:'rtRepairDate', 57:'rtRepairResult',
+      32:'vtPercent', 33:'vtDate', 34:'vtReport', 35:'vtResult', 36:'vtDefect', 37:'vtAddInfo', 38:'vtRepairDate', 39:'vtRepairResult', 40:'vtRepairAddInfo',
+      41:'ptPercent', 42:'ptDate', 43:'ptReport', 44:'ptResult', 45:'ptDefect', 46:'ptAddInfo', 47:'ptRepairDate', 48:'ptRepairResult', 49:'ptRepairAddInfo',
+      50:'rtPercent', 51:'rtDate', 52:'rtReport', 53:'rtResult', 54:'rtDefect', 55:'rtAddInfo', 56:'rtRepairDate', 57:'rtRepairResult', 58:'rtRepairAddInfo',
       59:'inchWeld', 60:'prefabPlanned', 61:'prefabWelded', 62:'installPlanned', 63:'installWelded',
     },
   };
@@ -10791,13 +10779,13 @@ function importWeldBookExcel(){
     'heat nr.':'heatNrWeld','heat nr':'heatNrWeld','certificate nr.':'certNrWeld','certificate nr':'certNrWeld',
     'welder id':'welderId','date of welding':'dateWelding',
     'vt inspection %':'vtPercent','vt report':'vtReport','vt result':'vtResult',
-    'vt defect lenght [mm]':'vtDefect','vt additional information':'vtInfo',
+    'vt defect lenght [mm]':'vtDefect','vt additional information':'vtAddInfo',
     'vt repair date':'vtRepairDate','vt repair result':'vtRepairResult',
     'pt inspection %':'ptPercent','pt report':'ptReport','pt result':'ptResult',
-    'pt defect lenght [mm]':'ptDefect','pt additional information':'ptInfo',
+    'pt defect lenght [mm]':'ptDefect','pt additional information':'ptAddInfo',
     'pt repair date':'ptRepairDate','pt repair result':'ptRepairResult',
     'rt inspection %':'rtPercent','rt report':'rtReport','rt result':'rtResult',
-    'rt defect lenght [mm]':'rtDefect','rt additional information':'rtInfo',
+    'rt defect lenght [mm]':'rtDefect','rt additional information':'rtAddInfo',
     'rt repair date':'rtRepairDate','rt repair result':'rtRepairResult',
     'inch/weld':'inchWeld','prefab planned':'prefabPlanned','prefab welded':'prefabWelded',
     'install planned':'installPlanned','install welded':'installWelded',
