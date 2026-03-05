@@ -9408,23 +9408,35 @@ async function recoverFromNotifications() {
     var applied = 0, notFound = 0;
     wbActions.forEach(function(n) {
       if (!n.weldId) return;
-      // Hľadaj podľa weldId + iso (ak je v notifikácii)
+      // Extrahuj izometriu z message poľa ak iso nie je priamo v notifikácii
+      // Format: "... pre zvar #10 (LIS-720-20097-...)" alebo "priradený k zvaru #26 (KY-716-...)"
+      var isoFromMsg = null;
+      if (n.iso && n.iso !== '?') {
+        isoFromMsg = n.iso;
+      } else if (n.message) {
+        var mMatch = n.message.match(/\(([A-Z0-9][A-Z0-9\-\.]{5,})\)/);
+        if (mMatch) isoFromMsg = mMatch[1];
+      }
+      // Hľadaj podľa weldId + iso
       var row = null;
-      if (n.iso) {
+      if (isoFromMsg) {
         row = weldBookData.find(function(r){
           return String(r.weldId||'') === String(n.weldId) &&
-                 String(r.isometric||'') === String(n.iso);
+                 String(r.isometric||'') === String(isoFromMsg);
         });
       }
-      // Fallback - len weldId (môže byť viac zhodných)
+      // Fallback - len weldId
       if (!row) {
         var matches = weldBookData.filter(function(r){ return String(r.weldId||'') === String(n.weldId); });
         if (matches.length === 1) row = matches[0];
-        // Ak viac zhodných - skús podľa part z notifikácie
         if (!row && matches.length > 1 && n.part) {
           row = matches.find(function(r){ return (r.part||'').toUpperCase() === n.part.toUpperCase(); });
         }
-        if (!row && matches.length > 1) row = matches[0]; // posledný fallback
+        // Ak stale viac - pouzi isoFromMsg cast
+        if (!row && matches.length > 1 && isoFromMsg) {
+          row = matches.find(function(r){ return (r.isometric||'').indexOf(isoFromMsg.substring(0,8)) >= 0; });
+        }
+        if (!row && matches.length > 0) row = matches[0];
       }
       if (!row) { notFound++; return; }
 

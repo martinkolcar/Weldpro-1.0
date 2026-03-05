@@ -1673,7 +1673,7 @@ async function clearFittingModal() {
     await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
     showToast('Heat Nr vymazany pre zvar #' + weldIdStr);
     var _wbF = weldBookData.filter(function(r){ return !activeWbPart || (r.part||'').toUpperCase() === activeWbPart; }); renderWeldBook(_wbF);
-    sendFirebaseNotification('fitting_clear', (currentUser?currentUser.username:'?') + ' vymazal Heat Nr #' + weldIdStr + ' (' + notifProject + ')', { weldId: weldIdStr });
+    sendFirebaseNotification('fitting_clear', (currentUser?currentUser.username:'?') + ' vymazal Heat Nr #' + weldIdStr + ' (' + notifProject + ')', { weldId: weldIdStr, iso: targetRow.isometric||'' });
   } catch(e) { showToast('Chyba: ' + e.message); }
 }
 
@@ -1718,7 +1718,7 @@ async function saveFittingModal() {
     if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
     await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
     showToast('Heat Nr ulozene pre zvar #' + weldIdStr);
-    sendFirebaseNotification('fitting', (currentUser?currentUser.username:'?') + ' zadal Heat Nr pre zvar #' + weldIdStr + ' (' + notifProject + ')', { weldId: weldIdStr, heatNr1: heat1, heatNr2: heat2 });
+    sendFirebaseNotification('fitting', (currentUser?currentUser.username:'?') + ' zadal Heat Nr pre zvar #' + weldIdStr + ' (' + notifProject + ')', { weldId: weldIdStr, heatNr1: heat1, heatNr2: heat2, iso: targetRow.isometric||'' });
   } catch(e) { showToast('Chyba: ' + e.message); console.error('Fitting save:', e); }
 }
 
@@ -2056,7 +2056,7 @@ async function saveRtModal() {
     await _directWbSave(r);
     filterWB();
     showToast('✅ RT dátum: ' + rtDate);
-    sendFirebaseNotification('rt_date', (currentUser?currentUser.username:'?') + ' zadal RT datum ' + rtDate + ' pre zvar #' + r.weldId + ' (' + (r.isometric||'') + ')', { weldId: String(r.weldId), rtDate: rtDate });
+    sendFirebaseNotification('rt_date', (currentUser?currentUser.username:'?') + ' zadal RT datum ' + rtDate + ' pre zvar #' + r.weldId + ' (' + (r.isometric||'') + ')', { weldId: String(r.weldId), rtDate: rtDate, iso: r.isometric||'' });
   } catch(e) { showToast('Chyba: ' + e.message); }
 }
 
