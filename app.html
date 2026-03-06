@@ -5731,9 +5731,18 @@ function startFirebaseNotifListener() {
     var hist = [];
     snap.docs.forEach(function(doc){
       var d = doc.data();
-      if (!d.message || !d.at) { doc.ref.delete().catch(function(){}); return; }
-      if (d.at < sevenDaysAgo) { doc.ref.delete().catch(function(){}); return; } // Auto-cleanup
-      hist.push({ id: doc.id, fbId: doc.id, message: d.message, timestamp: d.at, by: d.by||'' });
+      if (!d.at) { doc.ref.delete().catch(function(){}); return; }
+      if (d.at < sevenDaysAgo) { doc.ref.delete().catch(function(){}); return; }
+      // Zostavaj message
+      var msg = d.message || '';
+      if (!msg && d.type === 'fitting' && (d.heatNr1||d.heatNr2)) {
+        msg = 'Heat nr. 1: ' + (d.heatNr1||'-') + ' | Heat nr. 2: ' + (d.heatNr2||'-') + ' | Zvar #' + (d.weldId||'?') + ' | ' + (d.iso||'');
+      }
+      if (!msg) msg = (d.type||'notif') + ': ' + (d.weldId||'') + ' | ' + (d.iso||'');
+      hist.push({ id: doc.id, fbId: doc.id, message: msg, timestamp: d.at, by: d.by||'',
+        type: d.type||'', weldId: d.weldId||'', iso: d.iso||'', part: d.part||'',
+        heatNr1: d.heatNr1||'', heatNr2: d.heatNr2||'',
+        heatField: d.heatField||'', heatValue: d.heatValue||'' });
     });
     hist.sort(function(a,b){ return b.timestamp.localeCompare(a.timestamp); });
     notifications = hist; // Nahraď - Firebase je master
@@ -5751,7 +5760,7 @@ function startFirebaseNotifListener() {
       var d = change.doc.data();
       if (!d.at) return;
       if (!d.message && d.type) d.message = d.type + ': ' + (d.weldId||'') + ' | ' + (d.iso||'');
-      if (d.at <= startTime) return; // Staré - ignoruj
+      if (d.at < new Date(Date.now() - 30000).toISOString()) return; // Staré (>30s) - ignoruj
       if (d.sessionId && d.sessionId === window._pcSessionId) return; // Vlastná session
       if (notifications.find(function(n){ return n.fbId === change.doc.id; })) return; // Duplikát
       // Zostavaj message s detailami ak chybaju
