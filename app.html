@@ -9365,26 +9365,18 @@ function wbLocalBackup() {
 
 function wbLocalLoad(part) {
   try {
-    // Skús všetky možné kľúče
-    var keys = [
-      'wbIndex_' + (part||'ALL'),
-      'weldBookData_' + (part||'ALL'),
-      'wbIndex_' + (part||'').toUpperCase(),
-      'weldBookData_' + (part||'').toUpperCase()
-    ];
+    var partKey = (part || 'ALL').toUpperCase();
+    var keys = ['wbIndex_' + partKey, 'weldBookData_' + partKey];
     for (var ki = 0; ki < keys.length; ki++) {
       var saved = localStorage.getItem(keys[ki]);
       if (saved) {
         var parsed = JSON.parse(saved);
-        if (parsed && parsed.length > 0) return parsed;
+        if (parsed && parsed.length > 0) {
+          // Vždy filtruj podľa časti - ochrana pred zmiešanými dátami
+          if (part) return parsed.filter(function(r){ return (r.part||'').toUpperCase() === part.toUpperCase(); });
+          return parsed;
+        }
       }
-    }
-    // Fallback na starý kľúč
-    var old = localStorage.getItem('weldBookData');
-    if (old) {
-      var all = JSON.parse(old);
-      if (part) return all.filter(function(r) { return (r.part||'').toUpperCase() === part.toUpperCase(); });
-      return all;
     }
   } catch(e) {}
   return null;
@@ -9748,17 +9740,13 @@ async function saveWbIsometricAsync(iso) { await _saveWbToFirebase(); }
 
 // Načítaj konkrétnu časť z Firebase
 async function loadWbPart(part) {
-  wbActivePart = part || null;
-  var docId = wbDocId(part);
+  wbActivePart = part ? part.toUpperCase() : null;
+  var docId = wbDocId(wbActivePart);
 
-  // 1. Cache - okamžite
-  var cached = wbLocalLoad(part);
-  if (cached && cached.length > 0) {
-    weldBookData = cached;
-    if (weldBookGrid && weldBookGrid.api) {
-      weldBookGrid.api.setGridOption('rowData', weldBookData);
-      populateWeldBookFilterDropdowns();
-    }
+  // Ihneď vyčisti grid - zabrání zobrazeniu dát inej časti
+  weldBookData = [];
+  if (weldBookGrid && weldBookGrid.api) {
+    weldBookGrid.api.setGridOption('rowData', []);
   }
 
   if (!db) return;
@@ -10645,7 +10633,9 @@ function importAllPartsExcel() {
                 obj[field] = strVal;
               }
             });
-            if (!obj.weldId || obj.weldId === '' || obj.weldId === '0') { skipped++; return; }
+            if (!obj.weldId || obj.weldId === '') { skipped++; return; }
+            // Oprav float weldId: '1.0' -> '1'
+            if (/^\d+\.0$/.test(obj.weldId)) obj.weldId = String(parseInt(obj.weldId));
             // Merguj s existujúcim - zachovaj chránené polia
             const key = String(obj.weldId||'').trim() + '||' + String(obj.isometric||'').trim();
             const existing = existingIndex[key];
