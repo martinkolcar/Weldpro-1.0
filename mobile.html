@@ -1718,7 +1718,11 @@ async function saveFittingModal() {
     if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
     await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
     showToast('Heat Nr ulozene pre zvar #' + weldIdStr);
-    sendFirebaseNotification('fitting', (currentUser?currentUser.username:'?') + ' zadal Heat Nr pre zvar #' + weldIdStr + ' (' + notifProject + ')', { weldId: weldIdStr, heatNr1: heat1, heatNr2: heat2, iso: targetRow.isometric||'' });
+    var heatMsg = (currentUser?currentUser.username:'?') + ' zadal Heat Nr pre zvar #' + weldIdStr;
+    if (heat1) heatMsg += ' | Heat 1: ' + heat1;
+    if (heat2) heatMsg += ' | Heat 2: ' + heat2;
+    heatMsg += ' (' + notifProject + ')';
+    sendFirebaseNotification('fitting', heatMsg, { weldId: weldIdStr, heatNr1: heat1, heatNr2: heat2, iso: targetRow.isometric||'', part: (targetRow.part||'') });
   } catch(e) { showToast('Chyba: ' + e.message); console.error('Fitting save:', e); }
 }
 
