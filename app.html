@@ -5760,7 +5760,8 @@ function startFirebaseNotifListener() {
       if (!msg) msg = d.type + ': ' + (d.weldId||'') + ' | ' + (d.iso||'');
       var notif = { id: change.doc.id, fbId: change.doc.id, message: msg, timestamp: d.at, by: d.by||'',
         type: d.type||'', weldId: d.weldId||'', iso: d.iso||'', part: d.part||'',
-        heatField: d.heatField||'', heatValue: d.heatValue||'' };
+        heatField: d.heatField||'', heatValue: d.heatValue||'',
+        heatNr1: d.heatNr1||'', heatNr2: d.heatNr2||'' };
       notifications.unshift(notif);
       changed = true;
       console.log('🔔 Nová notifikácia:', d.message);
@@ -14086,12 +14087,16 @@ allItems.forEach(function(item){
   html+='<div style="background:'+(isRecent?'#fefce8':'white')+';border:1px solid '+(isRecent?'#fde68a':'#e5e7eb')+';border-radius:8px;padding:9px 12px;margin-bottom:5px">';
   html+=delBtn;
   var msgHtml = item.message || '';
-  // Heat notifikacia - zvyraznenie
-  if (item.type === 'heat_nr' && item.heatValue) {
-    var hLabel = item.heatField === 'heatNr1' ? 'Heat nr. 1' : (item.heatField === 'heatNr2' ? 'Heat nr. 2' : 'Heat nr.');
-    msgHtml = '🔥 <b style="color:#b45309">' + hLabel + ': ' + item.heatValue + '</b>'
-      + (item.weldId ? ' &nbsp;·&nbsp; Zvar <b>#' + item.weldId + '</b>' : '')
-      + (item.iso ? '<br><span style="font-size:11px;color:#6b7280">📐 ' + item.iso + (item.part ? ' [' + item.part + ']' : '') + '</span>' : '');
+  // Heat notifikacia - zvyraznenie (fitting z mobile alebo heat_nr z PC)
+  if ((item.type === 'fitting' && (item.heatNr1 || item.heatNr2)) || (item.type === 'heat_nr' && item.heatValue)) {
+    var h1 = item.heatNr1 || (item.heatField === 'heatNr1' ? item.heatValue : '');
+    var h2 = item.heatNr2 || (item.heatField === 'heatNr2' ? item.heatValue : '');
+    msgHtml = '🔥 ';
+    if (h1) msgHtml += '<b style="color:#b45309">Heat nr. 1: ' + h1 + '</b>';
+    if (h1 && h2) msgHtml += ' &nbsp;|&nbsp; ';
+    if (h2) msgHtml += '<b style="color:#b45309">Heat nr. 2: ' + h2 + '</b>';
+    msgHtml += (item.weldId ? ' &nbsp;·&nbsp; Zvar <b>#' + item.weldId + '</b>' : '')
+      + (item.iso ? '<br><span style="font-size:11px;color:#6b7280">📐 ' + item.iso + '</span>' : '');
   }
   html+='<div style="font-size:13px;color:#1f2937;margin-bottom:3px;padding-right:20px">'+msgHtml+'</div>';
   html+='<div style="font-size:11px;color:#9ca3af">'+byStr+timeStr+'</div>';
