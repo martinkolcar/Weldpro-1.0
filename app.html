@@ -9907,13 +9907,10 @@ function startWbRealtimeSync() {
     if (data.sessionId && data.sessionId === mySessionId) return;
 
     var changedPart = (data.part && data.part !== 'ALL') ? data.part : null;
-    var msg = '📋 ' + data.by + ' upravil WeldBook [' + (changedPart||'ALL') + ']';
-
     // Vždy načítaj aktívnu časť - či už je zmena v nej alebo inej
     if (changedPart && wbActivePart && changedPart !== wbActivePart) {
-      // Iná časť zmenená - len notifikácia, ale neblokuj
+      // Iná časť zmenená - len sync info, NIE do zvončeka
       showWbSyncNotification('📢 ' + data.by + ' upravil WeldBook [' + changedPart + ']', 'info');
-      addNotification(msg);
       return;
     }
 
@@ -9941,7 +9938,6 @@ function startWbRealtimeSync() {
       });
       if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.refreshCells({ force: true });
       showWbSyncNotification('✅ ' + data.by + ' upravil WeldBook', 'success');
-      addNotification(msg);
     }).catch(function(e){ console.error('Signal fetch error:', e); });
   });
   wbRealtimeListeners.push(unsubSignal);
