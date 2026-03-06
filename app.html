@@ -10577,14 +10577,65 @@ function importAllPartsExcel() {
           const colMapping = ALL_SHEET_MAPS[sheetName];
           // Odstran hidden flag zo vsetkych riadkov - aby filter v Exceli nevynechal riadky
           if (ws['!rows']) { ws['!rows'].forEach(function(r){ if(r) r.hidden = false; }); }
-          // Citaj VSETKY riadky (skipHidden:false pre novšie verzie SheetJS)
-          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, skipHidden: false });
+          // Citaj VSETKY riadky
+          if (ws['!rows']) ws['!rows'].forEach(function(r){ if(r) r.hidden = false; });
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true, skipHidden: false });
 
-          // Nájdi header riadok
+          // Nájdi header riadok podľa "Weld ID"
           let headerRowIdx = 2;
           for (let i = 0; i < Math.min(8, rows.length); i++) {
-            if (rows[i].join('|').toLowerCase().includes('weld id')) { headerRowIdx = i; break; }
+            if (rows[i].map(function(c){return String(c).toLowerCase().trim();}).indexOf('weld id') >= 0) { headerRowIdx = i; break; }
           }
+
+          // Dynamicky mapuj stĺpce podľa názvu hlavičky
+          // KRITICKÉ: preskoč duplikátne headery (merged cells) - berieme len prvý výskyt
+          const headerRow = rows[headerRowIdx];
+          const FIELD_MAP = {
+            'isometric':'isometric','sheets':'sheets','ped':'ped','rev.':'rev','pipe class':'pipeClass','weld id':'weldId',
+            'welded item 1':'item1','heat nr. 1':'heatNr1','certificate nr. 1':'certNr1','dimension 1':'dimension1',
+            'wall thickness 1':'thickness1','material 1':'material1','mat. group 1':'matGroup1',
+            'welded item 2':'item2','heat nr. 2':'heatNr2','certificate nr. 2':'certNr2','dimension 2':'dimension2',
+            'wall thickness 2':'thickness2','material 2':'material2','mat. group 2':'matGroup2',
+            'wps':'wps','wpqr':'wpqr','welding method':'weldingMethod','type of joint':'jointType',
+            'type of welding':'weldingType','welding gas':'weldingGas',
+            'heat nr.':'heatNrWeld','certificate nr.':'certNrWeld','welder id':'welderId','date of welding':'dateWelding',
+            'inch/weld':'inchWeld','prefab planned':'prefabPlanned','prefab welded':'prefabWelded',
+            'install planned':'installPlanned','install welded':'installWelded',
+            'vt inspection %':'vtPercent','pt inspection %':'ptPercent','rt inspection %':'rtPercent',
+            'vt report':'vtReport','vt result':'vtResult','vt defect lenght [mm]':'vtDefect',
+            'vt additional information':'vtAddInfo','vt repair date':'vtRepairDate',
+            'vt repair result':'vtRepairResult','vt repair additional information':'vtRepairAddInfo',
+            'pt report':'ptReport','pt result':'ptResult','pt defect lenght [mm]':'ptDefect',
+            'pt additional information':'ptAddInfo','pt repair date':'ptRepairDate',
+            'pt repair result':'ptRepairResult','pt repair additional information':'ptRepairAddInfo',
+            'rt report':'rtReport','rt result':'rtResult','rt defect lenght [mm]':'rtDefect',
+            'rt additional information':'rtAddInfo','rt repair date':'rtRepairDate',
+            'rt repair result':'rtRepairResult','rt repair additional information':'rtRepairAddInfo',
+          };
+          // VT/PT/RT date of testing - podľa pozície (rovnaký názov pre viacero skupín)
+          var colToField = {};
+          var seenHeaders = {};
+          var vtDateCol = -1, ptDateCol = -1, rtDateCol = -1;
+          var vtStart = -1, ptStart = -1, rtStart = -1;
+          headerRow.forEach(function(h, i) {
+            var hLow = String(h||'').toLowerCase().trim();
+            if (!hLow) return;
+            if (seenHeaders[hLow] !== undefined) return; // preskoc duplikat
+            seenHeaders[hLow] = i;
+            if (FIELD_MAP[hLow]) colToField[i] = FIELD_MAP[hLow];
+            if (hLow === 'vt inspection %') vtStart = i;
+            if (hLow === 'pt inspection %') ptStart = i;
+            if (hLow === 'rt inspection %') rtStart = i;
+          });
+          // Date of testing - berie sa ako vtStart+1, ptStart+1, rtStart+1
+          if (vtStart >= 0) colToField[vtStart+1] = 'vtDate';
+          if (ptStart >= 0) colToField[ptStart+1] = 'ptDate';
+          if (rtStart >= 0) colToField[rtStart+1] = 'rtDate';
+          // Pressure test group - posledný výskyt (riadok 71)
+          for (var pi = headerRow.length-1; pi >= 0; pi--) {
+            if (String(headerRow[pi]||'').toLowerCase().trim() === 'pressure test group') { colToField[pi] = 'pressureGroup'; break; }
+          }
+          console.log('📋 ['+sheetName+'] header idx '+headerRowIdx+', weldId col='+seenHeaders['weld id']+', fields='+Object.keys(colToField).length);
 
           let added = 0, updated = 0, skipped = 0;
           const dataRows = rows.slice(headerRowIdx + 1);
@@ -10623,13 +10674,22 @@ function importAllPartsExcel() {
           dataRows.forEach(function(row) {
             if (!row || row.every(c => c === '' || c === null || c === undefined)) return;
             const obj = { part: sheetName };
-            Object.entries(colMapping).forEach(function([idx, field]) {
-              const val = row[parseInt(idx)];
+            Object.keys(colToField).forEach(function(idx) {
+              var field = colToField[idx];
+              var val = row[parseInt(idx)];
               if (val !== '' && val !== null && val !== undefined) {
-                let strVal = String(val).trim();
+                var strVal = String(val).trim();
                 if (strVal.startsWith('=')) return;
-                if (strVal === '0' && (field.includes('heatNr') || field.includes('certNr'))) return;
-                if ((field.includes('date') || field.includes('Date')) && strVal.includes('T')) strVal = strVal.split('T')[0];
+                // Dátumy - Excel serial number alebo ISO string
+                if (field.includes('Date') || field.includes('date')) {
+                  if (!isNaN(val) && val > 40000) {
+                    // Excel date serial -> JS date
+                    var d = new Date(Math.round((val - 25569) * 86400 * 1000));
+                    strVal = d.toISOString().split('T')[0];
+                  } else if (strVal.includes('T')) {
+                    strVal = strVal.split('T')[0];
+                  }
+                }
                 obj[field] = strVal;
               }
             });
