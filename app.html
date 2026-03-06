@@ -8596,9 +8596,6 @@ function openWeldBook() {
   content += '<button onclick="deleteSelectedWeldBookRows()" style="padding:10px 20px;background:#ef4444;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🗑️ Zmazať označené</button>';
   content += '<button onclick="cleanWeldBook()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🧹 Vyčistiť orphaned</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
-  content += '<button onclick="applyHardcodedRecovery()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #6ee7b7" title="Aplikuj zmeny z 5.3.2026 podľa zvončeka">✅ Obnov zmeny 5.3.2026</button>';
-  content += '<button onclick="showWbNotifDebug()" style="padding:10px 20px;background:#0369a1;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔍 Ukáž históriu zmien</button>';
-  content += '<button onclick="recoverFromNotifications()" style="padding:10px 20px;background:#7c3aed;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #a78bfa" title="Rekonštruuj zmeny z histórie notifikácií">📋 Obnov z histórie</button>';
   content += '<button onclick="repairFirebaseChunk()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fca5a5" title="Opraví poškodený JSON chunk vo Firebase">🔧 Opraviť Firebase LIG</button>';
   content += '<button onclick="recoverWbFromCache()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fbbf24" title="Obnov dáta z lokálnej cache prehliadača a oprav Firebase">🚑 Obnov z cache</button>';
   content += '<button onclick="importJSONProjects()" style="padding:10px 20px;background:#667eea;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z JSON</button>';
@@ -8920,10 +8917,31 @@ function initializeWeldBookGrid() {
       console.log('✅ WeldBook AG-Grid initialized!');
     },
     onCellValueChanged: function(params) {
-      // refreshCells() sposobuje reset pozicie - pouzijeme len refreshCell na jednu bunku
       params.api.refreshCells({ rowNodes: [params.node], force: false });
       saveWeldBookToStorage();
-      console.log('✏️ Bunka upravená, uložené do localStorage');
+      // Heat notifikácia - zaloguj do zvončeka
+      var heatFields = ['heatNr1','heatNr2','heatNrWeld'];
+      if (heatFields.indexOf(params.colDef.field) >= 0 && params.newValue && params.newValue !== params.oldValue) {
+        var row = params.data;
+        var fieldLabel = params.colDef.field === 'heatNr1' ? 'Heat 1' : (params.colDef.field === 'heatNr2' ? 'Heat 2' : 'Heat (weld)');
+        var msg = fieldLabel + ': ' + params.newValue + ' | Zvar #' + (row.weldId||'?') + ' | ' + (row.isometric||'?');
+        if (db && window.currentUser) {
+          var notifId = 'heat_' + Date.now();
+          db.collection('notifications').doc(notifId).set({
+            type: 'heat_nr',
+            message: msg,
+            weldId: String(row.weldId||''),
+            iso: String(row.isometric||''),
+            part: String(row.part||''),
+            heatField: params.colDef.field,
+            heatValue: String(params.newValue),
+            by: (window.currentUser && window.currentUser.username) || 'PC',
+            at: new Date().toISOString(),
+            read: false
+          }).catch(function(e){ console.warn('Heat notif save:', e); });
+        }
+      }
+      console.log('✏️ Bunka upravená, uložené');
     }
   };
   
@@ -9419,7 +9437,7 @@ async function showWbNotifDebug() {
     var lines = [];
     snap.forEach(function(d){
       var n = d.data();
-      if (['welder_assigned','welder_removed','fitting','fitting_clear','rt_date','vt_date'].indexOf(n.type) >= 0) {
+      if (['welder_assigned','welder_removed','fitting','fitting_clear','rt_date','vt_date','heat_nr'].indexOf(n.type) >= 0) {
         lines.push((n.at||'').substring(0,16).replace('T',' ') + ' | ' + n.type + ' | weldId:' + (n.weldId||'?') + ' | iso:' + (n.iso||'?') + ' | by:' + (n.by||'?') + ' | ' + (n.message||'').substring(0,60));
       }
     });
@@ -9437,7 +9455,7 @@ async function recoverFromNotifications() {
     var wbActions = [];
     snap.forEach(function(d){
       var n = d.data();
-      if (['welder_assigned','welder_removed','fitting','fitting_clear','rt_date','vt_date'].indexOf(n.type) >= 0)
+      if (['welder_assigned','welder_removed','fitting','fitting_clear','rt_date','vt_date','heat_nr'].indexOf(n.type) >= 0)
         wbActions.push(n);
     });
 
@@ -9507,6 +9525,8 @@ async function recoverFromNotifications() {
         if (n.heatNr2) { row.heatNr2 = n.heatNr2; }
       } else if (n.type === 'fitting_clear') {
         row.heatNr1 = ''; row.heatNr2 = ''; applied++;
+      } else if (n.type === 'heat_nr') {
+        if (n.heatField && n.heatValue) { row[n.heatField] = n.heatValue; applied++; }
       } else if (n.type === 'rt_date') {
         if (n.rtDate) { row.rtDate = n.rtDate; applied++; }
       } else if (n.type === 'vt_date') {
@@ -9763,6 +9783,12 @@ async function loadWbPart(part) {
       weldBookData = JSON.parse(chunks.join(''));
       wbLocalBackup();
       console.log('✅ WeldBook [' + (part||'ALL') + '] načítaný:', weldBookData.length, 'zvarov');
+      if (part) {
+        if (window._wbPartAlertTimeout) clearTimeout(window._wbPartAlertTimeout);
+        window._wbPartAlertTimeout = setTimeout(function() {
+          alert('✅ ' + part + ' načítaný\n\nZvarov: ' + weldBookData.length);
+        }, 300);
+      }
     } else if (part) {
       // Part doc neexistuje - načítaj z weldbook_main a prefiltrovaj
       console.log('⚠️ [' + part + '_main] neexistuje - načítavam z weldbook_main...');
