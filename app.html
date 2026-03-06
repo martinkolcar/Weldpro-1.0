@@ -10509,39 +10509,39 @@ function fixWbParts() {
 function importAllPartsExcel() {
   // Importuj všetky časti (SUL, LIG, DRY, FLA, LHT) z jedného Excel súboru naraz
 
-  const ALL_SHEET_MAPS = {
+    const ALL_SHEET_MAPS = {
     'SUL': {
-      0:'isometric', 1:'sheets', 6:'ped', 7:'rev', 8:'pipeClass', 9:'weldId',
-      10:'item1', 11:'heatNr1', 12:'certNr1', 13:'dimension1', 14:'thickness1', 15:'material1', 16:'matGroup1',
-      17:'item2', 18:'heatNr2', 19:'certNr2', 20:'dimension2', 21:'thickness2', 22:'material2', 23:'matGroup2',
-      24:'wps', 25:'wpqr', 26:'weldingMethod', 27:'jointType', 28:'weldingType', 29:'weldingGas',
-      30:'heatNrWeld', 31:'certNrWeld', 32:'welderId', 33:'dateWelding',
-      34:'vtPercent', 35:'vtDate', 36:'vtReport', 37:'vtResult', 38:'vtDefect', 39:'vtAddInfo', 40:'vtRepairDate', 41:'vtRepairResult', 42:'vtRepairAddInfo',
-      43:'ptPercent', 44:'ptDate', 45:'ptReport', 46:'ptResult', 47:'ptDefect', 48:'ptAddInfo', 49:'ptRepairDate', 50:'ptRepairResult', 51:'ptRepairAddInfo',
-      52:'rtPercent', 53:'rtDate', 54:'rtReport', 55:'rtResult', 56:'rtDefect', 57:'rtAddInfo', 58:'rtRepairDate', 59:'rtRepairResult', 60:'rtRepairAddInfo',
-      61:'inchWeld', 62:'prefabPlanned', 63:'prefabWelded', 64:'installPlanned', 65:'installWelded',
+      0:'isometric', 1:'sheets', 11:'ped', 12:'rev', 13:'pipeClass', 14:'weldId',
+      15:'item1', 16:'heatNr1', 17:'certNr1', 18:'dimension1', 19:'thickness1', 20:'material1', 21:'matGroup1',
+      22:'item2', 23:'heatNr2', 24:'certNr2', 25:'dimension2', 26:'thickness2', 27:'material2', 28:'matGroup2',
+      29:'wps', 30:'wpqr', 31:'weldingMethod', 32:'jointType', 33:'weldingType', 34:'weldingGas',
+      35:'heatNrWeld', 36:'certNrWeld', 37:'welderId', 38:'dateWelding',
+      39:'vtPercent', 40:'vtDate', 41:'vtReport', 42:'vtResult', 43:'vtDefect', 44:'vtAddInfo', 45:'vtRepairDate', 46:'vtRepairResult', 47:'vtRepairAddInfo',
+      48:'ptPercent', 49:'ptDate', 50:'ptReport', 51:'ptResult', 52:'ptDefect', 53:'ptAddInfo', 54:'ptRepairDate', 55:'ptRepairResult', 56:'ptRepairAddInfo',
+      57:'rtPercent', 58:'rtDate', 59:'rtReport', 60:'rtResult', 61:'rtDefect', 62:'rtAddInfo', 63:'rtRepairDate', 64:'rtRepairResult', 65:'rtRepairAddInfo',
+      66:'inchWeld', 67:'prefabPlanned', 68:'prefabWelded', 69:'installPlanned', 70:'installWelded', 71:'pressureGroup',
     },
     'LIG': {
-      0:'isometric', 1:'sheets', 2:'ped', 3:'rev', 4:'pipeClass', 5:'weldId',
-      6:'item1', 7:'heatNr1', 8:'certNr1', 9:'dimension1', 10:'thickness1', 11:'material1', 12:'matGroup1',
-      13:'item2', 14:'heatNr2', 15:'certNr2', 16:'dimension2', 17:'thickness2', 18:'material2', 19:'matGroup2',
-      20:'wps', 21:'wpqr', 22:'weldingMethod', 23:'jointType', 24:'weldingType', 25:'weldingGas',
-      26:'heatNrWeld', 27:'certNrWeld', 28:'welderId', 29:'dateWelding',
-      30:'vtPercent', 31:'vtDate', 32:'vtReport', 33:'vtResult', 34:'vtDefect', 35:'vtAddInfo', 36:'vtRepairDate', 37:'vtRepairResult', 38:'vtRepairAddInfo',
-      39:'ptPercent', 40:'ptDate', 41:'ptReport', 42:'ptResult', 43:'ptDefect', 44:'ptAddInfo', 45:'ptRepairDate', 46:'ptRepairResult', 47:'ptRepairAddInfo',
-      48:'rtPercent', 49:'rtDate', 50:'rtReport', 51:'rtResult', 52:'rtDefect', 53:'rtAddInfo', 54:'rtRepairDate', 55:'rtRepairResult', 56:'rtRepairAddInfo',
-      57:'inchWeld', 58:'prefabPlanned', 59:'prefabWelded', 60:'installPlanned', 61:'installWelded',
+      0:'isometric', 1:'sheets', 11:'ped', 12:'rev', 13:'pipeClass', 14:'weldId',
+      15:'item1', 16:'heatNr1', 17:'certNr1', 18:'dimension1', 19:'thickness1', 20:'material1', 21:'matGroup1',
+      22:'item2', 23:'heatNr2', 24:'certNr2', 25:'dimension2', 26:'thickness2', 27:'material2', 28:'matGroup2',
+      29:'wps', 30:'wpqr', 31:'weldingMethod', 32:'jointType', 33:'weldingType', 34:'weldingGas',
+      35:'heatNrWeld', 36:'certNrWeld', 37:'welderId', 38:'dateWelding',
+      39:'vtPercent', 40:'vtDate', 41:'vtReport', 42:'vtResult', 43:'vtDefect', 44:'vtAddInfo', 45:'vtRepairDate', 46:'vtRepairResult', 47:'vtRepairAddInfo',
+      48:'ptPercent', 49:'ptDate', 50:'ptReport', 51:'ptResult', 52:'ptDefect', 53:'ptAddInfo', 54:'ptRepairDate', 55:'ptRepairResult', 56:'ptRepairAddInfo',
+      57:'rtPercent', 58:'rtDate', 59:'rtReport', 60:'rtResult', 61:'rtDefect', 62:'rtAddInfo', 63:'rtRepairDate', 64:'rtRepairResult', 65:'rtRepairAddInfo',
+      66:'inchWeld', 67:'prefabPlanned', 68:'prefabWelded', 69:'installPlanned', 70:'installWelded', 71:'pressureGroup',
     },
     'DRY': {
-      0:'isometric', 3:'sheets', 4:'ped', 5:'rev', 6:'pipeClass', 7:'weldId',
-      8:'item1', 9:'heatNr1', 10:'certNr1', 11:'dimension1', 12:'thickness1', 13:'material1', 14:'matGroup1',
-      15:'item2', 16:'heatNr2', 17:'certNr2', 18:'dimension2', 19:'thickness2', 20:'material2', 21:'matGroup2',
-      22:'wps', 23:'wpqr', 24:'weldingMethod', 25:'jointType', 26:'weldingType', 27:'weldingGas',
-      28:'heatNrWeld', 29:'certNrWeld', 30:'welderId', 31:'dateWelding',
-      32:'vtPercent', 33:'vtDate', 34:'vtReport', 35:'vtResult', 36:'vtDefect', 37:'vtAddInfo', 38:'vtRepairDate', 39:'vtRepairResult', 40:'vtRepairAddInfo',
-      41:'ptPercent', 42:'ptDate', 43:'ptReport', 44:'ptResult', 45:'ptDefect', 46:'ptAddInfo', 47:'ptRepairDate', 48:'ptRepairResult', 49:'ptRepairAddInfo',
-      50:'rtPercent', 51:'rtDate', 52:'rtReport', 53:'rtResult', 54:'rtDefect', 55:'rtAddInfo', 56:'rtRepairDate', 57:'rtRepairResult', 58:'rtRepairAddInfo',
-      59:'inchWeld', 60:'prefabPlanned', 61:'prefabWelded', 62:'installPlanned', 63:'installWelded',
+      0:'isometric', 1:'sheets', 11:'ped', 12:'rev', 13:'pipeClass', 14:'weldId',
+      15:'item1', 16:'heatNr1', 17:'certNr1', 18:'dimension1', 19:'thickness1', 20:'material1', 21:'matGroup1',
+      22:'item2', 23:'heatNr2', 24:'certNr2', 25:'dimension2', 26:'thickness2', 27:'material2', 28:'matGroup2',
+      29:'wps', 30:'wpqr', 31:'weldingMethod', 32:'jointType', 33:'weldingType', 34:'weldingGas',
+      35:'heatNrWeld', 36:'certNrWeld', 37:'welderId', 38:'dateWelding',
+      39:'vtPercent', 40:'vtDate', 41:'vtReport', 42:'vtResult', 43:'vtDefect', 44:'vtAddInfo', 45:'vtRepairDate', 46:'vtRepairResult', 47:'vtRepairAddInfo',
+      48:'ptPercent', 49:'ptDate', 50:'ptReport', 51:'ptResult', 52:'ptDefect', 53:'ptAddInfo', 54:'ptRepairDate', 55:'ptRepairResult', 56:'ptRepairAddInfo',
+      57:'rtPercent', 58:'rtDate', 59:'rtReport', 60:'rtResult', 61:'rtDefect', 62:'rtAddInfo', 63:'rtRepairDate', 64:'rtRepairResult', 65:'rtRepairAddInfo',
+      66:'inchWeld', 67:'prefabPlanned', 68:'prefabWelded', 69:'installPlanned', 70:'installWelded', 71:'pressureGroup',
     },
   };
   // FLA a LHT = rovnaká štruktúra ako LIG
@@ -12112,15 +12112,14 @@ function updateProjectsUI() {
           nameSpan.textContent = '📂 ' + partName;
           nameSpan.style.flex = '1';
           nameSpan.style.cursor = 'pointer';
-          nameSpan.onclick = function() {
-            if (switchToPart(partName)) {
-              updateProjectsUI();
-              if (weldBookGrid && weldBookGrid.api) {
-                weldBookGrid.api.setRowData(weldBookData);
-              }
-              alert('✅ Prepnuté na: ' + partName + '\n\nZvarov: ' + weldCount);
-            }
-          };
+          nameSpan.onclick = (function(pn) { return function() {
+            projectsData.currentPart = pn;
+            saveProjectsToStorage();
+            updateProjectsUI();
+            loadWbPart(pn.toUpperCase()).then(function() {
+              if (typeof startWbRealtimeSync === 'function') startWbRealtimeSync();
+            });
+          }; })(partName);
           
           var countSpan = document.createElement('span');
           countSpan.textContent = '(' + weldCount + ')';
