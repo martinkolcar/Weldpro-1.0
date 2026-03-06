@@ -602,6 +602,23 @@ var jsPDF = window.jspdf.jsPDF;
       }
     });
     
+    // Spusti notifikácie hneď po prihlásení - nezávisle od WeldBook
+    window.addEventListener('DOMContentLoaded', function() {
+      setTimeout(function() {
+        if (typeof startFirebaseNotifListener === 'function' && window.db) {
+          startFirebaseNotifListener();
+          console.log('🔔 Notif listener spustený po prihlásení');
+        } else {
+          // db ešte nie je ready - skús neskôr
+          setTimeout(function() {
+            if (typeof startFirebaseNotifListener === 'function' && window.db) {
+              startFirebaseNotifListener();
+            }
+          }, 3000);
+        }
+      }, 1500);
+    });
+
     // Zobraz ADMIN tlačidlo ak je admin
     if (userData.role === 'admin') {
       window.addEventListener('DOMContentLoaded', function() {
@@ -5752,16 +5769,18 @@ function startFirebaseNotifListener() {
     console.log('🔔 História načítaná:', hist.length, 'notifikácií (7 dní)');
   }).catch(function(e){ console.warn('Notif history err:', e.message); });
 
-  // 2. Realtime - onSnapshot BEZ orderBy/where - jednoduché
+  // 2. Realtime - onSnapshot - zobraz len nové (po načítaní stránky)
+  var historyLoaded = false;
+  setTimeout(function(){ historyLoaded = true; }, 3000); // Po 3s považuj históriu za načítanú
   firebaseNotifUnsub = db.collection('notifications').onSnapshot(function(snap) {
     var changed = false;
     snap.docChanges().forEach(function(change) {
       if (change.type !== 'added') return;
       var d = change.doc.data();
       if (!d.at) return;
-      if (!d.message && d.type) d.message = d.type + ': ' + (d.weldId||'') + ' | ' + (d.iso||'');
-      if (d.at < new Date(Date.now() - 30000).toISOString()) return; // Staré (>30s) - ignoruj
-      if (d.sessionId && d.sessionId === window._pcSessionId) return; // Vlastná session
+      // Kým sa nenačíta história (3s), ignoruj staré - potom zobraz všetko nové
+      if (!historyLoaded && d.at <= startTime) return;
+      if (d.sessionId && d.sessionId === window._pcSessionId) return; // Vlastná PC session - ignoruj
       if (notifications.find(function(n){ return n.fbId === change.doc.id; })) return; // Duplikát
       // Zostavaj message s detailami ak chybaju
       var msg = d.message || '';
@@ -5811,11 +5830,12 @@ console.log('✓ Notifikácia odstránená');
 function updateNotificationBadge(){
 var badge=document.getElementById('notificationBadge');
 var badge2=document.getElementById('notificationsBadge');
-var oneDayAgo = new Date(Date.now() - 24*60*60*1000).toISOString();
-var recentCount = notifications.filter(function(n){ return (n.timestamp||'') >= oneDayAgo; }).length;
-if(recentCount>0){
-if(badge){badge.style.display='block';badge.textContent=recentCount;}
-if(badge2){badge2.style.display='block';badge2.textContent=recentCount;}
+// Zobraz len notifikacie po poslednom otvoreni zvonceka
+if (!window._notifLastSeen) window._notifLastSeen = localStorage.getItem('weldpro_notif_seen') || new Date(0).toISOString();
+var unreadCount = notifications.filter(function(n){ return (n.timestamp||'') > window._notifLastSeen; }).length;
+if(unreadCount>0){
+if(badge){badge.style.display='block';badge.textContent=unreadCount;}
+if(badge2){badge2.style.display='block';badge2.textContent=unreadCount;}
 }else{
 if(badge)badge.style.display='none';
 if(badge2)badge2.style.display='none';
@@ -9938,6 +9958,7 @@ function startWbRealtimeSync() {
       });
       if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.refreshCells({ force: true });
       showWbSyncNotification('✅ ' + data.by + ' upravil WeldBook', 'success');
+      addNotification('📋 ' + data.by + ' upravil WeldBook [' + (changedPart||'ALL') + ']');
     }).catch(function(e){ console.error('Signal fetch error:', e); });
   });
   wbRealtimeListeners.push(unsubSignal);
@@ -14031,6 +14052,10 @@ const panel=document.getElementById('notificationsPanel');
 if(panel.style.display==='none'){
 panel.style.display='block';
 showCombinedNotifications();
+// Reset badge - oznac vsetky ako precitane
+window._notifLastSeen = new Date().toISOString();
+localStorage.setItem('weldpro_notif_seen', window._notifLastSeen);
+updateNotificationBadge();
 }else{
 panel.style.display='none';
 }
