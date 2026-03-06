@@ -10157,32 +10157,28 @@ async function exportWeldBookExcel() {
 
 // ============= IMPORT EXCELU DO WELDBOOK =============
 function clearLocalStorageWeldBook() {
-  // Vymaž všetky weldbook dáta z localStorage prehliadača
+  if (!confirm('Vymazať lokálnu cache WeldBook?\n\nPo vymazaní sa dáta načítajú znova z Firebase.')) return;
   var removed = [];
   var keys = [];
   for (var i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
   keys.forEach(function(k) {
-    if (k && (k.toLowerCase().includes('weld') || k.toLowerCase().includes('wbook'))) {
+    if (k && (k.toLowerCase().includes('weld') || k.toLowerCase().includes('wbindex') || k.toLowerCase().includes('wbook'))) {
       localStorage.removeItem(k);
       removed.push(k);
     }
   });
-  localStorage.removeItem('weldBookData'); // istota
-
-  // Vymaž aj z pamäte
+  ['SUL','LIG','DRY','FLA','LHT','ALL'].forEach(function(p) {
+    ['wbIndex_','weldBookData_'].forEach(function(prefix) {
+      localStorage.removeItem(prefix + p);
+      localStorage.removeItem(prefix + p.toLowerCase());
+    });
+  });
+  localStorage.removeItem('weldBookData');
   weldBookData = [];
   if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', []);
   populateWeldBookFilterDropdowns();
-
-  alert('✅ Cache vymazaná!\nVymazaných kľúčov: ' + removed.length + '\n\nStránka sa teraz znovu načíta dáta z Firebase.');
-
-  // Znovu načítaj z Firebase
-  loadWeldBookFromStorage().then(function() {
-    if (weldBookGrid && weldBookGrid.api) {
-      weldBookGrid.api.setGridOption('rowData', weldBookData);
-      populateWeldBookFilterDropdowns();
-    }
-  });
+  alert('✅ Cache vymazaná! Vymazaných kľúčov: ' + removed.length + '\n\nNačítavam z Firebase...');
+  loadWbPart(wbActivePart);
 }
 
 async function compareJsonVsWeldBook() {
