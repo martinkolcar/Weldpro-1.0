@@ -6148,6 +6148,35 @@ alert('⚠️ Vyberte aspoň 1 balík alebo načítajte extra spooly!');
 return;
 }
 
+// Shift+scroll = horizontálny posun - na cw wrapper a pdfCanvas
+document.addEventListener('DOMContentLoaded', function() {
+  function addShiftScroll(el) {
+    if (!el) return;
+    el.addEventListener('wheel', function(e) {
+      var cw = document.getElementById('cw');
+      if (!cw || cw.style.display === 'none') return;
+      e.preventDefault();
+      if (e.shiftKey) {
+        cw.scrollLeft += e.deltaY || e.deltaX;
+      } else {
+        cw.scrollTop += e.deltaY;
+        cw.scrollLeft += e.deltaX;
+      }
+    }, { passive: false });
+  }
+  addShiftScroll(document.getElementById('cw'));
+  addShiftScroll(document.getElementById('pdfCanvas'));
+  // Aj na celom dokumente ked je cw viditelny
+  document.addEventListener('wheel', function(e) {
+    var cw = document.getElementById('cw');
+    if (!cw || cw.style.display === 'none') return;
+    if (e.shiftKey) {
+      e.preventDefault();
+      cw.scrollLeft += e.deltaY || e.deltaX;
+    }
+  }, { passive: false });
+});
+
 // Vytvor canvas pre PDF
 var ca=document.createElement('canvas');
 ca.width=2480; // A4 @ 300 DPI
@@ -8990,9 +9019,20 @@ function initializeWeldBookGrid() {
   var gridDiv = document.getElementById('weldBookGrid');
   new agGrid.Grid(gridDiv, gridOptions);
 
-  // Shift + koliesko = horizontálny scroll
-  gridDiv.addEventListener('wheel', function(e) {
+  // Shift + koliesko = horizontálny scroll - na celom modaloch aj gridu
+  function handleShiftWheel(e) {
     if (e.shiftKey) {
+      e.preventDefault();
+      var viewport = gridDiv.querySelector('.ag-body-horizontal-scroll-viewport');
+      if (viewport) viewport.scrollLeft += e.deltaY;
+    }
+  }
+  gridDiv.addEventListener('wheel', handleShiftWheel, { passive: false });
+  // Aj na celom weldbook modaloch (výkres, celá stránka)
+  var wbModal = document.getElementById('weldBookModal');
+  if (wbModal) wbModal.addEventListener('wheel', handleShiftWheel, { passive: false });
+  document.addEventListener('wheel', function(e) {
+    if (e.shiftKey && document.getElementById('weldBookModal') && document.getElementById('weldBookModal').style.display !== 'none') {
       e.preventDefault();
       var viewport = gridDiv.querySelector('.ag-body-horizontal-scroll-viewport');
       if (viewport) viewport.scrollLeft += e.deltaY;
