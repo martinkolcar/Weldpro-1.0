@@ -8989,6 +8989,15 @@ function initializeWeldBookGrid() {
   // Vytvorenie gridu
   var gridDiv = document.getElementById('weldBookGrid');
   new agGrid.Grid(gridDiv, gridOptions);
+
+  // Shift + koliesko = horizontálny scroll
+  gridDiv.addEventListener('wheel', function(e) {
+    if (e.shiftKey) {
+      e.preventDefault();
+      var viewport = gridDiv.querySelector('.ag-body-horizontal-scroll-viewport');
+      if (viewport) viewport.scrollLeft += e.deltaY;
+    }
+  }, { passive: false });
 }
 
 // ============= PRIDANIE ZVARU DO WELDBOOK =============
