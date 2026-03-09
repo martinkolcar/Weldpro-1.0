@@ -1275,7 +1275,10 @@ async function listProjectsFromFirebase() {
 <div id="notificationsPanel" style="display:none;position:fixed;top:120px;right:20px;width:420px;max-height:600px;background:white;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.2);border:2px solid #e5e7eb;z-index:9999;overflow:hidden">
 <div style="padding:15px;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;display:flex;justify-content:space-between;align-items:center">
 <h3 style="margin:0;font-size:16px">🔔 História zmien projektov</h3>
+<div style="display:flex;gap:8px;align-items:center">
+<button onclick="applyNotificationsToWeldBook()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.5);color:white;font-size:11px;cursor:pointer;padding:4px 8px;border-radius:5px;white-space:nowrap">📥 Doplň do WB</button>
 <button onclick="toggleNotificationsPanel()" style="background:transparent;border:none;color:white;font-size:20px;cursor:pointer;padding:0">✕</button>
+</div>
 </div>
 <div id="notificationsContent" style="max-height:500px;overflow-y:auto;padding:10px">
 <div style="text-align:center;color:#999;padding:20px">Žiadne zmeny</div>
@@ -9926,6 +9929,25 @@ async function loadWbPart(part) {
           allRows = allRows.concat(d.welds);
         }
       });
+      // Skontroluj aj starú chunk štruktúru - spoj dáta (per-iso má prednosť pre izometrie kde existuje)
+      var isoNamesInNew = {};
+      allRows.forEach(function(r){ isoNamesInNew[r.isometric||''] = true; });
+      var docId = wbDocId(p);
+      try {
+        var chunkMeta = await db.collection('weldbook').doc(docId).get();
+        if (chunkMeta.exists) {
+          var meta2 = chunkMeta.data();
+          var cp2 = [];
+          for (var ci2=0; ci2<(meta2.chunks||1); ci2++)
+            cp2.push(db.collection('weldbook').doc(docId).collection('data').doc('c'+ci2).get());
+          var cd2 = await Promise.all(cp2);
+          var chunkRows = JSON.parse(cd2.filter(function(c){return c.exists;}).map(function(c){return c.data().d;}).join(''));
+          // Pridaj iba izometrie ktoré NIE SÚ v per-iso (staré nezmenené)
+          var chunkOnlyRows = chunkRows.filter(function(r){ return !isoNamesInNew[r.isometric||'']; });
+          allRows = allRows.concat(chunkOnlyRows);
+          console.log('🔀 Spojené: ' + Object.keys(isoNamesInNew).length + ' per-iso + ' + chunkOnlyRows.length + ' chunk riadkov');
+        }
+      } catch(mergeErr) { console.warn('Merge chunk err:', mergeErr); }
       weldBookData = allRows;
       wbLocalBackup();
       console.log('✅ [ISO] WeldBook [' + p + '] načítaný:', weldBookData.length, 'zvarov,', isoColl.size, 'izometrií');
@@ -9944,9 +9966,7 @@ async function loadWbPart(part) {
         weldBookData = JSON.parse(chunkDocs.filter(function(c){return c.exists;}).map(function(c){return c.data().d;}).join(''));
         wbLocalBackup();
         console.log('✅ [CHUNK fallback] WeldBook [' + p + '] načítaný:', weldBookData.length, 'zvarov');
-        // Automaticky migruj na novú štruktúru
-        console.log('🔄 Migrujem na per-iso štruktúru...');
-        _saveWbPartToFirebase(p).catch(function(e){ console.warn('Migrácia:', e); });
+        // Migrácia VYPNUTÁ - per-iso môže mať novšie dáta z mobile
       }
     }
 
@@ -14185,6 +14205,44 @@ updateNotificationBadge();
 }else{
 panel.style.display='none';
 }
+}
+
+// Aplikuj notifikácie do WeldBook dát (záchrana ak sync zlyhá)
+function applyNotificationsToWeldBook() {
+  if (!notifications || notifications.length === 0) { alert('Žiadne notifikácie'); return; }
+  var applied = 0, skipped = 0;
+  notifications.forEach(function(n) {
+    if (!n.weldId || !n.iso) return;
+    var row = weldBookData.find(function(r) {
+      return String(r.weldId||'') === String(n.weldId) && (r.isometric||'') === n.iso;
+    });
+    if (!row) { skipped++; return; }
+    // Podľa typu notifikácie aplikuj zmenu
+    if (n.type === 'heat_nr' && n.heatField && n.heatValue) {
+      row[n.heatField] = n.heatValue;
+      applied++;
+    } else if (n.type === 'fitting') {
+      if (n.heatNr1) { row.heatNr1 = n.heatNr1; applied++; }
+      if (n.heatNr2) { row.heatNr2 = n.heatNr2; applied++; }
+    } else if (n.type === 'welder_assigned' && n.welder) {
+      row.welderId = n.welder;
+      applied++;
+    } else if (n.type === 'welder_removed') {
+      row.welderId = '';
+      applied++;
+    } else if (n.type === 'rt_date' && n.rtDate) {
+      row.rtDate = n.rtDate;
+      applied++;
+    }
+  });
+  if (applied === 0) { alert('Nič na aplikovanie (notifikácie nemajú weldId/iso alebo typ)'); return; }
+  if (!confirm('Aplikovat ' + applied + ' zmien z notifikacii do WeldBook? (skipped: ' + skipped + ')')) return;
+  if (weldBookGrid && weldBookGrid.api) {
+    weldBookGrid.api.setGridOption('rowData', weldBookData);
+    weldBookGrid.api.refreshCells({ force: true });
+  }
+  saveWeldBookToStorage();
+  alert('✅ Aplikovaných ' + applied + ' zmien');
 }
 
 function showCombinedNotifications(){
