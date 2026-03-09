@@ -10046,13 +10046,21 @@ function startWbRealtimeSync() {
     if (changedIso) {
       var isoDocId = changedIso.replace(/\//g, '__');
       db.collection('weldbook').doc(syncPart).collection('isos').doc(isoDocId).get().then(function(isoDoc) {
-        if (!isoDoc.exists) return;
+        if (!isoDoc.exists) {
+          // Iso doc neexistuje v novej štruktúre - načítaj celú časť (migrácia ešte neprebehla)
+          console.warn('ISO doc neexistuje, načítavam celú časť...');
+          return loadWbPart(syncPart);
+        }
         var isoData = isoDoc.data();
         var newRows = isoData.welds || [];
         // Soft update - vymaž staré riadky tejto iso a pridaj nové
         weldBookData = weldBookData.filter(function(r){ return (r.isometric||'') !== changedIso; });
         weldBookData = weldBookData.concat(newRows);
-        if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.refreshCells({ force: true });
+        wbLocalBackup();
+        if (weldBookGrid && weldBookGrid.api) {
+          weldBookGrid.api.setGridOption('rowData', weldBookData);
+          weldBookGrid.api.refreshCells({ force: true });
+        }
         showWbSyncNotification('✅ ' + data.by + ' upravil ' + changedIso, 'success');
         addNotification('📋 ' + data.by + ' upravil WeldBook [' + syncPart + ']');
       }).catch(function(e){ console.error('Signal iso fetch error:', e); });
@@ -10069,7 +10077,11 @@ function startWbRealtimeSync() {
           if (idx >= 0) Object.assign(weldBookData[idx], newRow);
           else weldBookData.push(newRow);
         });
-        if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.refreshCells({ force: true });
+        wbLocalBackup();
+        if (weldBookGrid && weldBookGrid.api) {
+          weldBookGrid.api.setGridOption('rowData', weldBookData);
+          weldBookGrid.api.refreshCells({ force: true });
+        }
         showWbSyncNotification('✅ ' + data.by + ' upravil WeldBook', 'success');
         addNotification('📋 ' + data.by + ' upravil WeldBook [' + syncPart + ']');
       }).catch(function(e){ console.error('Signal fetch error:', e); });
