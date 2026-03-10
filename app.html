@@ -8947,6 +8947,7 @@ function initializeWeldBookGrid() {
     // RT INSPECTION
     { headerName: 'RT inspection %', field: 'rtPercent', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
     { headerName: 'RT Date of testing', field: 'rtDate', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'RT Note', field: 'rtNote', width: 80, editable: true, cellStyle: function(params) { return params.value === 'N' ? {backgroundColor: '#fef3c7', color: '#b45309', fontWeight: '700', textAlign: 'center'} : (isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null); } },
     { headerName: 'RT report', field: 'rtReport', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
     { headerName: 'RT result', field: 'rtResult', width: 110, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
     { headerName: 'RT defect [mm]', field: 'rtDefect', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
