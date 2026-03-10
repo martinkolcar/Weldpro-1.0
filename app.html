@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WeldPro 1.0 - Professional Welding Management</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://unpkg.com/pizzip@3.1.4/dist/pizzip.js"></script>
+<script src="https://unpkg.com/docxtemplater@3.44.0/build/docxtemplater.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/dist/ag-grid-community.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-grid.css">
@@ -8671,6 +8674,7 @@ function openWeldBook() {
   content += '<button onclick="clearLocalStorageWeldBook()" style="padding:10px 20px;background:#92400e;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600" title="Vymaže len lokálnu cache prehliadača">🧹 Vymazať cache</button>';
   content += '<button onclick="fixWbParts()" style="padding:10px 20px;background:#7c3aed;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600" title="Opraví SUL/LIG/DRY na uppercase">🔧 Opraviť časti</button>';
   content += '<button onclick="compareJsonVsWeldBook()" style="padding:10px 20px;background:#0369a1;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600" title="Porovná zvary z JSON projektov vs WeldBook">🔍 JSON vs WeldBook</button>';
+  content += '<button onclick="openRtPoziadavkaModal()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📡 RT Požiadavka</button>';
   content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button>';
   content += '<button onclick="closeWeldBook()" style="padding:10px 20px;background:#6b7280;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✕ Zavrieť</button>';
   content += '</div></div>';
@@ -8884,7 +8888,7 @@ function initializeWeldBookGrid() {
     { headerName: 'PED', field: 'ped', width: 80, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
     { headerName: 'REV.', field: 'rev', width: 80, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
     { headerName: 'Pipe Class', field: 'pipeClass', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Weld ID', field: 'weldId', width: 100, editable: true, cellDataType: 'text', valueFormatter: function(params) { return params.value ? String(params.value) : ''; }, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'Weld ID', field: 'weldId', width: 100, editable: true, pinned: 'left', cellDataType: 'text', valueFormatter: function(params) { return params.value ? String(params.value) : ''; }, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
     { headerName: 'Source', field: 'source', width: 90, editable: true, cellStyle: function(params) { 
       if(params.value==='prefab')return {backgroundColor:'#d1fae5',color:'#065f46',fontWeight:'600'};
       if(params.value==='new')return {backgroundColor:'#fef3c7',color:'#92400e',fontWeight:'600'};
@@ -16952,6 +16956,317 @@ function waitForDbAndStartBadge(){
 waitForDbAndStartBadge();
 window.addEventListener('load', () => setTimeout(waitForDbAndStartBadge, 1000));
 
+</script>
+
+<!-- RT POŽIADAVKA MODAL -->
+<div id="rtPoziadavkaModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:12px;padding:28px;width:540px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,0.4)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="margin:0;color:#b45309;font-size:18px">📡 RT Požiadavka</h2>
+      <button onclick="closeRtPoziadavkaModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#9ca3af">×</button>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="display:block;font-weight:600;color:#374151;margin-bottom:5px;font-size:13px">Dátum RT testovania</label>
+      <input type="date" id="rtPozDatum" style="width:100%;padding:10px;border:1.5px solid #d1d5db;border-radius:8px;font-size:15px;box-sizing:border-box">
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="display:block;font-weight:600;color:#374151;margin-bottom:5px;font-size:13px">Číslo zákazky</label>
+      <input type="text" id="rtPozZakazka" placeholder="napr. 001" style="width:100%;padding:10px;border:1.5px solid #d1d5db;border-radius:8px;font-size:15px;box-sizing:border-box">
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="display:block;font-weight:600;color:#374151;margin-bottom:5px;font-size:13px">Miesto vykonania</label>
+      <input type="text" id="rtPozMiesto" value="Montex JCB" style="width:100%;padding:10px;border:1.5px solid #d1d5db;border-radius:8px;font-size:15px;box-sizing:border-box">
+    </div>
+    <div id="rtPozPreview" style="display:none;margin-bottom:14px;padding:12px;background:#fef3c7;border-radius:8px;border:1px solid #fcd34d">
+      <div style="font-weight:600;color:#92400e;margin-bottom:6px" id="rtPozCount"></div>
+      <div style="max-height:160px;overflow-y:auto;font-size:11px;color:#374151;font-family:monospace" id="rtPozList"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button onclick="previewRtPoziadavka()" style="flex:1;padding:11px;background:#fef3c7;color:#92400e;border:1.5px solid #fcd34d;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px">🔍 Zobraziť zvary</button>
+      <button onclick="generateRtPoziadavka()" style="flex:1;padding:11px;background:#b45309;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px">📄 Generovať Word</button>
+    </div>
+    <div id="rtPozStatus" style="margin-top:10px;font-size:13px;text-align:center;color:#6b7280"></div>
+  </div>
+</div>
+
+<script>
+// ============= RT POŽIADAVKA =============
+function openRtPoziadavkaModal() {
+  var d = new Date();
+  var today = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  document.getElementById('rtPozDatum').value = today;
+  document.getElementById('rtPozPreview').style.display = 'none';
+  document.getElementById('rtPozStatus').textContent = '';
+  var modal = document.getElementById('rtPoziadavkaModal');
+  modal.style.display = 'flex';
+}
+
+function closeRtPoziadavkaModal() {
+  document.getElementById('rtPoziadavkaModal').style.display = 'none';
+}
+
+function getRtPozWelds() {
+  var datum = document.getElementById('rtPozDatum').value;
+  if (!datum) return [];
+  return weldBookData.filter(function(r) {
+    return r.rtDate && r.rtDate === datum;
+  });
+}
+
+function previewRtPoziadavka() {
+  var welds = getRtPozWelds();
+  var datum = document.getElementById('rtPozDatum').value;
+  if (!datum) { document.getElementById('rtPozStatus').textContent = 'Vyber dátum!'; return; }
+  var preview = document.getElementById('rtPozPreview');
+  var countEl = document.getElementById('rtPozCount');
+  var listEl = document.getElementById('rtPozList');
+  if (welds.length === 0) {
+    countEl.textContent = 'Žiadne zvary s RT dátumom ' + datum;
+    listEl.innerHTML = '';
+  } else {
+    countEl.textContent = 'Nájdených ' + welds.length + ' zvarov s RT dátumom ' + datum + ':';
+    listEl.innerHTML = welds.map(function(r, i) {
+      return (i+1) + '. ' + (r.isometric||'—') + ' | Zvar: ' + (r.weldId||'—') + ' | Zvárač: ' + (r.welderId||'—') + ' | Ø' + (r.dimension1||r.dimension2||'—') + ' | hr.' + (r.thickness1||r.thickness2||'—') + ' | ' + (r.material1||r.material2||'—');
+    }).join('<br>');
+  }
+  preview.style.display = 'block';
+}
+
+async function generateRtPoziadavka() {
+  var welds = getRtPozWelds();
+  var datum = document.getElementById('rtPozDatum').value;
+  if (!datum) { alert('Vyber dátum!'); return; }
+  if (welds.length === 0) { alert('Žiadne zvary pre dátum ' + datum); return; }
+
+  var zakazka = document.getElementById('rtPozZakazka').value || 'XXX';
+  var miesto = document.getElementById('rtPozMiesto').value || 'Montex JCB';
+  var datumFormatted = datum.split('-').reverse().join('.');
+
+  document.getElementById('rtPozStatus').textContent = '⏳ Generujem Word...';
+
+  try {
+    var blob = await buildRtDocx(welds, zakazka, miesto, datumFormatted);
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'RT_Poziadavka_' + datum + '.docx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    document.getElementById('rtPozStatus').textContent = '✅ Word vygenerovaný!';
+  } catch(e) {
+    console.error(e);
+    document.getElementById('rtPozStatus').textContent = '❌ Chyba: ' + e.message;
+  }
+}
+
+function escXml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+}
+
+function xmlCell(text, opts) {
+  opts = opts || {};
+  var span = opts.span ? '<w:gridSpan w:val="'+opts.span+'"/>' : '';
+  var shading = opts.gray ? '<w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>' : '';
+  var bold = opts.bold ? '<w:b/>' : '';
+  var sz = '<w:sz w:val="'+(opts.sz||18)+'"/><w:szCs w:val="'+(opts.sz||18)+'"/>';
+  var align = opts.center ? '<w:jc w:val="center"/>' : '';
+  var vAlign = '<w:vAlign w:val="center"/>';
+  var borders = '<w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders>';
+  return '<w:tc><w:tcPr>'+
+    (opts.w ? '<w:tcW w:w="'+opts.w+'" w:type="dxa"/>' : '')+
+    span + borders + shading + vAlign +
+    '<w:tcMar><w:top w:w="40" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tcMar>'+
+    '</w:tcPr>'+
+    '<w:p><w:pPr>'+align+'<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/>'+(opts.bold?'<w:b/>':'')+sz+'</w:rPr></w:pPr>'+
+    '<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/>'+bold+sz+'</w:rPr>'+
+    '<w:t xml:space="preserve">'+escXml(text)+'</w:t></w:r></w:p></w:tc>';
+}
+
+function xmlRow(cells, height) {
+  var hPr = height ? '<w:trPr><w:trHeight w:val="'+height+'" w:hRule="atLeast"/></w:trPr>' : '<w:trPr/>';
+  return '<w:tr>'+hPr+cells.join('')+'</w:tr>';
+}
+
+function buildRtDocx(welds, zakazka, miesto, datumFormatted) {
+  // Sirky stlpcov v dxa - spolu ~13000
+  var W = [600, 3600, 900, 1000, 2000, 1000, 1000, 600, 1300];
+  var TW = W.reduce(function(a,b){return a+b;},0);
+
+  var MIN_ROWS = 20;
+  var dataRows = [];
+  for (var i = 0; i < Math.max(welds.length, MIN_ROWS); i++) {
+    var w = welds[i];
+    dataRows.push(xmlRow([
+      xmlCell(w ? String(i+1) : '', {w:W[0], center:true, sz:16}),
+      xmlCell(w ? (w.isometric||'') : '', {w:W[1], sz:14}),
+      xmlCell(w ? String(w.weldId||'') : '', {w:W[2], center:true, sz:16}),
+      xmlCell(w ? (w.welderId||'') : '', {w:W[3], center:true, sz:16}),
+      xmlCell(w ? (w.material1||w.material2||'') : '', {w:W[4], center:true, sz:16}),
+      xmlCell(w ? (w.dimension1||w.dimension2||'') : '', {w:W[5], center:true, sz:16}),
+      xmlCell(w ? (w.thickness1||w.thickness2||'') : '', {w:W[6], center:true, sz:16}),
+      xmlCell(w ? '1' : '', {w:W[7], center:true, sz:16}),
+      xmlCell(w ? (w.rtNote==='N'?'N':'') : '', {w:W[8], center:true, sz:16}),
+    ], 360));
+  }
+
+  var tblGrid = W.map(function(w){return '<w:gridCol w:w="'+w+'"/>';}).join('');
+
+  var headerRows = [
+    // Nadpis
+    xmlRow([
+      xmlCell('POŽIADAVKOVÝ LIST č. XX/26/XXXX', {w:TW-1300, span:7, bold:true, sz:28}),
+      xmlCell('strana 1 z 1', {w:1300, span:2, bold:true, sz:22, center:true}),
+    ], 700),
+    xmlRow([
+      xmlCell('Zákazník/firma: PMP Montex s.r.o.', {span:5, bold:true, sz:18}),
+      xmlCell('Trvalá objednávka/ZoD č.: 2011 dodatok č.1', {span:4, bold:true, sz:18}),
+    ]),
+    xmlRow([
+      xmlCell('Požadujeme vykonanie NDT skúšok metódou: RT', {span:5, bold:true, sz:18}),
+      xmlCell('Zákazka číslo: '+zakazka, {span:4, bold:true, sz:18}),
+    ]),
+    xmlRow([
+      xmlCell('Skúška má byť vykonaná dňa:', {span:5, bold:true, sz:18}),
+      xmlCell(datumFormatted, {span:4, sz:18}),
+    ]),
+    xmlRow([
+      xmlCell('Miesto vykonania skúšky:', {span:5, bold:true, sz:18}),
+      xmlCell(miesto, {span:4, sz:18}),
+    ]),
+    xmlRow([
+      xmlCell('Názov akcie:/názov stavby:', {span:5, bold:true, sz:18}),
+      xmlCell('Södra Cell Mönsterås Lignin separation / H2SO4', {span:4, sz:18}),
+    ]),
+    xmlRow([
+      xmlCell('Skúška podľa:', {span:5, bold:true, sz:18}),
+      xmlCell('EN ISO 17636-1, level B', {span:4, sz:18}),
+    ]),
+    xmlRow([
+      xmlCell('Vyhodnotenie podľa/ prípustnosť, akosť:', {span:5, bold:true, sz:18}),
+      xmlCell('EN ISO 10675-1, level 2', {span:4, sz:18}),
+    ]),
+    xmlRow([xmlCell('Poznámky:', {span:9, bold:true, sz:18})]),
+    xmlRow([xmlCell('Parametre skúšaného objektu:', {span:9, bold:true, sz:18})]),
+    // Hlavicky stlpcov
+    xmlRow([
+      xmlCell('Int.č.', {w:W[0], gray:true, bold:true, center:true, sz:16}),
+      xmlCell('objekt / oblasť (izometria)', {w:W[1], gray:true, bold:true, center:true, sz:16}),
+      xmlCell('číslo zvaru', {w:W[2], gray:true, bold:true, center:true, sz:16}),
+      xmlCell('číslo zvárača', {w:W[3], gray:true, bold:true, center:true, sz:16}),
+      xmlCell('materiál', {w:W[4], gray:true, bold:true, center:true, sz:16}),
+      xmlCell('priemer', {w:W[5], gray:true, bold:true, center:true, sz:16}),
+      xmlCell('hrúbka', {w:W[6], gray:true, bold:true, center:true, sz:16}),
+      xmlCell('ks', {w:W[7], gray:true, bold:true, center:true, sz:16}),
+      xmlCell('poznámka', {w:W[8], gray:true, bold:true, center:true, sz:16}),
+    ], 500),
+  ];
+
+  var footerRow = xmlRow([
+    xmlCell('Dátum: '+datumFormatted, {span:4, bold:true, sz:18}),
+    xmlCell('Vystavil/podpis/mobil: Martin Kolčár\ntel. 0902 048 393, Ján Boroš 0903 728 693', {span:5, bold:true, sz:18}),
+  ], 600);
+
+  // Oprava - footer s dvoma paragrafmi
+  var footerCellContent = '<w:tc><w:tcPr><w:gridSpan w:val="4"/>'+
+    '<w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders>'+
+    '<w:vAlign w:val="center"/>'+
+    '</w:tcPr><w:p><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:b/><w:sz w:val="18"/></w:rPr><w:t>Dátum: '+escXml(datumFormatted)+'</w:t></w:r></w:p></w:tc>';
+  var footerCell2Content = '<w:tc><w:tcPr><w:gridSpan w:val="5"/>'+
+    '<w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders>'+
+    '<w:vAlign w:val="center"/>'+
+    '</w:tcPr>'+
+    '<w:p><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:b/><w:sz w:val="18"/></w:rPr><w:t>Vystavil/podpis/mobil: Martin Kolčár</w:t></w:r></w:p>'+
+    '<w:p><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:b/><w:sz w:val="18"/></w:rPr><w:t>tel. 0902 048 393, Ján Boroš 0903 728 693</w:t></w:r></w:p>'+
+    '</w:tc>';
+  var footerRowXml = '<w:tr><w:trPr><w:trHeight w:val="600" w:hRule="atLeast"/></w:trPr>'+footerCellContent+footerCell2Content+'</w:tr>';
+
+  var docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" '+
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '+
+    'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" '+
+    'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '+
+    'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">'+
+    '<w:body>'+
+    '<w:tbl>'+
+    '<w:tblPr>'+
+    '<w:tblW w:w="'+TW+'" w:type="dxa"/>'+
+    '<w:jc w:val="center"/>'+
+    '<w:tblBorders>'+
+    '<w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>'+
+    '<w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>'+
+    '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>'+
+    '<w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>'+
+    '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>'+
+    '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>'+
+    '</w:tblBorders>'+
+    '</w:tblPr>'+
+    '<w:tblGrid>'+tblGrid+'</w:tblGrid>'+
+    headerRows.join('') +
+    dataRows.join('') +
+    footerRowXml +
+    '</w:tbl>'+
+    '<w:sectPr>'+
+    '<w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>'+
+    '<w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="0" w:footer="0" w:gutter="0"/>'+
+    '</w:sectPr>'+
+    '</w:body></w:document>';
+
+  // Minimalne DOCX subory
+  var contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
+    '<Default Extension="xml" ContentType="application/xml"/>'+
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'+
+    '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'+
+    '</Types>';
+
+  var rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'+
+    '</Relationships>';
+
+  var wordRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'+
+    '</Relationships>';
+
+  var styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'+
+    '<w:docDefaults><w:rPrDefault><w:rPr>'+
+    '<w:rFonts w:ascii="Arial" w:hAnsi="Arial"/>'+
+    '<w:sz w:val="18"/><w:szCs w:val="18"/>'+
+    '</w:rPr></w:rPrDefault></w:docDefaults>'+
+    '</w:styles>';
+
+  // Pouzijeme JSZip ktory je uz nacitany (cez SheetJS)
+  // SheetJS exportuje JSZip ako XLSX.JSZip alebo pouzijeme vlastny
+  return buildZip({
+    '[Content_Types].xml': contentTypes,
+    '_rels/.rels': rels,
+    'word/document.xml': docXml,
+    'word/_rels/document.xml.rels': wordRels,
+    'word/styles.xml': styles,
+  });
+}
+
+function buildZip(files) {
+  // Pouzijeme JSZip nacitany cez CDN (uz je v stranke ako zavislost)
+  // Ak nie, nacitame ho
+  if (typeof JSZip === 'undefined') {
+    throw new Error('JSZip nie je načítaný. Skús obnoviť stránku.');
+  }
+  var zip = new JSZip();
+  Object.keys(files).forEach(function(path) {
+    zip.file(path, files[path]);
+  });
+  return zip.generateAsync({
+    type: 'blob',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    compression: 'DEFLATE'
+  });
+}
 </script>
 
 </body></html>
