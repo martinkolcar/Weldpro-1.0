@@ -2088,6 +2088,7 @@ async function clearRtModal() {
   if (!currentWbRow) return;
   var r = currentWbRow.row;
   r.rtDate = '';
+  r.rtNote = '';
   document.getElementById('rt_date').value = '';
   closeRtModal();
   showToast('Mažem RT dátum...');
