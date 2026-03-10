@@ -9964,16 +9964,16 @@ function startWbRealtimeSync() {
   if (!window._pcSessionId) window._pcSessionId = 'pc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   var mySessionId = window._pcSessionId;
   var initialLoad = true;
-  setTimeout(function() { initialLoad = false; }, 3000);
+  setTimeout(function() { initialLoad = false; console.log('🟢 WB signal listener aktívny'); }, 1000);
 
   // Listener na signal - počúva weldbook_signal
   var unsubSignal = db.collection('weldbook_signal').doc('latest').onSnapshot(function(doc) {
-    if (!doc.exists || initialLoad) return;
+    if (!doc.exists || initialLoad) { console.log('⏭️ Signal ignorovaný (initialLoad alebo neexistuje)'); return; }
     var data = doc.data();
     var signalAge = Date.now() - (data.at ? new Date(data.at).getTime() : 0);
-    if (signalAge > 60000) return;
-    // Ignoruj len ak to poslala táto konkrétna session (nie len rovnaký user)
-    if (data.sessionId && data.sessionId === mySessionId) return;
+    if (signalAge > 60000) { console.log('⏭️ Signal príliš starý:', signalAge, 'ms'); return; }
+    if (data.sessionId && data.sessionId === mySessionId) { console.log('⏭️ Vlastná session, ignorujem'); return; }
+    console.log('📡 Signal prijatý od:', data.by, '| part:', data.part, '| age:', signalAge, 'ms');
 
     var changedPart = (data.part && data.part !== 'ALL') ? data.part : null;
     // Vždy načítaj aktívnu časť - či už je zmena v nej alebo inej
@@ -9983,20 +9983,25 @@ function startWbRealtimeSync() {
       return;
     }
 
-    // Naša aktívna časť sa zmenila - nacitaj a soft-update (nezmen pozíciu gridu)
+    // Naša aktívna časť sa zmenila - načítaj znovu z Firebase
     showWbSyncNotification('🔄 ' + data.by + ' upravil WeldBook...', 'loading');
-    var fetchDocId = wbActivePart ? (wbActivePart + '_main') : 'weldbook_main';
-    db.collection('weldbook').doc(fetchDocId).get().then(function(metaDoc) {
-      if (!metaDoc.exists) return;
-      var meta = metaDoc.data();
-      var cps = [];
-      for (var ci2 = 0; ci2 < (meta.chunks||1); ci2++)
-        cps.push(db.collection('weldbook').doc(fetchDocId).collection('data').doc('c'+ci2).get());
-      return Promise.all(cps);
-    }).then(function(cds) {
-      if (!cds) return;
-      var newData = JSON.parse(cds.filter(function(c){return c.exists;}).map(function(c){return c.data().d;}).join(''));
-      // Soft update - in-place, zachova grid pozíciu a filter
+    var syncPart = changedPart || wbActivePart;
+    var fetchDocId = syncPart ? (syncPart + '_main') : 'weldbook_main';
+    console.log('📥 Načítavam zmeny z:', fetchDocId);
+
+    // Ulož aktuálnu scroll pozíciu a filter
+    var currentIsoFilter = document.getElementById('wbFilterIsometric') ? document.getElementById('wbFilterIsometric').value : '';
+
+    db.collection('weldbook').doc(fetchDocId).collection('data').get().then(function(snap) {
+      if (snap.empty) { console.warn('Žiadne chunky v', fetchDocId); return null; }
+      // Zoraď chunky podľa názvu c0, c1, c2...
+      var chunkDocs = snap.docs.sort(function(a,b){ return a.id.localeCompare(b.id, undefined, {numeric:true}); });
+      var joined = chunkDocs.map(function(d){ return d.data().d || ''; }).join('');
+      return JSON.parse(joined);
+    }).then(function(newData) {
+      if (!newData) return;
+      console.log('✅ Načítaných', newData.length, 'zvarov z Firebase');
+      // In-place update - zachová grid pozíciu
       newData.forEach(function(newRow) {
         var idx = weldBookData.findIndex(function(r) {
           return String(r.weldId||'') === String(newRow.weldId||'') &&
