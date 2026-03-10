@@ -9983,14 +9983,21 @@ function startWbRealtimeSync() {
       return;
     }
 
-    // Naša aktívna časť sa zmenila - nacitaj zmeny
+    // Naša aktívna časť sa zmenila - nacitaj a soft-update (nezmen pozíciu gridu)
     showWbSyncNotification('🔄 ' + data.by + ' upravil WeldBook...', 'loading');
-    var syncPart = changedPart || wbActivePart;
-    var fetchDocId = syncPart ? (syncPart + '_main') : 'weldbook_main';
-    var changedIso = data.iso || null;
-
-    function applyAndRefresh(rows) {
-      rows.forEach(function(newRow) {
+    var fetchDocId = wbActivePart ? (wbActivePart + '_main') : 'weldbook_main';
+    db.collection('weldbook').doc(fetchDocId).get().then(function(metaDoc) {
+      if (!metaDoc.exists) return;
+      var meta = metaDoc.data();
+      var cps = [];
+      for (var ci2 = 0; ci2 < (meta.chunks||1); ci2++)
+        cps.push(db.collection('weldbook').doc(fetchDocId).collection('data').doc('c'+ci2).get());
+      return Promise.all(cps);
+    }).then(function(cds) {
+      if (!cds) return;
+      var newData = JSON.parse(cds.filter(function(c){return c.exists;}).map(function(c){return c.data().d;}).join(''));
+      // Soft update - in-place, zachova grid pozíciu a filter
+      newData.forEach(function(newRow) {
         var idx = weldBookData.findIndex(function(r) {
           return String(r.weldId||'') === String(newRow.weldId||'') &&
                  String(r.isometric||'') === String(newRow.isometric||'');
@@ -10005,43 +10012,7 @@ function startWbRealtimeSync() {
       }
       showWbSyncNotification('✅ ' + data.by + ' upravil WeldBook', 'success');
       addNotification('📋 ' + data.by + ' upravil WeldBook [' + (changedPart||'ALL') + ']');
-    }
-
-    if (changedIso && syncPart) {
-      // Rýchle - načítaj len zmenú izometriu
-      var isoDocId = changedIso.replace(/\//g, '__');
-      db.collection('weldbook').doc(fetchDocId).collection('isos').doc(isoDocId).get()
-        .then(function(isoDoc) {
-          if (isoDoc.exists && isoDoc.data().welds) {
-            applyAndRefresh(isoDoc.data().welds);
-          } else {
-            // Iso dokument ešte nie je - načítaj celú časť z chunkov
-            return db.collection('weldbook').doc(fetchDocId).get().then(function(metaDoc) {
-              if (!metaDoc.exists) return;
-              var meta = metaDoc.data();
-              var cps = [];
-              for (var i=0; i<(meta.chunks||1); i++)
-                cps.push(db.collection('weldbook').doc(fetchDocId).collection('data').doc('c'+i).get());
-              return Promise.all(cps).then(function(cds) {
-                applyAndRefresh(JSON.parse(cds.filter(function(c){return c.exists;}).map(function(c){return c.data().d;}).join('')));
-              });
-            });
-          }
-        }).catch(function(e){ console.error('ISO fetch error:', e); });
-    } else {
-      // Načítaj celú časť z chunkov
-      db.collection('weldbook').doc(fetchDocId).get().then(function(metaDoc) {
-        if (!metaDoc.exists) return;
-        var meta = metaDoc.data();
-        var cps = [];
-        for (var ci2=0; ci2<(meta.chunks||1); ci2++)
-          cps.push(db.collection('weldbook').doc(fetchDocId).collection('data').doc('c'+ci2).get());
-        return Promise.all(cps);
-      }).then(function(cds) {
-        if (!cds) return;
-        applyAndRefresh(JSON.parse(cds.filter(function(c){return c.exists;}).map(function(c){return c.data().d;}).join('')));
-      }).catch(function(e){ console.error('Signal fetch error:', e); });
-    }
+    }).catch(function(e){ console.error('Signal fetch error:', e); });
   });
   wbRealtimeListeners.push(unsubSignal);
 
