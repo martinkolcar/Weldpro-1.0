@@ -8882,13 +8882,13 @@ function initializeWeldBookGrid() {
   // Definícia stĺpcov (46 stĺpcov podľa Excel template)
   var columnDefs = [
     // DESCRIPTION
-    { headerName: 'Časť', field: 'part', width: 200, editable: true, pinned: 'left', cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Izometria', field: 'isometric', width: 200, editable: true, pinned: 'left', cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Sheets', field: 'sheets', width: 80, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'PED', field: 'ped', width: 80, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'REV.', field: 'rev', width: 80, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Pipe Class', field: 'pipeClass', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Weld ID', field: 'weldId', width: 100, editable: true, pinned: 'left', cellDataType: 'text', valueFormatter: function(params) { return params.value ? String(params.value) : ''; }, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'Časť', field: 'part', width: 200, editable: true, pinned: 'left', cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Izometria', field: 'isometric', width: 200, editable: true, pinned: 'left', cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Sheets', field: 'sheets', width: 80, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'PED', field: 'ped', width: 80, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'REV.', field: 'rev', width: 80, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Pipe Class', field: 'pipeClass', width: 120, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Weld ID', field: 'weldId', width: 100, editable: true, pinned: 'left', cellDataType: 'text', valueFormatter: function(params) { return params.value ? String(params.value) : ''; }, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
     { headerName: 'Source', field: 'source', width: 90, editable: true, cellStyle: function(params) { 
       if(params.value==='prefab')return {backgroundColor:'#d1fae5',color:'#065f46',fontWeight:'600'};
       if(params.value==='new')return {backgroundColor:'#fef3c7',color:'#92400e',fontWeight:'600'};
@@ -8897,76 +8897,76 @@ function initializeWeldBookGrid() {
     } },
     
     // ITEM 1
-    { headerName: 'Welded Item 1', field: 'item1', width: 150, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Heat nr. 1', field: 'heatNr1', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Certificate nr. 1', field: 'certNr1', width: 150, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Dimension 1', field: 'dimension1', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Wall thickness 1', field: 'thickness1', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Material 1', field: 'material1', width: 150, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Mat. Group 1', field: 'matGroup1', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'Welded Item 1', field: 'item1', width: 150, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Heat nr. 1', field: 'heatNr1', width: 120, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Certificate nr. 1', field: 'certNr1', width: 150, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Dimension 1', field: 'dimension1', width: 120, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Wall thickness 1', field: 'thickness1', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Material 1', field: 'material1', width: 150, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Mat. Group 1', field: 'matGroup1', width: 120, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
     
     // ITEM 2
-    { headerName: 'Welded Item 2', field: 'item2', width: 150, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Heat nr. 2', field: 'heatNr2', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Certificate nr. 2', field: 'certNr2', width: 150, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Dimension 2', field: 'dimension2', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Wall thickness 2', field: 'thickness2', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Material 2', field: 'material2', width: 150, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Mat. Group 2', field: 'matGroup2', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'Welded Item 2', field: 'item2', width: 150, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Heat nr. 2', field: 'heatNr2', width: 120, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Certificate nr. 2', field: 'certNr2', width: 150, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Dimension 2', field: 'dimension2', width: 120, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Wall thickness 2', field: 'thickness2', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Material 2', field: 'material2', width: 150, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Mat. Group 2', field: 'matGroup2', width: 120, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
     
     // WELDING
-    { headerName: 'WPS', field: 'wps', width: 100, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'WPQR', field: 'wpqr', width: 100, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Welding method', field: 'weldingMethod', width: 150, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Type of joint', field: 'jointType', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Type of welding', field: 'weldingType', width: 150, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Welding gas', field: 'weldingGas', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Heat nr.', field: 'heatNrWeld', width: 110, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Certificate nr.', field: 'certNrWeld', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Welder ID', field: 'welderId', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Date of welding', field: 'dateWelding', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'WPS', field: 'wps', width: 100, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'WPQR', field: 'wpqr', width: 100, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Welding method', field: 'weldingMethod', width: 150, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Type of joint', field: 'jointType', width: 130, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Type of welding', field: 'weldingType', width: 150, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Welding gas', field: 'weldingGas', width: 120, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Heat nr.', field: 'heatNrWeld', width: 110, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Certificate nr.', field: 'certNrWeld', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Welder ID', field: 'welderId', width: 120, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Date of welding', field: 'dateWelding', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
     
     // VT INSPECTION
-    { headerName: 'VT inspection %', field: 'vtPercent', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'VT Date of testing', field: 'vtDate', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'VT report', field: 'vtReport', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'VT result', field: 'vtResult', width: 110, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'VT defect [mm]', field: 'vtDefect', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'VT Add. Info', field: 'vtAddInfo', width: 150, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'VT repair date', field: 'vtRepairDate', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'VT repair result', field: 'vtRepairResult', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'VT repair Add. Info', field: 'vtRepairAddInfo', width: 160, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'VT inspection %', field: 'vtPercent', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'VT Date of testing', field: 'vtDate', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'VT report', field: 'vtReport', width: 120, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'VT result', field: 'vtResult', width: 110, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'VT defect [mm]', field: 'vtDefect', width: 130, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'VT Add. Info', field: 'vtAddInfo', width: 150, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'VT repair date', field: 'vtRepairDate', width: 130, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'VT repair result', field: 'vtRepairResult', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'VT repair Add. Info', field: 'vtRepairAddInfo', width: 160, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
 
     // PT INSPECTION
-    { headerName: 'PT inspection %', field: 'ptPercent', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'PT Date of testing', field: 'ptDate', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'PT report', field: 'ptReport', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'PT result', field: 'ptResult', width: 110, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'PT defect [mm]', field: 'ptDefect', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'PT Add. Info', field: 'ptAddInfo', width: 150, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'PT repair date', field: 'ptRepairDate', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'PT repair result', field: 'ptRepairResult', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'PT repair Add. Info', field: 'ptRepairAddInfo', width: 160, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'PT inspection %', field: 'ptPercent', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'PT Date of testing', field: 'ptDate', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'PT report', field: 'ptReport', width: 120, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'PT result', field: 'ptResult', width: 110, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'PT defect [mm]', field: 'ptDefect', width: 130, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'PT Add. Info', field: 'ptAddInfo', width: 150, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'PT repair date', field: 'ptRepairDate', width: 130, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'PT repair result', field: 'ptRepairResult', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'PT repair Add. Info', field: 'ptRepairAddInfo', width: 160, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
 
     // RT INSPECTION
-    { headerName: 'RT inspection %', field: 'rtPercent', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'RT Date of testing', field: 'rtDate', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'RT inspection %', field: 'rtPercent', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'RT Date of testing', field: 'rtDate', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
     { headerName: 'RT Note', field: 'rtNote', width: 80, editable: true, cellStyle: function(params) { return params.value === 'N' ? {backgroundColor: '#fef3c7', color: '#b45309', fontWeight: '700', textAlign: 'center'} : (isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null); } },
-    { headerName: 'RT report', field: 'rtReport', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'RT result', field: 'rtResult', width: 110, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'RT defect [mm]', field: 'rtDefect', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'RT Add. Info', field: 'rtAddInfo', width: 150, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'RT repair date', field: 'rtRepairDate', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'RT repair result', field: 'rtRepairResult', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'RT repair Add. Info', field: 'rtRepairAddInfo', width: 160, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'RT report', field: 'rtReport', width: 120, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'RT result', field: 'rtResult', width: 110, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'RT defect [mm]', field: 'rtDefect', width: 130, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'RT Add. Info', field: 'rtAddInfo', width: 150, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'RT repair date', field: 'rtRepairDate', width: 130, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'RT repair result', field: 'rtRepairResult', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'RT repair Add. Info', field: 'rtRepairAddInfo', width: 160, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
 
     // PROGRESS
-    { headerName: 'Inch/Weld', field: 'inchWeld', width: 110, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Prefab Planned', field: 'prefabPlanned', width: 140, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Prefab Welded', field: 'prefabWelded', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Install Planned', field: 'installPlanned', width: 130, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Install Welded', field: 'installWelded', width: 120, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
-    { headerName: 'Pressure test group', field: 'pressureGroup', width: 170, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } },
+    { headerName: 'Inch/Weld', field: 'inchWeld', width: 110, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Prefab Planned', field: 'prefabPlanned', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Prefab Welded', field: 'prefabWelded', width: 130, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Install Planned', field: 'installPlanned', width: 130, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Install Welded', field: 'installWelded', width: 120, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Pressure test group', field: 'pressureGroup', width: 170, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
     { headerName: 'Note', field: 'note', width: 200, editable: true, cellStyle: function(params) { return isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null; } }
   ];
   
@@ -17005,18 +17005,38 @@ function closeRtPoziadavkaModal() {
   document.getElementById('rtPoziadavkaModal').style.display = 'none';
 }
 
-function getRtPozWelds() {
-  var datum = document.getElementById('rtPozDatum').value;
+async function getRtPozWelds(datum) {
   if (!datum) return [];
-  return weldBookData.filter(function(r) {
-    return r.rtDate && r.rtDate === datum;
-  });
+  var parts = ['SUL','LIG','DRY','FLA','LHT'];
+  var allRows = [];
+  console.log('RT hladam datum:', datum, 'db:', !!db);
+  for (var pi = 0; pi < parts.length; pi++) {
+    var p = parts[pi];
+    try {
+      var metaDoc = await db.collection('weldbook').doc(p+'_main').get();
+      if (!metaDoc.exists) { console.log(p+': neexistuje'); continue; }
+      var meta = metaDoc.data();
+      var numChunks = meta.chunks || 1;
+      var cps = [];
+      for (var ci = 0; ci < numChunks; ci++)
+        cps.push(db.collection('weldbook').doc(p+'_main').collection('data').doc('c'+ci).get());
+      var cds = await Promise.all(cps);
+      var joined = cds.filter(function(c){return c.exists;}).map(function(c){return c.data().d||'';}).join('');
+      var rows = JSON.parse(joined);
+      var hits = rows.filter(function(r){return r.rtDate && r.rtDate === datum;}).length;
+      console.log(p+': '+rows.length+' zvarov, '+hits+' matches');
+      allRows = allRows.concat(rows);
+    } catch(e) { console.error('RT error '+p+':', e); }
+  }
+  return allRows.filter(function(r){ return r.rtDate && r.rtDate === datum; });
 }
 
-function previewRtPoziadavka() {
-  var welds = getRtPozWelds();
+async function previewRtPoziadavka() {
   var datum = document.getElementById('rtPozDatum').value;
   if (!datum) { document.getElementById('rtPozStatus').textContent = 'Vyber dátum!'; return; }
+  document.getElementById('rtPozStatus').textContent = '⏳ Načítavam zvary zo všetkých častí...';
+  var welds = await getRtPozWelds(datum);
+  document.getElementById('rtPozStatus').textContent = '';
   var preview = document.getElementById('rtPozPreview');
   var countEl = document.getElementById('rtPozCount');
   var listEl = document.getElementById('rtPozList');
@@ -17033,10 +17053,11 @@ function previewRtPoziadavka() {
 }
 
 async function generateRtPoziadavka() {
-  var welds = getRtPozWelds();
   var datum = document.getElementById('rtPozDatum').value;
   if (!datum) { alert('Vyber dátum!'); return; }
-  if (welds.length === 0) { alert('Žiadne zvary pre dátum ' + datum); return; }
+  document.getElementById('rtPozStatus').textContent = '⏳ Načítavam zvary zo všetkých častí...';
+  var welds = await getRtPozWelds(datum);
+  if (welds.length === 0) { document.getElementById('rtPozStatus').textContent = ''; alert('Žiadne zvary pre dátum ' + datum); return; }
 
   var zakazka = document.getElementById('rtPozZakazka').value || 'XXX';
   var miesto = document.getElementById('rtPozMiesto').value || 'Montex JCB';

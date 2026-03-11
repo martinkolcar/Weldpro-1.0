@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<title>WeldBook Import z Excelu</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; background: #f1f5f9; margin: 0; padding: 20px; }
+  .card { background: white; border-radius: 12px; padding: 24px; max-width: 900px; margin: 0 auto 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+  h1 { color: #1e293b; margin: 0 0 6px; font-size: 22px; }
+  .sub { color: #64748b; font-size: 14px; margin-bottom: 20px; }
+  .drop-zone { border: 2px dashed #94a3b8; border-radius: 10px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.2s; color: #64748b; }
+  .drop-zone:hover, .drop-zone.drag { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
+  .drop-zone input { display: none; }
+  .btn { padding: 11px 22px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; }
+  .btn-primary { background: #2563eb; color: white; }
+  .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+  .btn-danger { background: #dc2626; color: white; }
+  .progress-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin: 10px 0; }
+  .progress-fill { height: 100%; background: #2563eb; border-radius: 4px; transition: width 0.3s; }
+  .log { background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 16px; font-family: monospace; font-size: 12px; max-height: 320px; overflow-y: auto; }
+  .log .ok { color: #4ade80; }
+  .log .warn { color: #fbbf24; }
+  .log .err { color: #f87171; }
+  .log .info { color: #60a5fa; }
+  .part-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 16px 0; }
+  .part-card { border: 2px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: center; }
+  .part-card.done { border-color: #4ade80; background: #f0fdf4; }
+  .part-card.active { border-color: #3b82f6; background: #eff6ff; animation: pulse 1s infinite; }
+  .part-card.warn { border-color: #fbbf24; background: #fefce8; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  .part-name { font-weight: 700; font-size: 15px; color: #1e293b; }
+  .part-stats { font-size: 11px; color: #64748b; margin-top: 4px; }
+  .changed-badge { display: inline-block; background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: 600; }
+  .summary-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-top: 14px; }
+  .summary-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>📥 WeldBook Import z Excelu</h1>
+  <p class="sub">Nahrá dáta z Excel súboru do Firebase. Polia kde sa Excel líši od Firebase budú označené <span class="changed-badge">žltou</span> farbou.</p>
+
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+    <div style="font-size:40px;margin-bottom:8px">📊</div>
+    <div style="font-weight:600;font-size:15px">Klikni alebo presuň Excel súbor sem</div>
+    <div style="font-size:12px;margin-top:4px">Weld_log_*.xlsx</div>
+  </div>
+
+  <div id="fileInfo" style="display:none;margin-top:14px;padding:12px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0">
+    <span style="font-weight:600;color:#166534">✅ Súbor načítaný:</span> <span id="fileName"></span>
+  </div>
+</div>
+
+<div class="card" id="partsCard" style="display:none">
+  <h2 style="margin:0 0 14px;font-size:16px;color:#1e293b">Časti na import</h2>
+  <div class="part-grid" id="partGrid"></div>
+  <div style="display:flex;gap:10px;margin-top:16px">
+    <button class="btn btn-primary" id="startBtn" onclick="startImport()">🚀 Spustiť import</button>
+    <div style="flex:1"></div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+      <input type="checkbox" id="chkProtected" checked> Chráň ručne doplnené polia (welder, heat nr, dátumy testov...)
+    </label>
+  </div>
+</div>
+
+<div class="card" id="progressCard" style="display:none">
+  <h2 style="margin:0 0 14px;font-size:16px;color:#1e293b">Priebeh importu</h2>
+  <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  <div id="progressText" style="font-size:13px;color:#64748b;margin-bottom:10px">Pripravujem...</div>
+  <div class="log" id="logEl"></div>
+  <div class="summary-box" id="summaryBox" style="display:none">
+    <div style="font-weight:700;color:#1e293b;margin-bottom:8px">📊 Súhrn importu</div>
+    <div id="summaryContent"></div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDYFCovgo873FIrX4_pEdG1LpDKevxxEU4",
+  authDomain: "weldpro-66d2a-8336e.firebaseapp.com",
+  projectId: "weldpro-66d2a-8336e",
+  storageBucket: "weldpro-66d2a-8336e.firebasestorage.app",
+  messagingSenderId: "1062303461642",
+  appId: "1:1062303461642:web:e90ff234366c88a5eccaf3"
+};
+
+function initFirebase() {
+  firebase.initializeApp(firebaseConfig);
+  window.db = firebase.firestore();
+  log('✅ Firebase pripojený', 'ok');
+}
+
+// Mapovanie stĺpcov Excel → WeldBook polia
+const COL_MAP = {
+  0:'isometric', 1:'sheets', 11:'ped', 12:'rev', 13:'pipeClass', 14:'weldId',
+  15:'item1', 16:'heatNr1', 17:'certNr1', 18:'dimension1', 19:'thickness1', 20:'material1', 21:'matGroup1',
+  22:'item2', 23:'heatNr2', 24:'certNr2', 25:'dimension2', 26:'thickness2', 27:'material2', 28:'matGroup2',
+  29:'wps', 30:'wpqr', 31:'weldingMethod', 32:'jointType', 33:'weldingType', 34:'weldingGas',
+  35:'heatNrWeld', 36:'certNrWeld', 37:'welderId', 38:'dateWelding',
+  39:'vtPercent', 40:'vtDate', 41:'vtReport', 42:'vtResult', 43:'vtDefect', 44:'vtAddInfo',
+  45:'vtRepairDate', 46:'vtRepairResult', 47:'vtRepairAddInfo',
+  48:'ptPercent', 49:'ptDate', 50:'ptReport', 51:'ptResult', 52:'ptDefect', 53:'ptAddInfo',
+  54:'ptRepairDate', 55:'ptRepairResult', 56:'ptRepairAddInfo',
+  57:'rtPercent', 58:'rtDate', 59:'rtReport', 60:'rtResult', 61:'rtDefect', 62:'rtAddInfo',
+  63:'rtRepairDate', 64:'rtRepairResult', 65:'rtRepairAddInfo',
+  66:'inchWeld', 67:'prefabPlanned', 68:'prefabWelded', 69:'installPlanned', 70:'installWelded', 71:'pressureGroup'
+};
+
+// Polia ktore su "chranene" - rucne doplnene v programe, Excel ich NESMIE prepísať
+const PROTECTED_FIELDS = [
+  'welderId','dateWelding',
+  'heatNr1','heatNr2','certNr1','certNr2',
+  'vtDate','vtPercent','vtReport','vtResult',
+  'ptDate','ptPercent','ptReport','ptResult',
+  'rtDate','rtPercent','rtReport','rtResult',
+  'note','rtNote'
+];
+
+// Polia kde sledujeme zmeny (Excel môže prepísať, ale označíme žltou)
+const TRACKED_FIELDS = [
+  'item1','item2','dimension1','dimension2','thickness1','thickness2',
+  'material1','material2','matGroup1','matGroup2',
+  'wps','wpqr','weldingMethod','jointType','weldingType','weldingGas',
+  'heatNrWeld','certNrWeld','inchWeld','pipeClass','ped','rev','pressureGroup'
+];
+
+const DATE_FIELDS = new Set(['dateWelding','vtDate','ptDate','rtDate','vtRepairDate','ptRepairDate','rtRepairDate']);
+
+let workbook = null;
+let partData = {}; // { SUL: [{...}], LIG: [...], ... }
+
+function log(msg, type) {
+  var el = document.getElementById('logEl');
+  if (!el) return;
+  var div = document.createElement('div');
+  div.className = type || '';
+  div.textContent = msg;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function excelDateToStr(val) {
+  if (!val) return '';
+  if (typeof val === 'object' && val instanceof Date) return val.toISOString().split('T')[0];
+  if (typeof val === 'number' && val > 40000) {
+    var d = new Date(Math.round((val - 25569) * 86400 * 1000));
+    return d.toISOString().split('T')[0];
+  }
+  var s = String(val).trim();
+  if (s.includes('T')) return s.split('T')[0];
+  return s;
+}
+
+// Drag & drop
+var dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', function(e){ e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', function(){ dz.classList.remove('drag'); });
+dz.addEventListener('drop', function(e){ e.preventDefault(); dz.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
+document.getElementById('fileInput').addEventListener('change', function(e){ if(e.target.files[0]) handleFile(e.target.files[0]); });
+
+function handleFile(file) {
+  document.getElementById('fileName').textContent = file.name + ' (' + (file.size/1024/1024).toFixed(1) + ' MB)';
+  document.getElementById('fileInfo').style.display = 'block';
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+    parseAllSheets();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseAllSheets() {
+  var parts = ['SUL','LIG','DRY','FLA','LHT'];
+  partData = {};
+  var grid = document.getElementById('partGrid');
+  grid.innerHTML = '';
+
+  parts.forEach(function(p) {
+    if (!workbook.SheetNames.includes(p)) return;
+    var rows = parseSheet(workbook.Sheets[p], p);
+    partData[p] = rows;
+
+    var card = document.createElement('div');
+    card.className = 'part-card';
+    card.id = 'part_' + p;
+    card.innerHTML = '<div class="part-name">'+p+'</div><div class="part-stats">'+rows.length+' zvarov</div>';
+    grid.appendChild(card);
+  });
+
+  document.getElementById('partsCard').style.display = 'block';
+  document.getElementById('progressCard').style.display = 'block';
+  log('📊 Excel načítaný: ' + Object.keys(partData).map(function(p){return p+'='+partData[p].length;}).join(', '), 'ok');
+}
+
+function parseSheet(ws, partName) {
+  if (ws['!rows']) ws['!rows'].forEach(function(r){ if(r) r.hidden = false; });
+  var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, cellDates: true });
+
+  // Najdi header riadok
+  var headerIdx = 2;
+  for (var i = 0; i < Math.min(6, rows.length); i++) {
+    if (rows[i].map(function(c){return String(c).toLowerCase().trim();}).indexOf('weld id') >= 0) { headerIdx = i; break; }
+  }
+
+  var result = [];
+  for (var ri = headerIdx + 1; ri < rows.length; ri++) {
+    var row = rows[ri];
+    if (!row || !row[0]) continue;
+    var obj = { part: partName };
+    for (var col in COL_MAP) {
+      var field = COL_MAP[col];
+      var val = row[parseInt(col)];
+      if (val === '' || val === null || val === undefined) continue;
+      if (DATE_FIELDS.has(field)) {
+        var ds = excelDateToStr(val);
+        if (ds) obj[field] = ds;
+      } else {
+        var sv = String(val).trim();
+        if (sv && !sv.startsWith('=')) obj[field] = sv;
+      }
+    }
+    if (!obj.weldId) continue;
+    if (/^\d+\.0$/.test(obj.weldId)) obj.weldId = String(parseInt(obj.weldId));
+    result.push(obj);
+  }
+  return result;
+}
+
+async function startImport() {
+  document.getElementById('startBtn').disabled = true;
+  var protect = document.getElementById('chkProtected').checked;
+  var parts = Object.keys(partData);
+  var totalStats = { added: 0, updated: 0, changed: 0, unchanged: 0 };
+
+  for (var pi = 0; pi < parts.length; pi++) {
+    var p = parts[pi];
+    document.getElementById('part_' + p).className = 'part-card active';
+    setProgress((pi / parts.length) * 100, 'Spracovávam ' + p + '...');
+
+    var stats = await importPart(p, partData[p], protect);
+    totalStats.added += stats.added;
+    totalStats.updated += stats.updated;
+    totalStats.changed += stats.changed;
+    totalStats.unchanged += stats.unchanged;
+
+    var card = document.getElementById('part_' + p);
+    card.className = 'part-card done';
+    card.innerHTML = '<div class="part-name">'+p+'</div><div class="part-stats">'+
+      '✅ '+stats.added+' nových<br>🔄 '+stats.updated+' zmenených<br>'+
+      (stats.changed > 0 ? '<span class="changed-badge">🟡 '+stats.changed+' rozdielov</span>' : '⬛ bez rozdielov')+
+      '</div>';
+  }
+
+  setProgress(100, 'Hotovo!');
+  log('', '');
+  log('════════════════════════════════', 'info');
+  log('✅ IMPORT DOKONČENÝ', 'ok');
+  log('  Nových zvarov: ' + totalStats.added, 'ok');
+  log('  Aktualizovaných: ' + totalStats.updated, 'ok');
+  log('  Rozdielov (žltá): ' + totalStats.changed, 'warn');
+  log('  Bez zmeny: ' + totalStats.unchanged, 'info');
+
+  var summaryEl = document.getElementById('summaryContent');
+  summaryEl.innerHTML = [
+    ['Nových zvarov pridaných', totalStats.added, '#166534'],
+    ['Existujúcich aktualizovaných', totalStats.updated, '#1d4ed8'],
+    ['Polia označené žltou (rozdiel)', totalStats.changed, '#92400e'],
+    ['Bez zmeny', totalStats.unchanged, '#6b7280'],
+  ].map(function(r){
+    return '<div class="summary-row"><span>'+r[0]+'</span><span style="font-weight:700;color:'+r[2]+'">'+r[1]+'</span></div>';
+  }).join('');
+  document.getElementById('summaryBox').style.display = 'block';
+}
+
+async function importPart(partName, excelRows, protect) {
+  log('📦 Načítavam Firebase ' + partName + '...', 'info');
+  var stats = { added: 0, updated: 0, changed: 0, unchanged: 0 };
+
+  // Nacitaj existujuce z Firebase
+  var existing = {};
+  try {
+    var metaDoc = await db.collection('weldbook').doc(partName+'_main').get();
+    if (metaDoc.exists) {
+      var meta = metaDoc.data();
+      var cps = [];
+      for (var ci = 0; ci < (meta.chunks||1); ci++)
+        cps.push(db.collection('weldbook').doc(partName+'_main').collection('data').doc('c'+ci).get());
+      var cds = await Promise.all(cps);
+      var joined = cds.filter(function(c){return c.exists;}).map(function(c){return c.data().d||'';}).join('');
+      var existRows = JSON.parse(joined);
+      existRows.forEach(function(r){
+        var key = String(r.weldId||'').trim()+'||'+(r.isometric||'').trim();
+        existing[key] = r;
+      });
+      log('  Firebase: ' + existRows.length + ' existujúcich zvarov', 'info');
+    } else {
+      log('  Firebase: prázdne (nové)', 'warn');
+    }
+  } catch(e) {
+    log('  ⚠️ Chyba pri načítaní: ' + e.message, 'err');
+  }
+
+  // Spracuj Excel riadky
+  var merged = [];
+  excelRows.forEach(function(excelRow) {
+    var key = String(excelRow.weldId||'').trim()+'||'+(excelRow.isometric||'').trim();
+    var fbRow = existing[key];
+
+    if (!fbRow) {
+      // Nový zvar - pridaj priamo
+      merged.push(excelRow);
+      stats.added++;
+      return;
+    }
+
+    // Existujúci zvar - porovnaj
+    var merged_row = Object.assign({}, fbRow); // začni s Firebase dátami
+    var rowChanged = false;
+
+    // Inicializuj _changed pole ak neexistuje
+    if (!merged_row._changed) merged_row._changed = {};
+
+    Object.keys(excelRow).forEach(function(field) {
+      if (field === 'part') return;
+      var exVal = String(excelRow[field]||'').trim();
+      var fbVal = String(fbRow[field]||'').trim();
+
+      // Chranené polia - nikdy neprepis ak protect=true
+      if (protect && PROTECTED_FIELDS.indexOf(field) >= 0) return;
+
+      // Ak sa hodnoty líšia
+      if (exVal !== fbVal && exVal !== '') {
+        merged_row[field] = exVal; // prepiš novou hodnotou
+
+        // Ak je to sledované pole a bolo niečo iné pred tým
+        if (fbVal !== '' && TRACKED_FIELDS.indexOf(field) >= 0) {
+          merged_row._changed[field] = true; // označ žltou
+          rowChanged = true;
+          stats.changed++;
+          log('  🟡 ' + partName + ' #' + excelRow.weldId + ' ' + field + ': "' + fbVal + '" → "' + exVal + '"', 'warn');
+        }
+      }
+    });
+
+    // Ak nie sú žiadne zmeny v _changed, vyčisti
+    if (Object.keys(merged_row._changed).length === 0) delete merged_row._changed;
+
+    if (rowChanged) stats.updated++;
+    else stats.unchanged++;
+
+    merged.push(merged_row);
+    delete existing[key]; // odstran z existing
+  });
+
+  // Zvary ktore su vo Firebase ale nie v Exceli - zachovaj ich
+  Object.values(existing).forEach(function(r) {
+    merged.push(r);
+  });
+
+  log('  Výsledok: ' + merged.length + ' zvarov (' + stats.added + ' nových, ' + stats.updated + ' zmenených)', 'ok');
+
+  // Uloz do Firebase
+  try {
+    var jsonStr = JSON.stringify(merged);
+    var CHUNK = 800*1024;
+    var chunks = [];
+    for (var i = 0; i < jsonStr.length; i += CHUNK) chunks.push(jsonStr.slice(i, i+CHUNK));
+
+    await Promise.all(chunks.map(function(c, i){
+      return db.collection('weldbook').doc(partName+'_main').collection('data').doc('c'+i).set({d:c});
+    }));
+    await db.collection('weldbook').doc(partName+'_main').set({
+      type:'part', part:partName, chunks:chunks.length, count:merged.length,
+      date:new Date().toISOString(), modifiedBy:'import_excel'
+    });
+    log('  ✅ Uložené do Firebase (' + chunks.length + ' chunkov)', 'ok');
+  } catch(e) {
+    log('  ❌ Chyba pri ukladaní: ' + e.message, 'err');
+  }
+
+  return stats;
+}
+
+function setProgress(pct, text) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = text;
+}
+  // Firebase nacitame ako posledne
+  var _fbApp = document.createElement('script'); _fbApp.src='https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js';
+  var _fbFs = document.createElement('script'); _fbFs.src='https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js';
+  _fbApp.onload = function() { document.head.appendChild(_fbFs); };
+  _fbFs.onload = function() { initFirebase(); };
+  document.head.appendChild(_fbApp);
+</script>
+</body>
+</html>
