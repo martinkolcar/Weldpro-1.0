@@ -2758,7 +2758,7 @@ part: splitName.part,
 isometric: splitName.isometric,
 sheets: 1,
 weldId: String(cn),
-source:'site',
+source:'',
 item1: '', item2: '',
 ped: '', rev: '', pipeClass: '',
 heatNr1: '', certNr1: '', dimension1: '', thickness1: '', material1: '', matGroup1: '',
@@ -2807,7 +2807,7 @@ part: splitName.part,
 isometric: splitName.isometric,
 sheets: 1,
 weldId: String(cn),
-source:'site',
+source:'',
 item1: '', item2: '',
 ped: '', rev: '', pipeClass: '',
 heatNr1: '', certNr1: '', dimension1: '', thickness1: '', material1: '', matGroup1: '',
@@ -9844,6 +9844,19 @@ async function _saveWbToFirebase() {
 }
 
 // Fire-and-forget verzia
+
+function sortWeldBookData() {
+  weldBookData.sort(function(a, b) {
+    var isoA = (a.isometric||'').toLowerCase();
+    var isoB = (b.isometric||'').toLowerCase();
+    if (isoA < isoB) return -1;
+    if (isoA > isoB) return 1;
+    var nA = parseFloat(a.weldId) || 0;
+    var nB = parseFloat(b.weldId) || 0;
+    if (nA !== nB) return nA - nB;
+    return String(a.weldId||'').localeCompare(String(b.weldId||''));
+  });
+}
 function saveWeldBookToStorage() {
   wbLocalBackup();
   if (db) _saveWbToFirebase().catch(function(e) { console.error('WB save:', e); });
@@ -9876,6 +9889,7 @@ async function loadWbPart(part) {
       var chunkDocs = await Promise.all(chunkPromises);
       var chunks = chunkDocs.filter(function(c) { return c.exists; }).map(function(c) { return c.data().d; });
       weldBookData = JSON.parse(chunks.join(''));
+      sortWeldBookData();
       wbLocalBackup();
       console.log('✅ WeldBook [' + (part||'ALL') + '] načítaný:', weldBookData.length, 'zvarov');
       if (part) {
@@ -9911,6 +9925,7 @@ async function loadWbPart(part) {
           cp2.push(db.collection('weldbook').doc('weldbook_main').collection('data').doc('c'+i2).get());
         var cd2 = await Promise.all(cp2);
         weldBookData = JSON.parse(cd2.filter(function(c){return c.exists;}).map(function(c){return c.data().d;}).join(''));
+        sortWeldBookData();
         wbLocalBackup();
       }
       return;
