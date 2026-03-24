@@ -1873,19 +1873,39 @@ async function loadWbForPart(part) {
       for (let i=0; i<(meta.chunks||1); i++)
         cps.push(db.collection('weldbook').doc(docId).collection('data').doc('c'+i).get());
       const cds = await Promise.all(cps);
-      weldBookData = JSON.parse(cds.filter(c=>c.exists).map(c=>c.data().d).join(''));
+      const joined = cds.filter(c=>c.exists).map(c=>c.data().d||'').join('');
+      try {
+        weldBookData = JSON.parse(joined);
+      } catch(parseErr) {
+        // Pokus o opravu - najdi poslednu platnu zatvorkuA
+        var dbgEl3 = document.getElementById('wbCount');
+        if (dbgEl3) dbgEl3.textContent = '⚠️ Opravujem JSON ' + docId + '...';
+        var fixed = joined.trimEnd();
+        // Odstran trailing comma ak existuje
+        fixed = fixed.replace(/,\s*$/, '');
+        // Pridaj zatvorkuAk chyba
+        if (!fixed.endsWith(']')) fixed = fixed + ']';
+        try { weldBookData = JSON.parse(fixed); }
+        catch(e2) { throw new Error('JSON neopravitelny: ' + parseErr.message); }
+      }
     } else if (!part) {
-      // weldbook_main neexistuje - nacitaj vsetky casti paralelne (novy format po importe)
+      // weldbook_main neexistuje - nacitaj vsetky casti paralelne
       const PARTS = ['SUL','LIG','DRY','FLA','LHT'];
       const allArrays = await Promise.all(PARTS.map(async function(p) {
         const d = await db.collection('weldbook').doc(p+'_main').get();
         if (!d.exists) return [];
-        const meta = d.data();
-        const cps = [];
-        for (let i=0; i<(meta.chunks||1); i++)
-          cps.push(db.collection('weldbook').doc(p+'_main').collection('data').doc('c'+i).get());
-        const cds = await Promise.all(cps);
-        return JSON.parse(cds.filter(c=>c.exists).map(c=>c.data().d).join(''));
+        const meta2 = d.data();
+        const cps2 = [];
+        for (let i=0; i<(meta2.chunks||1); i++)
+          cps2.push(db.collection('weldbook').doc(p+'_main').collection('data').doc('c'+i).get());
+        const cds2 = await Promise.all(cps2);
+        const j2 = cds2.filter(c=>c.exists).map(c=>c.data().d||'').join('');
+        try { return JSON.parse(j2); }
+        catch(e3) {
+          var f2 = j2.trimEnd().replace(/,\s*$/,'');
+          if (!f2.endsWith(']')) f2 = f2 + ']';
+          try { return JSON.parse(f2); } catch(e4) { return []; }
+        }
       }));
       weldBookData = [].concat(...allArrays);
     } else {
