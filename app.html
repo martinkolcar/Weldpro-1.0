@@ -9794,26 +9794,25 @@ async function _saveWbPartToFirebase(part) {
   var chunks = [];
   for (var i = 0; i < jsonString.length; i += WB_CHUNK_SIZE) chunks.push(jsonString.slice(i, i + WB_CHUNK_SIZE));
 
-  // Zisti kolko chunkov bolo predtym (z metadata)
-  var oldMeta = await db.collection('weldbook').doc(docId).get();
-  var oldChunkCount = oldMeta.exists ? (oldMeta.data().chunks || 0) : 0;
+  // Chunk count z cache (nie extra Firebase read)
+  if (!window._wbChunkCache) window._wbChunkCache = {};
+  var oldChunkCount = window._wbChunkCache[docId] || 0;
 
-  // Uloz nove chunky paralelne (rychlo)
-  await Promise.all(chunks.map(function(chunk, i) {
+  // Uloz chunky + metadata PARALELNE (nie za sebou)
+  var saveOps = chunks.map(function(chunk, i) {
     return db.collection('weldbook').doc(docId).collection('data').doc('c' + i).set({ d: chunk });
-  }));
+  });
 
-  // Vymaz stare chunky ak ich bolo viac (inak zostanu a pokazia JSON)
+  // Vymaz stare chunky ak ich bolo viac
   if (oldChunkCount > chunks.length) {
-    var deleteOps = [];
     for (var di = chunks.length; di < oldChunkCount; di++) {
-      deleteOps.push(db.collection('weldbook').doc(docId).collection('data').doc('c' + di).delete());
+      saveOps.push(db.collection('weldbook').doc(docId).collection('data').doc('c' + di).delete());
     }
-    await Promise.all(deleteOps);
-    console.log('🗑️ Vymazaných starých chunkov:', oldChunkCount - chunks.length);
   }
+  await Promise.all(saveOps);
+  window._wbChunkCache[docId] = chunks.length;
 
-  // Potom metadata
+  // Metadata
   if (!window._pcSessionId) window._pcSessionId = 'pc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   await db.collection('weldbook').doc(docId).set({
     type: 'part', part: part || 'ALL', chunks: chunks.length, count: partRows.length,
@@ -9906,6 +9905,8 @@ async function loadWbPart(part) {
       var chunks = chunkDocs.filter(function(c) { return c.exists; }).map(function(c) { return c.data().d; });
       weldBookData = JSON.parse(chunks.join(''));
       sortWeldBookData();
+      if (!window._wbChunkCache) window._wbChunkCache = {};
+      window._wbChunkCache[docId] = chunkPromises.length;
       wbLocalBackup();
       console.log('✅ WeldBook [' + (part||'ALL') + '] načítaný:', weldBookData.length, 'zvarov');
       if (part) {
