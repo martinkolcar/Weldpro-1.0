@@ -546,6 +546,14 @@ canvas#mca { display: block; }
         <div id="rt_n_circle" style="width:28px;height:28px;border-radius:50%;border:2px solid #d1d5db;background:white;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#6b7280;flex-shrink:0"></div>
         <span style="font-size:14px;color:#374151;font-weight:500">N — Poznámka (zapíše <b>N</b> do note)</span>
       </div>
+      <div onclick="toggleRtR()" id="rt_r_btn" style="margin-top:8px;padding:12px 16px;border-radius:10px;border:2px solid #d1d5db;background:white;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none">
+        <div id="rt_r_circle" style="width:28px;height:28px;border-radius:50%;border:2px solid #d1d5db;background:white;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#6b7280;flex-shrink:0"></div>
+        <span style="font-size:14px;color:#374151;font-weight:500">R — Oprava (RT Result=N + RT Repair Date + <b>navýšenie</b>)</span>
+      </div>
+      <div id="rt_repair_date_row" style="display:none;margin-top:8px">
+        <label class="modal-label" style="color:#dc2626">RT Repair Date</label>
+        <input class="modal-input" id="rt_repair_date" type="date" style="border-color:#fca5a5;font-size:16px">
+      </div>
       <div class="modal-row" style="margin-top:12px">
         <button class="btn-secondary" onclick="closeRtModal()">Zrušiť</button>
         <button class="btn-primary" style="background:#b45309" onclick="saveRtModal()">✅ Uložiť RT dátum</button>
@@ -2079,10 +2087,13 @@ function openRtModal() {
   if (!r.rtDate) document.getElementById('rt_date').value = today();
   // Nastav N button podla aktualnej hodnoty
   var hasN = (r.rtNote || '') === 'N';
+  var hasR = (r.rtNote || '') === 'navýšenie';
   var circle = document.getElementById('rt_n_circle');
   var btn = document.getElementById('rt_n_btn');
   if (circle) { circle.textContent = hasN ? 'N' : ''; circle.style.color = hasN ? '#b45309' : '#6b7280'; circle.style.borderColor = hasN ? '#b45309' : '#d1d5db'; circle.style.background = hasN ? '#fef3c7' : 'white'; }
   if (btn) btn.style.borderColor = hasN ? '#b45309' : '#d1d5db';
+  _setRtRActive(hasR);
+  if (hasR && r.rtRepairDate) document.getElementById('rt_repair_date').value = r.rtRepairDate;
   var m = document.getElementById('rtModal'); if (m) m.classList.add('show');
 }
 
@@ -2092,6 +2103,30 @@ function toggleRtN() {
   var isN = circle && circle.textContent === 'N';
   if (circle) { circle.textContent = isN ? '' : 'N'; circle.style.color = isN ? '#6b7280' : '#b45309'; circle.style.borderColor = isN ? '#d1d5db' : '#b45309'; circle.style.background = isN ? 'white' : '#fef3c7'; }
   if (btn) btn.style.borderColor = isN ? '#d1d5db' : '#b45309';
+  // Vypni R ak zapnem N
+  if (!isN) { _setRtRActive(false); }
+}
+
+function _setRtRActive(active) {
+  var circle = document.getElementById('rt_r_circle');
+  var btn = document.getElementById('rt_r_btn');
+  var row = document.getElementById('rt_repair_date_row');
+  if (circle) { circle.textContent = active ? 'R' : ''; circle.style.color = active ? '#dc2626' : '#6b7280'; circle.style.borderColor = active ? '#dc2626' : '#d1d5db'; circle.style.background = active ? '#fee2e2' : 'white'; }
+  if (btn) btn.style.borderColor = active ? '#dc2626' : '#d1d5db';
+  if (row) row.style.display = active ? 'block' : 'none';
+}
+
+function toggleRtR() {
+  var circle = document.getElementById('rt_r_circle');
+  var isR = circle && circle.textContent === 'R';
+  _setRtRActive(!isR);
+  // Vypni N ak zapnem R
+  if (!isR) {
+    var nCircle = document.getElementById('rt_n_circle');
+    var nBtn = document.getElementById('rt_n_btn');
+    if (nCircle) { nCircle.textContent = ''; nCircle.style.color = '#6b7280'; nCircle.style.borderColor = '#d1d5db'; nCircle.style.background = 'white'; }
+    if (nBtn) nBtn.style.borderColor = '#d1d5db';
+  }
 }
 
 function closeRtModal() {
@@ -2104,8 +2139,18 @@ async function saveRtModal() {
   var rtDate = document.getElementById('rt_date').value;
   if (!rtDate) { showToast('Vyber dátum'); return; }
   r.rtDate = rtDate;
-  var circle = document.getElementById('rt_n_circle');
-  r.rtNote = (circle && circle.textContent === 'N') ? 'N' : '';
+  var nCircle = document.getElementById('rt_n_circle');
+  var rCircle = document.getElementById('rt_r_circle');
+  var isR = rCircle && rCircle.textContent === 'R';
+  var isN = nCircle && nCircle.textContent === 'N';
+  if (isR) {
+    r.rtNote = 'navýšenie';
+    r.rtResult = 'N';
+    var repairDate = document.getElementById('rt_repair_date').value;
+    if (repairDate) r.rtRepairDate = repairDate;
+  } else {
+    r.rtNote = isN ? 'N' : '';
+  }
   closeRtModal();
   showToast('Ukladám RT dátum...');
   try {
@@ -2122,7 +2167,11 @@ async function clearRtModal() {
   var r = currentWbRow.row;
   r.rtDate = '';
   r.rtNote = '';
+  r.rtResult = '';
+  r.rtRepairDate = '';
   document.getElementById('rt_date').value = '';
+  _setRtRActive(false);
+  document.getElementById('rt_repair_date').value = '';
   closeRtModal();
   showToast('Mažem RT dátum...');
   try {

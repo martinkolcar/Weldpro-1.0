@@ -8951,7 +8951,9 @@ function initializeWeldBookGrid() {
     // RT INSPECTION
     { headerName: 'RT inspection %', field: 'rtPercent', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
     { headerName: 'RT Date of testing', field: 'rtDate', width: 140, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
-    { headerName: 'RT Note', field: 'rtNote', width: 80, editable: true, cellStyle: function(params) { return params.value === 'N' ? {backgroundColor: '#fef3c7', color: '#b45309', fontWeight: '700', textAlign: 'center'} : (isDuplicateWeld(params) ? {backgroundColor: '#a7c7e7'} : null); } },
+    { headerName: 'RT Note', field: 'rtNote', width: 80, editable: true, cellStyle: function(params) { if(params.value === 'N') return {backgroundColor:'#fef3c7',color:'#b45309',fontWeight:'700',textAlign:'center'};
+        if(params.value === 'navýšenie') return {backgroundColor:'#fee2e2',color:'#dc2626',fontWeight:'700',textAlign:'center'};
+        return isDuplicateWeld(params) ? {backgroundColor:'#a7c7e7'} : null; } },
     { headerName: 'RT report', field: 'rtReport', width: 120, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
     { headerName: 'RT result', field: 'rtResult', width: 110, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
     { headerName: 'RT defect [mm]', field: 'rtDefect', width: 130, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
@@ -9792,10 +9794,24 @@ async function _saveWbPartToFirebase(part) {
   var chunks = [];
   for (var i = 0; i < jsonString.length; i += WB_CHUNK_SIZE) chunks.push(jsonString.slice(i, i + WB_CHUNK_SIZE));
 
-  // Najprv ulož chunky
+  // Zisti kolko chunkov bolo predtym (z metadata)
+  var oldMeta = await db.collection('weldbook').doc(docId).get();
+  var oldChunkCount = oldMeta.exists ? (oldMeta.data().chunks || 0) : 0;
+
+  // Uloz nove chunky paralelne (rychlo)
   await Promise.all(chunks.map(function(chunk, i) {
     return db.collection('weldbook').doc(docId).collection('data').doc('c' + i).set({ d: chunk });
   }));
+
+  // Vymaz stare chunky ak ich bolo viac (inak zostanu a pokazia JSON)
+  if (oldChunkCount > chunks.length) {
+    var deleteOps = [];
+    for (var di = chunks.length; di < oldChunkCount; di++) {
+      deleteOps.push(db.collection('weldbook').doc(docId).collection('data').doc('c' + di).delete());
+    }
+    await Promise.all(deleteOps);
+    console.log('🗑️ Vymazaných starých chunkov:', oldChunkCount - chunks.length);
+  }
 
   // Potom metadata
   if (!window._pcSessionId) window._pcSessionId = 'pc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
@@ -9916,7 +9932,7 @@ async function loadWbPart(part) {
         _saveWbPartToFirebase(part).catch(function(e){ console.warn('Part save:', e); });
       }
     } else {
-      // Načítaj weldbook_main
+      // Všetky časti - skús weldbook_main, ak neexistuje načítaj SUL+LIG+DRY+FLA+LHT
       var mainDoc2 = await db.collection('weldbook').doc('weldbook_main').get();
       if (mainDoc2.exists) {
         var m2 = mainDoc2.data();
@@ -9925,9 +9941,23 @@ async function loadWbPart(part) {
           cp2.push(db.collection('weldbook').doc('weldbook_main').collection('data').doc('c'+i2).get());
         var cd2 = await Promise.all(cp2);
         weldBookData = JSON.parse(cd2.filter(function(c){return c.exists;}).map(function(c){return c.data().d;}).join(''));
-        sortWeldBookData();
-        wbLocalBackup();
+      } else {
+        // Nový formát - načítaj všetky parts paralelne
+        var PARTS = ['SUL','LIG','DRY','FLA','LHT'];
+        var allArrays = await Promise.all(PARTS.map(async function(p) {
+          var pd = await db.collection('weldbook').doc(p+'_main').get();
+          if (!pd.exists) return [];
+          var pm = pd.data();
+          var pcp = [];
+          for (var pi=0; pi<(pm.chunks||1); pi++)
+            pcp.push(db.collection('weldbook').doc(p+'_main').collection('data').doc('c'+pi).get());
+          var pcd = await Promise.all(pcp);
+          return JSON.parse(pcd.filter(function(c){return c.exists;}).map(function(c){return c.data().d;}).join(''));
+        }));
+        weldBookData = [].concat.apply([], allArrays);
       }
+      sortWeldBookData();
+      wbLocalBackup();
       return;
     }
     if (weldBookGrid && weldBookGrid.api) {
