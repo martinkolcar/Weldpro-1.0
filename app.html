@@ -10027,14 +10027,28 @@ function startWbRealtimeSync() {
     console.log('📡 Signal prijatý od:', data.by, '| part:', data.part, '| age:', signalAge, 'ms');
 
     var changedPart = (data.part && data.part !== 'ALL') ? data.part : null;
-    // Vždy načítaj aktívnu časť - či už je zmena v nej alebo inej
+
+    // Nacitaj vzdy tu cast ktora sa zmenila (nie aktivnu)
+    // Ak PC zobrazuje inu cast - len notifikacia bez reloadu
     if (changedPart && wbActivePart && changedPart !== wbActivePart) {
-      // Iná časť zmenená - len sync info, NIE do zvončeka
       showWbSyncNotification('📢 ' + data.by + ' upravil WeldBook [' + changedPart + ']', 'info');
+      // Ale aj tak nacitaj zmenenu cast do pamate (pre pripad ze user prepne)
+      var bgDocId = changedPart + '_main';
+      db.collection('weldbook').doc(bgDocId).collection('data').get().then(function(snap) {
+        if (snap.empty) return;
+        var joined = snap.docs.sort(function(a,b){return a.id.localeCompare(b.id,undefined,{numeric:true});}).map(function(d){return d.data().d||'';}).join('');
+        var bgData = JSON.parse(joined);
+        bgData.forEach(function(newRow) {
+          var idx = weldBookData.findIndex(function(r){return String(r.weldId||'')===String(newRow.weldId||'')&&String(r.isometric||'')===String(newRow.isometric||'');});
+          if (idx >= 0) Object.assign(weldBookData[idx], newRow);
+          else weldBookData.push(newRow);
+        });
+        console.log('✅ Background sync [' + changedPart + ']:', bgData.length, 'zvarov');
+      }).catch(function(){});
       return;
     }
 
-    // Naša aktívna časť sa zmenila - načítaj znovu z Firebase
+    // Naša aktívna časť sa zmenila - načítaj znovu a zobraz
     showWbSyncNotification('🔄 ' + data.by + ' upravil WeldBook...', 'loading');
     var syncPart = changedPart || wbActivePart;
     var fetchDocId = syncPart ? (syncPart + '_main') : 'weldbook_main';
