@@ -9794,23 +9794,23 @@ async function _saveWbPartToFirebase(part) {
   var chunks = [];
   for (var i = 0; i < jsonString.length; i += WB_CHUNK_SIZE) chunks.push(jsonString.slice(i, i + WB_CHUNK_SIZE));
 
-  // Chunk count z cache (nie extra Firebase read)
-  if (!window._wbChunkCache) window._wbChunkCache = {};
-  var oldChunkCount = window._wbChunkCache[docId] || 0;
+  // Zisti kolko chunkov bolo predtym
+  var oldMeta = await db.collection('weldbook').doc(docId).get();
+  var oldChunkCount = oldMeta.exists ? (oldMeta.data().chunks || 0) : 0;
 
-  // Uloz chunky + metadata PARALELNE (nie za sebou)
-  var saveOps = chunks.map(function(chunk, i) {
+  // Uloz chunky paralelne
+  await Promise.all(chunks.map(function(chunk, i) {
     return db.collection('weldbook').doc(docId).collection('data').doc('c' + i).set({ d: chunk });
-  });
+  }));
 
   // Vymaz stare chunky ak ich bolo viac
   if (oldChunkCount > chunks.length) {
+    var deleteOps = [];
     for (var di = chunks.length; di < oldChunkCount; di++) {
-      saveOps.push(db.collection('weldbook').doc(docId).collection('data').doc('c' + di).delete());
+      deleteOps.push(db.collection('weldbook').doc(docId).collection('data').doc('c' + di).delete());
     }
+    await Promise.all(deleteOps);
   }
-  await Promise.all(saveOps);
-  window._wbChunkCache[docId] = chunks.length;
 
   // Metadata
   if (!window._pcSessionId) window._pcSessionId = 'pc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
@@ -9905,8 +9905,6 @@ async function loadWbPart(part) {
       var chunks = chunkDocs.filter(function(c) { return c.exists; }).map(function(c) { return c.data().d; });
       weldBookData = JSON.parse(chunks.join(''));
       sortWeldBookData();
-      if (!window._wbChunkCache) window._wbChunkCache = {};
-      window._wbChunkCache[docId] = chunkPromises.length;
       wbLocalBackup();
       console.log('✅ WeldBook [' + (part||'ALL') + '] načítaný:', weldBookData.length, 'zvarov');
       if (part) {
@@ -10028,27 +10026,13 @@ function startWbRealtimeSync() {
 
     var changedPart = (data.part && data.part !== 'ALL') ? data.part : null;
 
-    // Nacitaj vzdy tu cast ktora sa zmenila (nie aktivnu)
-    // Ak PC zobrazuje inu cast - len notifikacia bez reloadu
+    // Ak zmenená časť nie je aktívna - len notifikácia
     if (changedPart && wbActivePart && changedPart !== wbActivePart) {
       showWbSyncNotification('📢 ' + data.by + ' upravil WeldBook [' + changedPart + ']', 'info');
-      // Ale aj tak nacitaj zmenenu cast do pamate (pre pripad ze user prepne)
-      var bgDocId = changedPart + '_main';
-      db.collection('weldbook').doc(bgDocId).collection('data').get().then(function(snap) {
-        if (snap.empty) return;
-        var joined = snap.docs.sort(function(a,b){return a.id.localeCompare(b.id,undefined,{numeric:true});}).map(function(d){return d.data().d||'';}).join('');
-        var bgData = JSON.parse(joined);
-        bgData.forEach(function(newRow) {
-          var idx = weldBookData.findIndex(function(r){return String(r.weldId||'')===String(newRow.weldId||'')&&String(r.isometric||'')===String(newRow.isometric||'');});
-          if (idx >= 0) Object.assign(weldBookData[idx], newRow);
-          else weldBookData.push(newRow);
-        });
-        console.log('✅ Background sync [' + changedPart + ']:', bgData.length, 'zvarov');
-      }).catch(function(){});
       return;
     }
 
-    // Naša aktívna časť sa zmenila - načítaj znovu a zobraz
+    // Načítaj aktívnu časť
     showWbSyncNotification('🔄 ' + data.by + ' upravil WeldBook...', 'loading');
     var syncPart = changedPart || wbActivePart;
     var fetchDocId = syncPart ? (syncPart + '_main') : 'weldbook_main';
