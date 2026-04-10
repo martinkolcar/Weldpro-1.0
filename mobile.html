@@ -1679,7 +1679,8 @@ async function clearFittingModal() {
     var docId = part ? (part + '_main') : 'weldbook_main';
     var json = JSON.stringify(partRows), CHUNK = 800*1024, chunks = [];
     for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
-    await Promise.all([...chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }), db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() })]);
+    await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
+    await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() });
     if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
     await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
     showToast('Heat Nr vymazany pre zvar #' + weldIdStr);
@@ -1724,7 +1725,8 @@ async function saveFittingModal() {
     var json = JSON.stringify(partRows);
     var CHUNK = 800*1024, chunks = [];
     for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
-    await Promise.all([...chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }), db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() })]);
+    await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
+    await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() });
     if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
     await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
     showToast('Heat Nr ulozene pre zvar #' + weldIdStr);
@@ -2224,11 +2226,9 @@ async function _directWbSave(targetRow) {
   var docId = part ? (part + '_main') : 'weldbook_main';
   var json = JSON.stringify(partRows), CHUNK = 800*1024, chunks = [];
   for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
-  // Chunky + metadata paralelne, potom signal
-  await Promise.all([
-    ...chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }),
-    db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString(), sessionId:window._mobileSessionId })
-  ]);
+  // Najprv vsetky chunky, potom metadata, potom signal
+  await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
+  await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString(), sessionId:window._mobileSessionId });
   await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
 }
 

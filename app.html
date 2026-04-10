@@ -9798,12 +9798,12 @@ async function _saveWbPartToFirebase(part) {
   var oldMeta = await db.collection('weldbook').doc(docId).get();
   var oldChunkCount = oldMeta.exists ? (oldMeta.data().chunks || 0) : 0;
 
-  // Uloz chunky paralelne
+  // Uloz chunky paralelne - vsetky musia byt hotove pred metadata
   await Promise.all(chunks.map(function(chunk, i) {
     return db.collection('weldbook').doc(docId).collection('data').doc('c' + i).set({ d: chunk });
   }));
 
-  // Vymaz stare chunky ak ich bolo viac
+  // Vymaz stare chunky az po ulozeni novych
   if (oldChunkCount > chunks.length) {
     var deleteOps = [];
     for (var di = chunks.length; di < oldChunkCount; di++) {
@@ -9812,7 +9812,7 @@ async function _saveWbPartToFirebase(part) {
     await Promise.all(deleteOps);
   }
 
-  // Metadata
+  // Metadata az po uspesnom ulozeni chunkov
   if (!window._pcSessionId) window._pcSessionId = 'pc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   await db.collection('weldbook').doc(docId).set({
     type: 'part', part: part || 'ALL', chunks: chunks.length, count: partRows.length,
