@@ -2375,6 +2375,9 @@ function saveWbModal() {
 async function _directWbSave(targetRow) {
   var part = (targetRow.part || '').toUpperCase() || activeWbPart || null;
   var partRows = weldBookData.filter(function(r){ return !part || (r.part||'').toUpperCase() === part; });
+  // DEBUG
+  var dbgRow = partRows.find(function(r){ return String(r.weldId) === String(targetRow.weldId); });
+  console.log('_directWbSave: weldId='+targetRow.weldId+' part='+part+' rows='+partRows.length+' targetDate='+targetRow.dateWelding+' inArrayDate='+(dbgRow?dbgRow.dateWelding:'NOT_FOUND')+' sameRef='+(dbgRow===targetRow));
   if (partRows.length === 0 && weldBookData.length > 0) partRows = weldBookData;
   if (!partRows.length) { showToast('⚠️ WB nie je načítaný'); return; }
   if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
