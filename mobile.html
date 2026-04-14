@@ -1528,10 +1528,19 @@ function openWelderModal(weld) {
   var _btnR = document.getElementById('btnRemoveWelder');
   var _btnC = document.getElementById('btnCutWeld');
   var _btnU = document.getElementById('btnUncutWeld');
-  var isCanceled = wbEntry && wbEntry.canceledNote === 'canceled';
+  // Vzdy nacitaj najaktualnejsi stav z weldBookData
+  var freshEntry = wbEntry;
+  if (weldBookData && wbEntry) {
+    var _found = weldBookData.find(function(r) {
+      return String(r.weldId) === String(weld.displayNum).split('/')[0] &&
+             String(r.isometric||'') === String(wbEntry.isometric||'');
+    });
+    if (_found) freshEntry = _found;
+  }
+  var isCanceled = freshEntry && freshEntry.canceledNote === 'canceled';
   if (_btnR) _btnR.style.display = hasWelder ? 'block' : 'none';
   if (_btnC) _btnC.style.display = (hasWelder && !isCanceled) ? 'block' : 'none';
-  if (_btnU) _btnU.style.display = (hasWelder && isCanceled) ? 'block' : 'none';
+  if (_btnU) _btnU.style.display = isCanceled ? 'block' : 'none';
 
   const _el_welderModal_add = document.getElementById('welderModal'); if (_el_welderModal_add) _el_welderModal_add.classList.add('show');
   setTimeout(() => document.getElementById('wm_welder').focus(), 300);
@@ -2136,6 +2145,17 @@ function _applyWbFilter() {
 }
 
 function renderWeldBook(rows) {
+  // Zorad - 4 pred 4n, 4n pred 5
+  rows = rows.slice().sort(function(a,b){
+    var ia=(a.isometric||'').toLowerCase(),ib=(b.isometric||'').toLowerCase();
+    if(ia<ib)return -1;if(ia>ib)return 1;
+    var wa=String(a.weldId||''),wb=String(b.weldId||'');
+    var na=parseFloat(wa)||0,nb=parseFloat(wb)||0;
+    if(na!==nb)return na-nb;
+    if(!/n/.test(wa)&&/n/.test(wb))return -1;
+    if(/n/.test(wa)&&!/n/.test(wb))return 1;
+    return wa.localeCompare(wb);
+  });
   const tbody = document.getElementById('wbBody');
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:#9ca3af">Žiadne záznamy</td></tr>';

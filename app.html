@@ -9871,10 +9871,18 @@ function sortWeldBookData() {
     var isoB = (b.isometric||'').toLowerCase();
     if (isoA < isoB) return -1;
     if (isoA > isoB) return 1;
-    var nA = parseFloat(a.weldId) || 0;
-    var nB = parseFloat(b.weldId) || 0;
+    // Sort: 4 < 4n < 5 < 5n
+    var wA = String(a.weldId||'');
+    var wB = String(b.weldId||'');
+    var nA = parseFloat(wA) || 0;
+    var nB = parseFloat(wB) || 0;
     if (nA !== nB) return nA - nB;
-    return String(a.weldId||'').localeCompare(String(b.weldId||''));
+    // Rovnake cislo - "4" pred "4n", "4n" pred "4n2" atd
+    var isNvarA = /n/.test(wA);
+    var isNvarB = /n/.test(wB);
+    if (!isNvarA && isNvarB) return -1;
+    if (isNvarA && !isNvarB) return 1;
+    return wA.localeCompare(wB);
   });
 }
 function saveWeldBookToStorage() {
@@ -17356,12 +17364,20 @@ function buildZip(files) {
 <script>
 var _cancelWeldData = null;
 function showCancelWeldModal(w, weldBookEntry) {
-  _cancelWeldData = { w: w, entry: weldBookEntry };
-  var isCanceled = weldBookEntry && weldBookEntry.canceledNote === 'canceled';
+  // Vzdy nacitaj najaktualnejsi stav z weldBookData
+  var freshEntry = weldBookEntry;
+  if (weldBookData) {
+    var found = weldBookData.find(function(r) {
+      return String(r.weldId) === String(w.displayNum).split('/')[0] &&
+             String(r.isometric||'') === String(weldBookEntry ? weldBookEntry.isometric||'' : '');
+    });
+    if (found) freshEntry = found;
+  }
+  _cancelWeldData = { w: w, entry: freshEntry };
+  var isCanceled = freshEntry && freshEntry.canceledNote === 'canceled';
   var origNum = String(w.displayNum).split('/')[0];
   document.getElementById('cwModalNum').textContent = '#' + origNum;
   document.getElementById('cwModalNewNum').textContent = '#' + origNum + 'n';
-  // Zobraz spravne tlacidla
   document.getElementById('cwBtnCut').style.display = isCanceled ? 'none' : 'block';
   document.getElementById('cwBtnUncut').style.display = isCanceled ? 'block' : 'none';
   document.getElementById('cancelWeldModal').style.display = 'flex';
@@ -17396,7 +17412,8 @@ function cancelWeldAction(action) {
     weldBookData.push(newEntry);
 
     saveCurrentPartWeldBook();
-    up(); // uloz projekt s novym displayNum
+    saveProject(); // uloz projekt s novym displayNum
+    up();
     dw();
 
     // Otvor modal pre novy zvar
@@ -17420,7 +17437,8 @@ function cancelWeldAction(action) {
     if (idx2 >= 0) weldBookData.splice(idx2, 1);
 
     saveCurrentPartWeldBook();
-    up(); // uloz projekt s obnovenym displayNum
+    saveProject(); // uloz projekt s obnovenym displayNum
+    up();
     dw();
   }
 }
