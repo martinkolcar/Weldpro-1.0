@@ -1551,30 +1551,29 @@ function saveWelderModal() {
   if (!welder) { showToast('⚠️ Zadaj Welder ID'); return; }
 
   const { weld, wbEntry } = currentWeldForModal;
+  const _savedDisplayNum = weld.displayNum;
   // _savedTarget musime urcit PRED closeWelderModal (ktore nulluje currentWeldForModal)
   let _savedTarget = null;
   if (wbEntry) {
-    // Najdi PRIAMU referenciu v weldBookData podla identity
-    const liveRef = weldBookData.find(r => r === wbEntry) ||
-                    weldBookData.find(r => String(r.weldId) === String(weld.displayNum) && String(r.isometric||'') === String(wbEntry.isometric||''));
-    _savedTarget = liveRef || wbEntry;
-    _savedTarget.welderId = welder;
-    _savedTarget.dateWelding = date;
-    console.log('saveWelderModal: weld='+weld.displayNum+' date='+date+' welder='+welder+' liveRef='+(!!liveRef));
+    // wbEntry je uz priama referencia do weldBookData (predana cez openWelderModal)
+    wbEntry.welderId = welder;
+    wbEntry.dateWelding = date;
+    _savedTarget = wbEntry;
+    console.log('saveWelderModal [existujuci]: weld='+_savedDisplayNum+' date='+date+' welder='+welder+' dateCheck='+wbEntry.dateWelding);
   } else {
-    // Novy zaznam - vloz na spravne miesto zoradene podla weldId
+    // Novy zaznam - vloz a uloz referenciu
     const newRow = {
       part: getProjectPart(),
       isometric: getProjectIso(),
       sheets: 1,
-      weldId: String(weld.displayNum),
+      weldId: String(_savedDisplayNum),
       welderId: welder,
       dateWelding: date
     };
     wbInsertSorted(newRow);
-    _savedTarget = newRow; // newRow je uz vlozeny do weldBookData, pouzijeme priamu referenciu
+    _savedTarget = newRow;
+    console.log('saveWelderModal [novy]: weld='+_savedDisplayNum+' date='+date+' welder='+welder);
   }
-  const _savedDisplayNum = weld.displayNum;
   mDraw();
   closeWelderModal();
   showToast('💾 Ukladám...');
