@@ -17412,7 +17412,6 @@ function cancelWeldAction(action) {
     weldBookData.push(newEntry);
 
     saveCurrentPartWeldBook();
-    saveProject(); // uloz projekt s novym displayNum
     up();
     dw();
 
@@ -17437,7 +17436,6 @@ function cancelWeldAction(action) {
     if (idx2 >= 0) weldBookData.splice(idx2, 1);
 
     saveCurrentPartWeldBook();
-    saveProject(); // uloz projekt s obnovenym displayNum
     up();
     dw();
   }
