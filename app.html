@@ -3071,7 +3071,7 @@ var dy=endY-startY;
 var len=Math.sqrt(dx*dx+dy*dy);
 
 // ✅ NOVÁ LOGIKA - dynamická elipsa podľa dĺžky textu
-var displayText = String(w.displayNum); // Celý text (môže obsahovať písmená)
+var displayText = w.isCut ? String(w.displayNum) + '/' + String(w.displayNum) + 'n' : String(w.displayNum);
 var textLen = displayText.length;
 
 // Základný radius kruhu (fixný pre všetky)
@@ -3237,7 +3237,7 @@ tx.setAttribute('font-weight','normal');
 tx.setAttribute('text-anchor','middle');
 tx.setAttribute('dominant-baseline','middle');
 tx.setAttribute('font-family','Arial');
-tx.textContent=w.displayNum;
+tx.textContent = w.isCut ? String(w.displayNum) + '/' + String(w.displayNum) + 'n' : w.displayNum;
 ov.appendChild(tx);
 });
 
@@ -17368,14 +17368,14 @@ function showCancelWeldModal(w, weldBookEntry) {
   var freshEntry = weldBookEntry;
   if (weldBookData) {
     var found = weldBookData.find(function(r) {
-      return String(r.weldId) === String(w.displayNum).split('/')[0] &&
+      return String(r.weldId) === String(w.displayNum) &&
              String(r.isometric||'') === String(weldBookEntry ? weldBookEntry.isometric||'' : '');
     });
     if (found) freshEntry = found;
   }
   _cancelWeldData = { w: w, entry: freshEntry };
   var isCanceled = freshEntry && freshEntry.canceledNote === 'canceled';
-  var origNum = String(w.displayNum).split('/')[0];
+  var origNum = String(w.displayNum);
   document.getElementById('cwModalNum').textContent = '#' + origNum;
   document.getElementById('cwModalNewNum').textContent = '#' + origNum + 'n';
   document.getElementById('cwBtnCut').style.display = isCanceled ? 'none' : 'block';
@@ -17397,11 +17397,10 @@ function cancelWeldAction(action) {
     saveCurrentPartWeldBook();
     dw();
   } else if (action === 'cut') {
-    // Povodny zvar - canceled, zmen displayNum na 6/6n
     entry.canceledNote = 'canceled';
-    var origNum = String(w.displayNum);
+    var origNum = String(w.displayNum).split('/')[0];
     var newWeldId = origNum + 'n';
-    w.displayNum = origNum + '/' + newWeldId; // zobraz 6/6n v kruzku
+    w.isCut = true; // vizualny flag
 
     // Novy zvar len vo WeldBooku (nie na canvase)
     var newEntry = Object.assign({}, entry);
@@ -17423,11 +17422,10 @@ function cancelWeldAction(action) {
       if (ne) openMontazWelderModal(w, ne);
     }, 300);
   } else if (action === 'uncut') {
-    var currentNum = String(w.displayNum);
-    var origNum2 = currentNum.indexOf('/') >= 0 ? currentNum.split('/')[0] : currentNum.replace(/n$/, '');
+    var origNum2 = String(w.displayNum).split('/')[0];
     var newWeldId2 = origNum2 + 'n';
     entry.canceledNote = '';
-    w.displayNum = origNum2;
+    w.isCut = false;
 
     // Vymaz 6n z WeldBooku
     var idx2 = weldBookData.findIndex(function(r) {

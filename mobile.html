@@ -1065,7 +1065,7 @@ async function openProject(projId) {
 function mGetWbEntry(weld) {
   if (!weldBookData || !currentProject) return null;
   // Ak je displayNum "6/6n" tak hladaj "6" (povodny zvar)
-  const weldId = String(weld.displayNum).split('/')[0];
+  const weldId = String(weld.displayNum);
   const fn = currentProject.originalFileName || '';
   const isoFromSplit = splitIso(fn).iso; // napr. "KF-712-20002-4-25-10H1A"
 
@@ -1226,7 +1226,7 @@ function mDraw() {
 
       const weldColor = '#FF0000';
       // Dynamický radius podľa dĺžky čísla (ako PC)
-      const displayText = String(w.displayNum);
+      const displayText = w.isCut ? String(w.displayNum) + '/' + String(w.displayNum) + 'n' : String(w.displayNum);
       const tLen = displayText.length;
       const ry = 18; // základný radius Y
       const rx = tLen <= 2 ? ry : Math.max(ry, tLen * 11 * 0.6 / 2 + 6);
@@ -1533,7 +1533,7 @@ function openWelderModal(weld) {
   var freshEntry = wbEntry;
   if (weldBookData && wbEntry) {
     var _found = weldBookData.find(function(r) {
-      return String(r.weldId) === String(weld.displayNum).split('/')[0] &&
+      return String(r.weldId) === String(weld.displayNum) &&
              String(r.isometric||'') === String(wbEntry.isometric||'');
     });
     if (_found) freshEntry = _found;
@@ -1768,7 +1768,7 @@ function cutWeldModal() {
   var origNum = String(weld.displayNum).split('/')[0];
   var newWeldId = origNum + 'n';
   wbEntry.canceledNote = 'canceled';
-  weld.displayNum = origNum + '/' + newWeldId; // zobraz 6/6n
+  weld.isCut = true; // vizualny flag - nakresli 6/6n ale displayNum ostava 6
   var newEntry = Object.assign({}, wbEntry);
   newEntry.weldId = newWeldId;
   newEntry.welderId = '';
@@ -1793,11 +1793,10 @@ function uncutWeldModal() {
   if (!currentWeldForModal) return;
   const { weld, wbEntry } = currentWeldForModal;
   closeWelderModal();
-  var currentNum = String(weld.displayNum);
-  var origNum = currentNum.indexOf('/') >= 0 ? currentNum.split('/')[0] : currentNum.replace(/n$/, '');
+  var origNum = String(weld.displayNum).split('/')[0];
+  weld.isCut = false; // odstran vizualny flag
   var newWeldId = origNum + 'n';
   wbEntry.canceledNote = '';
-  weld.displayNum = origNum; // obnov povodne cislo
   // Vymaz n zvar z WeldBooku
   var idx2 = weldBookData.findIndex(function(r) {
     return String(r.weldId) === newWeldId && String(r.isometric||'') === String(wbEntry.isometric||'');
