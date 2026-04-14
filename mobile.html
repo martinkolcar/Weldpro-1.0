@@ -1990,6 +1990,8 @@ function startWbSignalListener() {
     var data = doc.data();
     // Ignoruj vlastne zmeny
     if (data.sessionId && data.sessionId === window._mobileSessionId) return;
+    // Ignoruj signaly do 5s po vlastnom save (race condition pri cutWeld)
+    if (window._lastOwnSaveAt && (Date.now() - window._lastOwnSaveAt) < 5000) { console.log('📡 Ignorujem signal - vlastny save pred', Date.now()-window._lastOwnSaveAt, 'ms'); return; }
     // Ignoruj stary signal (>60s)
     var age = Date.now() - (data.at ? new Date(data.at).getTime() : 0);
     if (age > 60000) return;
@@ -2382,6 +2384,7 @@ async function _directWbSave(targetRow) {
   // Najprv vsetky chunky, potom metadata, potom signal
   await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
   await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString(), sessionId:window._mobileSessionId });
+  window._lastOwnSaveAt = Date.now();
   await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
 }
 
