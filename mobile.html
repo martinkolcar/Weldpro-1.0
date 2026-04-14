@@ -1572,8 +1572,7 @@ function saveWelderModal() {
       dateWelding: date
     };
     wbInsertSorted(newRow);
-    // Po wbInsertSorted najdi prave vlozeny zaznam pre _directWbSave
-    _savedTarget = weldBookData.find(r => String(r.weldId) === String(weld.displayNum) && String(r.isometric||'') === String(getProjectIso()||'')) || null;
+    _savedTarget = newRow; // newRow je uz vlozeny do weldBookData, pouzijeme priamu referenciu
   }
   const _savedDisplayNum = weld.displayNum;
   mDraw();
