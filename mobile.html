@@ -1776,23 +1776,30 @@ function cutWeldModal() {
   const origNum = String(weld.displayNum);
   const newWeldId = origNum + 'n';
 
-  // Povodny - canceled + isCut flag
-  wbEntry.canceledNote = 'canceled';
+  // Najdi PRIAMU referenciu stareho zvaru v weldBookData (nie kopiu)
+  const liveOld = weldBookData.find(r => r === wbEntry) ||
+    weldBookData.find(r => String(r.weldId) === origNum &&
+      (r.isometric === iso || r.isometric === splitI || iso.includes(r.isometric) || (r.isometric||'').includes(splitI)));
+  if (!liveOld) { showToast('Zvar nenajdeny vo WeldBook'); return; }
+
+  // Povodny - canceled + isCut flag (NEprepis dateWelding!)
+  liveOld.canceledNote = 'canceled';
   weld.isCut = true;
 
   // Novy zvar - kopia s prazdnym zvaracom a datumom
-  const newEntry = Object.assign({}, wbEntry);
+  const newEntry = Object.assign({}, liveOld);
   newEntry.weldId = newWeldId;
   newEntry.welderId = '';
   newEntry.dateWelding = '';
   newEntry.canceledNote = '';
+  newEntry.vtDate = '';
   weldBookData.push(newEntry);
 
   closeWelderModal();
   mDraw();
 
   // Uloz oba do Firebase
-  Promise.all([_directWbSave(wbEntry), _directWbSave(newEntry)]).then(() => {
+  Promise.all([_directWbSave(liveOld), _directWbSave(newEntry)]).then(() => {
     showToast('✂️ Rezaný: ' + origNum + ' → ' + newWeldId);
     // Otvor modal pre n zvar s PRIAMOU referenciou
     const liveNewEntry = weldBookData.find(r =>
@@ -1819,7 +1826,14 @@ function uncutWeldModal() {
 
   const origNum = String(weld.displayNum);
   const newWeldId = origNum + 'n';
-  wbEntry.canceledNote = '';
+
+  // Najdi PRIAMU referenciu v weldBookData
+  const liveEntry = weldBookData.find(r => r === wbEntry) ||
+    weldBookData.find(r => String(r.weldId) === origNum &&
+      (r.isometric === iso || r.isometric === splitI || iso.includes(r.isometric) || (r.isometric||'').includes(splitI)));
+  if (!liveEntry) { showToast('Zvar nenajdeny'); return; }
+
+  liveEntry.canceledNote = '';
   weld.isCut = false;
 
   // Vymaz n zvar
@@ -1832,7 +1846,7 @@ function uncutWeldModal() {
   closeWelderModal();
   mDraw();
 
-  _directWbSave(wbEntry).then(() => {
+  _directWbSave(liveEntry).then(() => {
     showToast('↩️ Vrátené: ' + origNum);
   });
 }
@@ -1849,6 +1863,7 @@ function cutWbWeld() {
   newRow.welderId = '';
   newRow.dateWelding = '';
   newRow.canceledNote = '';
+  newRow.vtDate = '';
   weldBookData.push(newRow);
 
   Promise.all([_directWbSave(r), _directWbSave(newRow)]).then(() => {
@@ -1991,7 +2006,7 @@ function startWbSignalListener() {
     // Ignoruj vlastne zmeny
     if (data.sessionId && data.sessionId === window._mobileSessionId) return;
     // Ignoruj signaly do 5s po vlastnom save (race condition pri cutWeld)
-    if (window._lastOwnSaveAt && (Date.now() - window._lastOwnSaveAt) < 5000) { console.log('📡 Ignorujem signal - vlastny save pred', Date.now()-window._lastOwnSaveAt, 'ms'); return; }
+    if (window._lastOwnSaveAt && (Date.now() - window._lastOwnSaveAt) < 10000) { console.log('📡 Ignorujem signal - vlastny save pred', Date.now()-window._lastOwnSaveAt, 'ms'); return; }
     // Ignoruj stary signal (>60s)
     var age = Date.now() - (data.at ? new Date(data.at).getTime() : 0);
     if (age > 60000) return;
