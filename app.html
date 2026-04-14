@@ -10064,6 +10064,7 @@ function startWbRealtimeSync() {
       if (!newData) return;
       console.log('✅ Načítaných', newData.length, 'zvarov z Firebase');
       // In-place update - zachová grid pozíciu
+      // 1. Update/pridaj zaznamy ktore su v newData
       newData.forEach(function(newRow) {
         var idx = weldBookData.findIndex(function(r) {
           return String(r.weldId||'') === String(newRow.weldId||'') &&
@@ -10072,6 +10073,21 @@ function startWbRealtimeSync() {
         if (idx >= 0) Object.assign(weldBookData[idx], newRow);
         else weldBookData.push(newRow);
       });
+      // 2. Vymaz zaznamy ktore uz nie su v newData (napr. po uncut - n-zaznam)
+      // Len pre dany part/isometric skupinu ktora bola aktualizovana
+      if (newData.length > 0) {
+        var updatedPart = (newData[0].part || '').toUpperCase();
+        weldBookData = weldBookData.filter(function(r) {
+          // Ak zaznam patri do inej casti, nechaj ho
+          if (updatedPart && (r.part||'').toUpperCase() !== updatedPart) return true;
+          // Ak zaznam je v aktualizovanej casti, skontroluj ci existuje v newData
+          var stillExists = newData.some(function(n) {
+            return String(n.weldId||'') === String(r.weldId||'') &&
+                   String(n.isometric||'') === String(r.isometric||'');
+          });
+          return stillExists;
+        });
+      }
       wbLocalBackup();
       if (weldBookGrid && weldBookGrid.api) {
         weldBookGrid.api.setGridOption('rowData', weldBookData);

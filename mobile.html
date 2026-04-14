@@ -1836,18 +1836,17 @@ function uncutWeldModal() {
   liveEntry.canceledNote = '';
   weld.isCut = false;
 
-  // Vymaz n zvar
-  const idx = weldBookData.findIndex(r =>
-    String(r.weldId) === newWeldId &&
-    (r.isometric === iso || r.isometric === splitI)
-  );
-  if (idx >= 0) weldBookData.splice(idx, 1);
+  // Vymaz n zvar - uloz referenciu pred splice pre save
+  const nIdx = weldBookData.findIndex(r => String(r.weldId) === newWeldId);
+  if (nIdx >= 0) weldBookData.splice(nIdx, 1);
 
   closeWelderModal();
   mDraw();
 
+  // _directWbSave ulozi cely part (kde uz n-zaznam nie je) - staci jedno volanie
   _directWbSave(liveEntry).then(() => {
     showToast('↩️ Vrátené: ' + origNum);
+    sendFirebaseNotification('uncut', '↩️ Rezanie vrátené: zvar #' + origNum + ' (' + iso + ')', { weldId: origNum });
   });
 }
 
@@ -1881,11 +1880,10 @@ function uncutWbWeld() {
   closeWbModal();
 
   r.canceledNote = '';
-  const idx = weldBookData.findIndex(x =>
-    String(x.weldId) === newWeldId && String(x.isometric||'') === String(r.isometric||'')
-  );
-  if (idx >= 0) weldBookData.splice(idx, 1);
+  const nIdx2 = weldBookData.findIndex(x => String(x.weldId) === newWeldId);
+  if (nIdx2 >= 0) weldBookData.splice(nIdx2, 1);
 
+  // _directWbSave ulozi cely part (kde uz n-zaznam nie je)
   _directWbSave(r).then(() => {
     showToast('↩️ Vrátené: ' + r.weldId);
     filterWB();
