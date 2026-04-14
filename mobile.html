@@ -1838,14 +1838,17 @@ function uncutWeldModal() {
 
   // Vymaz n zvar - uloz referenciu pred splice pre save
   const nIdx = weldBookData.findIndex(r => String(r.weldId) === newWeldId);
+  console.log('uncut: hladam newWeldId='+newWeldId+' nIdx='+nIdx+' weldBookData weldIds='+weldBookData.map(r=>r.weldId).join(',').substring(0,200));
   if (nIdx >= 0) weldBookData.splice(nIdx, 1);
+  console.log('uncut: po splice count='+weldBookData.length);
 
   closeWelderModal();
   mDraw();
+  filterWB();
 
-  // _directWbSave ulozi cely part (kde uz n-zaznam nie je) - staci jedno volanie
   _directWbSave(liveEntry).then(() => {
     showToast('↩️ Vrátené: ' + origNum);
+    filterWB();
     sendFirebaseNotification('uncut', '↩️ Rezanie vrátené: zvar #' + origNum + ' (' + iso + ')', { weldId: origNum });
   });
 }

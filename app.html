@@ -10074,21 +10074,29 @@ function startWbRealtimeSync() {
         else weldBookData.push(newRow);
       });
       // 2. Vymaz zaznamy ktore uz nie su v newData (napr. po uncut - n-zaznam)
-      // Len pre dany part/isometric skupinu ktora bola aktualizovana
-      if (newData.length > 0) {
-        var updatedPart = (newData[0].part || '').toUpperCase();
+      // Pouzij syncPart zo signalu (spolahlive) nie newData[0].part (moze byt prazdne)
+      if (syncPart) {
         weldBookData = weldBookData.filter(function(r) {
-          // Ak zaznam patri do inej casti, nechaj ho
-          if (updatedPart && (r.part||'').toUpperCase() !== updatedPart) return true;
-          // Ak zaznam je v aktualizovanej casti, skontroluj ci existuje v newData
-          var stillExists = newData.some(function(n) {
+          if ((r.part||'').toUpperCase() !== syncPart) return true;
+          return newData.some(function(n) {
             return String(n.weldId||'') === String(r.weldId||'') &&
                    String(n.isometric||'') === String(r.isometric||'');
           });
-          return stillExists;
         });
+        console.log('PC sync: po delete weldBookData.length=', weldBookData.length);
       }
       wbLocalBackup();
+      // Zoradi weldBookData: podla isometric, potom weldId numericky (6 pred 6n)
+      weldBookData.sort(function(a, b) {
+        var ia = (a.isometric||'').toLowerCase(), ib = (b.isometric||'').toLowerCase();
+        if (ia < ib) return -1; if (ia > ib) return 1;
+        var wa = String(a.weldId||''), wb2 = String(b.weldId||'');
+        var na = parseFloat(wa)||0, nb = parseFloat(wb2)||0;
+        if (na !== nb) return na - nb;
+        if (!/n/.test(wa) && /n/.test(wb2)) return -1;
+        if (/n/.test(wa) && !/n/.test(wb2)) return 1;
+        return wa.localeCompare(wb2);
+      });
       if (weldBookGrid && weldBookGrid.api) {
         weldBookGrid.api.setGridOption('rowData', weldBookData);
         weldBookGrid.api.refreshCells({ force: true });
