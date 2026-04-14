@@ -1766,6 +1766,7 @@ function cutWeldModal() {
   newEntry.canceledNote = '';
   weldBookData.push(newEntry);
   mDraw();
+  mSave(); // uloz projekt s novym displayNum
   Promise.all([_directWbSave(wbEntry), _directWbSave(newEntry)]).then(() => {
     showToast('✂️ Rezaný: ' + origNum + ' → ' + newWeldId);
     filterWB();
@@ -1783,7 +1784,7 @@ function uncutWeldModal() {
   const { weld, wbEntry } = currentWeldForModal;
   closeWelderModal();
   var currentNum = String(weld.displayNum);
-  var origNum = currentNum.split('/')[0];
+  var origNum = currentNum.indexOf('/') >= 0 ? currentNum.split('/')[0] : currentNum.replace(/n$/, '');
   var newWeldId = origNum + 'n';
   wbEntry.canceledNote = '';
   weld.displayNum = origNum; // obnov povodne cislo
@@ -1793,6 +1794,7 @@ function uncutWeldModal() {
   });
   if (idx2 >= 0) weldBookData.splice(idx2, 1);
   mDraw();
+  mSave(); // uloz projekt s obnovenym displayNum
   _directWbSave(wbEntry).then(() => {
     showToast('↩️ Vrátené: ' + origNum);
     filterWB();

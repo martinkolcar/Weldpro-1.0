@@ -17396,6 +17396,7 @@ function cancelWeldAction(action) {
     weldBookData.push(newEntry);
 
     saveCurrentPartWeldBook();
+    up(); // uloz projekt s novym displayNum
     dw();
 
     // Otvor modal pre novy zvar
@@ -17406,12 +17407,11 @@ function cancelWeldAction(action) {
       if (ne) openMontazWelderModal(w, ne);
     }, 300);
   } else if (action === 'uncut') {
-    // Vrat naspat - odoberie canceled, obnovi povodne cislo
     var currentNum = String(w.displayNum);
-    var origNum2 = currentNum.split('/')[0]; // 6 z 6/6n
+    var origNum2 = currentNum.indexOf('/') >= 0 ? currentNum.split('/')[0] : currentNum.replace(/n$/, '');
     var newWeldId2 = origNum2 + 'n';
     entry.canceledNote = '';
-    w.displayNum = origNum2; // obnov povodne cislo
+    w.displayNum = origNum2;
 
     // Vymaz 6n z WeldBooku
     var idx2 = weldBookData.findIndex(function(r) {
@@ -17420,6 +17420,7 @@ function cancelWeldAction(action) {
     if (idx2 >= 0) weldBookData.splice(idx2, 1);
 
     saveCurrentPartWeldBook();
+    up(); // uloz projekt s obnovenym displayNum
     dw();
   }
 }
