@@ -1551,11 +1551,18 @@ function saveWelderModal() {
   if (!welder) { showToast('⚠️ Zadaj Welder ID'); return; }
 
   const { weld, wbEntry } = currentWeldForModal;
+  // _savedTarget musime urcit PRED closeWelderModal (ktore nulluje currentWeldForModal)
+  let _savedTarget = null;
   if (wbEntry) {
-    wbEntry.welderId = welder;
-    wbEntry.dateWelding = date;
+    // Najdi PRIAMU referenciu v weldBookData podla identity
+    const liveRef = weldBookData.find(r => r === wbEntry) ||
+                    weldBookData.find(r => String(r.weldId) === String(weld.displayNum) && String(r.isometric||'') === String(wbEntry.isometric||''));
+    _savedTarget = liveRef || wbEntry;
+    _savedTarget.welderId = welder;
+    _savedTarget.dateWelding = date;
+    console.log('saveWelderModal: weld='+weld.displayNum+' date='+date+' welder='+welder+' liveRef='+(!!liveRef));
   } else {
-    // Nový záznam - vlož na správne miesto zoradené podľa weldId
+    // Novy zaznam - vloz na spravne miesto zoradene podla weldId
     const newRow = {
       part: getProjectPart(),
       isometric: getProjectIso(),
@@ -1565,16 +1572,19 @@ function saveWelderModal() {
       dateWelding: date
     };
     wbInsertSorted(newRow);
+    // Po wbInsertSorted najdi prave vlozeny zaznam pre _directWbSave
+    _savedTarget = weldBookData.find(r => String(r.weldId) === String(weld.displayNum) && String(r.isometric||'') === String(getProjectIso()||'')) || null;
   }
+  const _savedDisplayNum = weld.displayNum;
   mDraw();
   closeWelderModal();
   showToast('💾 Ukladám...');
-  saveWeldBookToFirebase().then(() => {
-    showToast('✅ Zvar #' + weld.displayNum + ' → ' + welder);
-    // Notifikácia do PC zvončeka
+  // Pouzij _directWbSave - ulozi priamo zmeneny zaznam
+  (_savedTarget ? _directWbSave(_savedTarget) : saveWeldBookToFirebase()).then(() => {
+    showToast('✅ Zvar #' + _savedDisplayNum + ' → ' + welder);
     sendFirebaseNotification('welder_assigned',
-      '✅ ' + welder + ' priradený k zvaru #' + weld.displayNum + ' (' + (currentProject ? currentProject.originalFileName || currentProject.id : '?') + ')',
-      { weldId: String(weld.displayNum), welder, project: currentProject ? currentProject.id : '' }
+      '✅ ' + welder + ' priradený k zvaru #' + _savedDisplayNum + ' (' + (currentProject ? currentProject.originalFileName || currentProject.id : '?') + ')',
+      { weldId: String(_savedDisplayNum), welder, project: currentProject ? currentProject.id : '' }
     );
   });
 }
