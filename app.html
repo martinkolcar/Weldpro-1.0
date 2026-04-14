@@ -17409,6 +17409,10 @@ function cancelWeldAction(action) {
     newEntry.dateWelding = '';
     newEntry.canceledNote = '';
     weldBookData.push(newEntry);
+    sortWeldBookData(); // zarad n zvar hned za povodny
+    if (weldBookGrid && weldBookGrid.api) {
+      weldBookGrid.api.setGridOption('rowData', weldBookData);
+    }
 
     saveCurrentPartWeldBook();
     up();
@@ -17419,7 +17423,11 @@ function cancelWeldAction(action) {
       var ne = weldBookData.find(function(r) {
         return String(r.weldId) === newWeldId && String(r.isometric||'') === String(entry.isometric||'');
       });
-      if (ne) openMontazWelderModal(w, ne);
+      if (ne) {
+        // Docasny weld pre n zvar
+        var nWeld = Object.assign({}, w, {displayNum: newWeldId, isCut: false});
+        openMontazWelderModal(nWeld, ne);
+      }
     }, 300);
   } else if (action === 'uncut') {
     var origNum2 = String(w.displayNum).split('/')[0];

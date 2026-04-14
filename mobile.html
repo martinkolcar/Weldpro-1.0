@@ -2166,7 +2166,7 @@ function renderWeldBook(rows) {
     const hasHeat = r.heatNr1 || r.heatNr2;
     return `<tr onclick="openWbModal(${weldBookData.indexOf(r)})" style="background:${hasHeat?'#f5f3ff':'white'}">
       <td style="padding:6px 3px"><span class="weld-status ${done?'status-done':'status-todo'}"></span></td>
-      <td style="padding:6px 3px;font-weight:700;color:#111">${r.weldId||'-'}</td>
+      <td style="padding:6px 3px;font-weight:700;color:${r.canceledNote==='canceled'?'#dc2626':'#111'}">${r.weldId||'-'}${r.canceledNote==='canceled'?' <span style="font-size:9px;color:#dc2626">canceled</span>':''}</td>
       <td style="padding:6px 3px;font-size:10px;color:#374151;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.isometric||'-'}</td>
       <td style="padding:6px 3px;font-weight:${done?'600':'400'};color:${done?'#059669':'#9ca3af'};font-size:12px">${r.welderId||'—'}</td>
       <td style="padding:6px 3px;font-size:11px;color:#374151;max-width:65px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.item1||'—'}</td>
