@@ -17347,7 +17347,8 @@ function buildZip(files) {
     <p style="color:#64748b;margin:0 0 20px;font-size:14px">Zvar je označený. Čo chceš urobiť?</p>
     <div style="display:flex;flex-direction:column;gap:10px">
       <button onclick="cancelWeldAction('unmark')" style="padding:12px;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-align:left">❌ Odznačiť — vymaže zvárača a dátum</button>
-      <button onclick="cancelWeldAction('cut')" style="padding:12px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-align:left">✂️ Rezaný zvar — pôvodný <b>canceled</b>, vytvorí sa nový <span id="cwModalNewNum"></span></button>
+      <button id="cwBtnCut" onclick="cancelWeldAction('cut')" style="padding:12px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-align:left">✂️ Rezaný zvar — pôvodný <b>canceled</b>, vytvorí sa nový <span id="cwModalNewNum"></span></button>
+      <button id="cwBtnUncut" onclick="cancelWeldAction('uncut')" style="display:none;padding:12px;background:#dcfce7;color:#166534;border:1px solid #86efac;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-align:left">↩️ Vrátiť — zrušiť rezanie (odoberie canceled)</button>
       <button onclick="closeCancelWeldModal()" style="padding:12px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;cursor:pointer">Zavrieť</button>
     </div>
   </div>
@@ -17356,8 +17357,13 @@ function buildZip(files) {
 var _cancelWeldData = null;
 function showCancelWeldModal(w, weldBookEntry) {
   _cancelWeldData = { w: w, entry: weldBookEntry };
-  document.getElementById('cwModalNum').textContent = '#' + w.displayNum;
-  document.getElementById('cwModalNewNum').textContent = '#' + w.displayNum + 'n';
+  var isCanceled = weldBookEntry && weldBookEntry.canceledNote === 'canceled';
+  var origNum = String(w.displayNum).split('/')[0];
+  document.getElementById('cwModalNum').textContent = '#' + origNum;
+  document.getElementById('cwModalNewNum').textContent = '#' + origNum + 'n';
+  // Zobraz spravne tlacidla
+  document.getElementById('cwBtnCut').style.display = isCanceled ? 'none' : 'block';
+  document.getElementById('cwBtnUncut').style.display = isCanceled ? 'block' : 'none';
   document.getElementById('cancelWeldModal').style.display = 'flex';
 }
 function closeCancelWeldModal() {
@@ -17375,29 +17381,46 @@ function cancelWeldAction(action) {
     saveCurrentPartWeldBook();
     dw();
   } else if (action === 'cut') {
+    // Povodny zvar - canceled, zmen displayNum na 6/6n
     entry.canceledNote = 'canceled';
-    var newWeldId = String(w.displayNum) + 'n';
+    var origNum = String(w.displayNum);
+    var newWeldId = origNum + 'n';
+    w.displayNum = origNum + '/' + newWeldId; // zobraz 6/6n v kruzku
+
+    // Novy zvar len vo WeldBooku (nie na canvase)
     var newEntry = Object.assign({}, entry);
     newEntry.weldId = newWeldId;
     newEntry.welderId = '';
     newEntry.dateWelding = '';
     newEntry.canceledNote = '';
     weldBookData.push(newEntry);
-    var newWeld = {
-      id: Date.now() + '_' + Math.random().toString(36).slice(2),
-      start: { x: w.start.x + 0.012, y: w.start.y - 0.012 },
-      end:   { x: w.end.x + 0.012,   y: w.end.y - 0.012 },
-      displayNum: newWeldId
-    };
-    ws.push(newWeld);
+
     saveCurrentPartWeldBook();
     dw();
+
+    // Otvor modal pre novy zvar
     setTimeout(function() {
       var ne = weldBookData.find(function(r) {
         return String(r.weldId) === newWeldId && String(r.isometric||'') === String(entry.isometric||'');
       });
-      if (ne) openMontazWelderModal(newWeld, ne);
+      if (ne) openMontazWelderModal(w, ne);
     }, 300);
+  } else if (action === 'uncut') {
+    // Vrat naspat - odoberie canceled, obnovi povodne cislo
+    var currentNum = String(w.displayNum);
+    var origNum2 = currentNum.split('/')[0]; // 6 z 6/6n
+    var newWeldId2 = origNum2 + 'n';
+    entry.canceledNote = '';
+    w.displayNum = origNum2; // obnov povodne cislo
+
+    // Vymaz 6n z WeldBooku
+    var idx2 = weldBookData.findIndex(function(r) {
+      return String(r.weldId) === newWeldId2 && String(r.isometric||'') === String(entry.isometric||'');
+    });
+    if (idx2 >= 0) weldBookData.splice(idx2, 1);
+
+    saveCurrentPartWeldBook();
+    dw();
   }
 }
 </script>

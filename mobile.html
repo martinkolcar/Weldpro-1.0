@@ -463,6 +463,7 @@ canvas#mca { display: block; }
       <button onclick="openFittingModal()" style="width:100%;margin-top:8px;padding:12px;background:#7c3aed;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">🔩 Fitting / Heat Nr</button>
       <button id="btnRemoveWelder" onclick="removeWelderModal()" style="display:none;width:100%;margin-top:8px;padding:12px;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">❌ Odznačiť zvar</button>
       <button id="btnCutWeld" onclick="cutWeldModal()" style="display:none;width:100%;margin-top:6px;padding:12px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">✂️ Rezaný zvar</button>
+      <button id="btnUncutWeld" onclick="uncutWeldModal()" style="display:none;width:100%;margin-top:6px;padding:12px;background:#dcfce7;color:#166534;border:1px solid #86efac;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">↩️ Vrátiť — zrušiť rezanie</button>
       <button class="btn-danger" onclick="deleteWeldModal()" style="margin-top:8px">🗑️ Vymazať zvar</button>
     </div>
   </div>
@@ -662,6 +663,7 @@ canvas#mca { display: block; }
       <button onclick="openRtModal()" style="width:100%;margin-top:6px;padding:12px;background:#b45309;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">📡 RT</button>
       <button class="btn-danger" id="wb_remove" onclick="removeWbModal()" style="display:none">🗑️ Odstrániť zvarača</button>
       <button id="wb_cut" onclick="cutWbWeld()" style="display:none;width:100%;margin-top:6px;padding:12px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">✂️ Rezaný zvar</button>
+      <button id="wb_uncut" onclick="uncutWbWeld()" style="display:none;width:100%;margin-top:6px;padding:12px;background:#dcfce7;color:#166534;border:1px solid #86efac;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">↩️ Vrátiť — zrušiť rezanie</button>
       <button class="btn-danger" onclick="deleteWbRowModal()" style="margin-top:4px;background:#7f1d1d">🗑️ Vymazať zvar</button>
     </div>
   </div>
@@ -1525,8 +1527,11 @@ function openWelderModal(weld) {
   document.getElementById('wm_date').value = (wbEntry && wbEntry.dateWelding) ? wbEntry.dateWelding : today();
   var _btnR = document.getElementById('btnRemoveWelder');
   var _btnC = document.getElementById('btnCutWeld');
+  var _btnU = document.getElementById('btnUncutWeld');
+  var isCanceled = wbEntry && wbEntry.canceledNote === 'canceled';
   if (_btnR) _btnR.style.display = hasWelder ? 'block' : 'none';
-  if (_btnC) _btnC.style.display = hasWelder ? 'block' : 'none';
+  if (_btnC) _btnC.style.display = (hasWelder && !isCanceled) ? 'block' : 'none';
+  if (_btnU) _btnU.style.display = (hasWelder && isCanceled) ? 'block' : 'none';
 
   const _el_welderModal_add = document.getElementById('welderModal'); if (_el_welderModal_add) _el_welderModal_add.classList.add('show');
   setTimeout(() => document.getElementById('wm_welder').focus(), 300);
@@ -1750,31 +1755,63 @@ function cutWeldModal() {
   const { weld, wbEntry } = currentWeldForModal;
   if (!wbEntry) return;
   closeWelderModal();
-  var newWeldId = String(weld.displayNum) + 'n';
+  var origNum = String(weld.displayNum).split('/')[0];
+  var newWeldId = origNum + 'n';
   wbEntry.canceledNote = 'canceled';
+  weld.displayNum = origNum + '/' + newWeldId; // zobraz 6/6n
   var newEntry = Object.assign({}, wbEntry);
   newEntry.weldId = newWeldId;
   newEntry.welderId = '';
   newEntry.dateWelding = '';
   newEntry.canceledNote = '';
   weldBookData.push(newEntry);
-  var newWeld = {
-    id: Date.now() + '_' + Math.random().toString(36).slice(2),
-    start: { x: weld.start.x + 0.012, y: weld.start.y - 0.012 },
-    end:   { x: weld.end.x + 0.012,   y: weld.end.y - 0.012 },
-    displayNum: newWeldId
-  };
-  if (currentProject) currentProject.welds.push(newWeld);
   mDraw();
   Promise.all([_directWbSave(wbEntry), _directWbSave(newEntry)]).then(() => {
-    showToast('✂️ Rezaný: ' + weld.displayNum + ' → ' + newWeldId);
+    showToast('✂️ Rezaný: ' + origNum + ' → ' + newWeldId);
     filterWB();
     setTimeout(function() {
       var ne = weldBookData.find(function(r) {
         return String(r.weldId) === newWeldId && String(r.isometric||'') === String(wbEntry.isometric||'');
       });
-      if (ne) openWelderModal(newWeld, ne);
+      if (ne) openWelderModal(weld, ne);
     }, 400);
+  });
+}
+
+function uncutWeldModal() {
+  if (!currentWeldForModal) return;
+  const { weld, wbEntry } = currentWeldForModal;
+  closeWelderModal();
+  var currentNum = String(weld.displayNum);
+  var origNum = currentNum.split('/')[0];
+  var newWeldId = origNum + 'n';
+  wbEntry.canceledNote = '';
+  weld.displayNum = origNum; // obnov povodne cislo
+  // Vymaz n zvar z WeldBooku
+  var idx2 = weldBookData.findIndex(function(r) {
+    return String(r.weldId) === newWeldId && String(r.isometric||'') === String(wbEntry.isometric||'');
+  });
+  if (idx2 >= 0) weldBookData.splice(idx2, 1);
+  mDraw();
+  _directWbSave(wbEntry).then(() => {
+    showToast('↩️ Vrátené: ' + origNum);
+    filterWB();
+  });
+}
+
+function uncutWbWeld() {
+  if (!currentWbRow) return;
+  var r = currentWbRow.row;
+  var newWeldId = String(r.weldId) + 'n';
+  closeWbModal();
+  r.canceledNote = '';
+  var idx2 = weldBookData.findIndex(function(x) {
+    return String(x.weldId) === newWeldId && String(x.isometric||'') === String(r.isometric||'');
+  });
+  if (idx2 >= 0) weldBookData.splice(idx2, 1);
+  _directWbSave(r).then(function() {
+    showToast('↩️ Vrátené: ' + r.weldId);
+    filterWB();
   });
 }
 
@@ -2134,7 +2171,10 @@ function openWbModal(idx) {
   document.getElementById('wb_vtdate').value = r.vtDate || '';
   document.getElementById('wb_remove').style.display = (r.welderId && r.welderId.trim()) ? 'block' : 'none';
   var _wbCut = document.getElementById('wb_cut');
-  if (_wbCut) _wbCut.style.display = (r.welderId && r.welderId.trim()) ? 'block' : 'none';
+  var _wbUncut = document.getElementById('wb_uncut');
+  var _isCanceled = r.canceledNote === 'canceled';
+  if (_wbCut) _wbCut.style.display = (r.welderId && !_isCanceled) ? 'block' : 'none';
+  if (_wbUncut) _wbUncut.style.display = _isCanceled ? 'block' : 'none';
   const _el_wbModal_add = document.getElementById('wbModal'); if (_el_wbModal_add) _el_wbModal_add.classList.add('show');
   setTimeout(() => document.getElementById('wb_welder').focus(), 300);
 }
