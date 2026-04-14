@@ -464,7 +464,7 @@ canvas#mca { display: block; }
       <button id="btnRemoveWelder" onclick="removeWelderModal()" style="display:none;width:100%;margin-top:8px;padding:12px;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">❌ Odznačiť zvar</button>
       <button id="btnCutWeld" onclick="cutWeldModal()" style="display:none;width:100%;margin-top:6px;padding:12px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">✂️ Rezaný zvar</button>
       <button id="btnUncutWeld" onclick="uncutWeldModal()" style="display:none;width:100%;margin-top:6px;padding:12px;background:#dcfce7;color:#166534;border:1px solid #86efac;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">↩️ Vrátiť — zrušiť rezanie</button>
-      <button class="btn-danger" onclick="deleteWeldModal()" style="margin-top:8px">🗑️ Vymazať zvar</button>
+      <button class="btn-danger" onclick="deleteWeldModal()" style="margin-top:8px">🗑️ Vymazať zvar z výkresu</button>
     </div>
   </div>
 </div>
@@ -1064,7 +1064,8 @@ async function openProject(projId) {
 // ===== MONTAZ CANVAS =====
 function mGetWbEntry(weld) {
   if (!weldBookData || !currentProject) return null;
-  const weldId = String(weld.displayNum);
+  // Ak je displayNum "6/6n" tak hladaj "6" (povodny zvar)
+  const weldId = String(weld.displayNum).split('/')[0];
   const fn = currentProject.originalFileName || '';
   const isoFromSplit = splitIso(fn).iso; // napr. "KF-712-20002-4-25-10H1A"
 
