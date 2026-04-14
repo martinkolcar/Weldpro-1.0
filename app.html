@@ -2439,14 +2439,8 @@ break;
 }
 
 if(hasWelder){
-// ODZNAČ - vymaž zvarača
-if(confirm('Odznačiť zvar '+w.displayNum+'? (vymaže sa zvarač z WeldBook)')){
-weldBookEntry.welderId='';
-weldBookEntry.dateWelding='';
-saveCurrentPartWeldBook();
-dw();
-console.log('❌ Zvar',w.displayNum,'odznačený - zvarač vymazaný');
-}
+// ODZNAČ alebo REZANÝ ZVAR
+showCancelWeldModal(w, weldBookEntry);
 }else{
 // OZNAČIŤ - otvor modal
 openMontazWelderModal(w, weldBookEntry);
@@ -8888,7 +8882,19 @@ function initializeWeldBookGrid() {
     { headerName: 'PED', field: 'ped', width: 80, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
     { headerName: 'REV.', field: 'rev', width: 80, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
     { headerName: 'Pipe Class', field: 'pipeClass', width: 120, editable: true, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
-    { headerName: 'Weld ID', field: 'weldId', width: 100, editable: true, pinned: 'left', cellDataType: 'text', valueFormatter: function(params) { return params.value ? String(params.value) : ''; }, cellStyle: function(params) { if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'}; if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'}; return null; } },
+    { headerName: 'Weld ID', field: 'weldId', width: 130, editable: true, pinned: 'left', cellDataType: 'text',
+      valueFormatter: function(params) {
+        if (!params.value) return '';
+        var val = String(params.value);
+        if (params.data && params.data.canceledNote === 'canceled') val += ' canceled';
+        return val;
+      },
+      cellStyle: function(params) {
+        if (params.data && params.data.canceledNote === 'canceled') return {backgroundColor:'#fee2e2',color:'#dc2626',fontWeight:'600'};
+        if(isDuplicateWeld(params)) return {backgroundColor:'#a7c7e7'};
+        if(params.data && params.data._changed && params.data._changed[params.colDef.field]) return {backgroundColor:'#fef08a',color:'#713f12'};
+        return null;
+      } },
     { headerName: 'Source', field: 'source', width: 90, editable: true, cellStyle: function(params) { 
       if(params.value==='prefab')return {backgroundColor:'#d1fae5',color:'#065f46',fontWeight:'600'};
       if(params.value==='new')return {backgroundColor:'#fef3c7',color:'#92400e',fontWeight:'600'};
@@ -17333,5 +17339,90 @@ function buildZip(files) {
   });
 }
 </script>
+
+<!-- Cancel/Rezany Zvar Modal -->
+<div id="cancelWeldModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:12px;padding:28px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.3)">
+    <h3 style="margin:0 0 8px;font-size:18px">Zvar <span id="cwModalNum" style="color:#0078D4"></span></h3>
+    <p style="color:#64748b;margin:0 0 20px;font-size:14px">Zvar je označený. Čo chceš urobiť?</p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button onclick="cancelWeldAction('unmark')" style="padding:12px;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-align:left">
+        ❌ Odznačiť — vymaže zvárača a dátum
+      </button>
+      <button onclick="cancelWeldAction('cut')" style="padding:12px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-align:left">
+        ✂️ Rezaný zvar — pôvodný <b>canceled</b>, vytvorí sa nový <span id="cwModalNewNum"></span>
+      </button>
+      <button onclick="closeCancelWeldModal()" style="padding:12px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;cursor:pointer">
+        Zavrieť
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+var _cancelWeldData = null;
+
+function showCancelWeldModal(w, weldBookEntry) {
+  _cancelWeldData = { w: w, entry: weldBookEntry };
+  document.getElementById('cwModalNum').textContent = '#' + w.displayNum;
+  document.getElementById('cwModalNewNum').textContent = '#' + w.displayNum + 'n';
+  var m = document.getElementById('cancelWeldModal');
+  m.style.display = 'flex';
+}
+
+function closeCancelWeldModal() {
+  document.getElementById('cancelWeldModal').style.display = 'none';
+  _cancelWeldData = null;
+}
+
+function cancelWeldAction(action) {
+  if (!_cancelWeldData) return;
+  var w = _cancelWeldData.w;
+  var entry = _cancelWeldData.entry;
+  closeCancelWeldModal();
+
+  if (action === 'unmark') {
+    entry.welderId = '';
+    entry.dateWelding = '';
+    saveCurrentPartWeldBook();
+    dw();
+
+  } else if (action === 'cut') {
+    // Povodny zvar - oznac ako canceled
+    entry.canceledNote = 'canceled';
+
+    // Novy zvar vo WeldBook
+    var newWeldId = String(w.displayNum) + 'n';
+    var newEntry = Object.assign({}, entry);
+    newEntry.weldId = newWeldId;
+    newEntry.welderId = '';
+    newEntry.dateWelding = '';
+    newEntry.canceledNote = '';
+    weldBookData.push(newEntry);
+
+    // Novy zvar na canvas - trochu posunuty
+    var newWeld = {
+      id: Date.now() + '_' + Math.random().toString(36).slice(2),
+      start: { x: w.start.x + 0.012, y: w.start.y - 0.012 },
+      end:   { x: w.end.x + 0.012,   y: w.end.y - 0.012 },
+      displayNum: newWeldId
+    };
+    ws.push(newWeld);
+
+    saveCurrentPartWeldBook();
+    dw();
+
+    // Okamzite otvor modal pre novy zvar
+    setTimeout(function() {
+      var ne = weldBookData.find(function(r) {
+        return String(r.weldId) === newWeldId &&
+               String(r.isometric||'') === String(entry.isometric||'');
+      });
+      if (ne) openMontazWelderModal(newWeld, ne);
+    }, 300);
+  }
+}
+
+
 
 </body></html>
