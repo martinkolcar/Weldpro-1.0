@@ -1516,8 +1516,8 @@ function handleCanvasTap(clientX, clientY) {
 }
 
 // ===== WELDER MODAL =====
-function openWelderModal(weld) {
-  const wbEntry = mGetWbEntry(weld);
+function openWelderModal(weld, forcedWbEntry) {
+  const wbEntry = forcedWbEntry || mGetWbEntry(weld);
   currentWeldForModal = { weld, wbEntry };
 
   document.getElementById('wm_weldNum').textContent = '#' + weld.displayNum;
@@ -1776,7 +1776,6 @@ function cutWeldModal() {
   newEntry.canceledNote = '';
   weldBookData.push(newEntry);
   mDraw();
-  mSave(); // uloz projekt s novym displayNum
   Promise.all([_directWbSave(wbEntry), _directWbSave(newEntry)]).then(() => {
     showToast('✂️ Rezaný: ' + origNum + ' → ' + newWeldId);
     filterWB();

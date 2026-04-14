@@ -17411,7 +17411,9 @@ function cancelWeldAction(action) {
     weldBookData.push(newEntry);
     sortWeldBookData(); // zarad n zvar hned za povodny
     if (weldBookGrid && weldBookGrid.api) {
-      weldBookGrid.api.setGridOption('rowData', weldBookData);
+      // Reset grid sort aby neprepísal nas sort
+      weldBookGrid.api.applyColumnState({ defaultState: { sort: null } });
+      weldBookGrid.api.setGridOption('rowData', weldBookData.slice());
     }
 
     saveCurrentPartWeldBook();
