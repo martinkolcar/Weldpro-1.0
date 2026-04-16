@@ -987,7 +987,9 @@ function selectPart(part) {
 function filterProjects() {
   const q = document.getElementById('kSearch').value.toLowerCase().trim();
   let filtered = allProjects.filter(p => {
-    if (selectedPart && getPart(p.id) !== selectedPart) return false;
+    // Pouzi meta.part (z Firebase) ako prioritu, getPart ako fallback
+    const pPart = (p.meta && p.meta.part) ? p.meta.part.toUpperCase() : getPart(p.id).toUpperCase();
+    if (selectedPart && pPart !== selectedPart.toUpperCase()) return false;
     if (q && !p.id.toLowerCase().includes(q)) return false;
     return true;
   });
@@ -1003,7 +1005,7 @@ function filterProjects() {
 
   // Render po 50 naraz pre rýchlosť
   el.innerHTML = filtered.slice(0, 50).map(p => {
-    const part = getPart(p.id);
+    const part = (p.meta && p.meta.part) ? p.meta.part.toUpperCase() : getPart(p.id);
     const weldCount = p.meta.count || '?';
     // Skráť dlhý názov
     const shortName = p.id.replace(/^(SUL|LIG|DRY|FLA|LHT)[_,]?/,'').replace(/_/g,' ').replace(/PIPE ISOMETRIC,?/i,'');
