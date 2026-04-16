@@ -954,10 +954,11 @@ async function loadProjects() {
     for (const doc of snap.docs) {
       if (doc.id === 'weldbook_main' || doc.id.startsWith('_')) continue;
       const meta = doc.data();
-      // Ak part nie je v metadatach, zisti z ID
       if (!meta.part) meta.part = getPart(doc.id);
+      console.log('PROJECT:', doc.id, '| meta.part=', meta.part, '| selectedPart=', selectedPart);
       allProjects.push({ id: doc.id, meta });
     }
+    console.log('TOTAL loaded:', allProjects.length, 'selectedPart=', selectedPart);
     allProjects.sort((a,b) => a.id.localeCompare(b.id));
     filterProjects();
   } catch(e) { 
