@@ -17110,26 +17110,60 @@ async function getRtPozWelds(datum) {
   if (!datum) return [];
   var parts = ['SUL','LIG','DRY','FLA','LHT'];
   var allRows = [];
-  console.log('RT hladam datum:', datum, 'db:', !!db);
+  console.log('RT hladam datum:', datum);
+
+  // Nacitaj z weldbook (hlavne chunky)
   for (var pi = 0; pi < parts.length; pi++) {
     var p = parts[pi];
     try {
       var metaDoc = await db.collection('weldbook').doc(p+'_main').get();
-      if (!metaDoc.exists) { console.log(p+': neexistuje'); continue; }
+      if (!metaDoc.exists) continue;
       var meta = metaDoc.data();
-      var numChunks = meta.chunks || 1;
       var cps = [];
-      for (var ci = 0; ci < numChunks; ci++)
+      for (var ci = 0; ci < (meta.chunks||1); ci++)
         cps.push(db.collection('weldbook').doc(p+'_main').collection('data').doc('c'+ci).get());
       var cds = await Promise.all(cps);
       var joined = cds.filter(function(c){return c.exists;}).map(function(c){return c.data().d||'';}).join('');
-      var rows = JSON.parse(joined);
-      var hits = rows.filter(function(r){return r.rtDate && r.rtDate === datum;}).length;
-      console.log(p+': '+rows.length+' zvarov, '+hits+' matches');
-      allRows = allRows.concat(rows);
+      try { allRows = allRows.concat(JSON.parse(joined)); } catch(e) {}
     } catch(e) { console.error('RT error '+p+':', e); }
   }
-  return allRows.filter(function(r){ return r.rtDate && r.rtDate === datum; });
+
+  // Nacitaj aj z weldbook_rows (row-level zmeny z mobile) a zluc
+  try {
+    var rowsSnap = await db.collection('weldbook_rows').where('rtDate', '==', datum).get();
+    if (!rowsSnap.empty) {
+      console.log('RT: najdenych ' + rowsSnap.docs.length + ' row-level zaznamov s rtDate='+datum);
+      rowsSnap.docs.forEach(function(d) {
+        var row = d.data();
+        delete row._part; delete row._updatedAt; delete row._by; delete row._sessionId;
+        // Aktualizuj existujuci zaznam alebo pridaj novy
+        var idx = allRows.findIndex(function(r) {
+          return String(r.weldId||'') === String(row.weldId||'') &&
+                 String(r.isometric||'') === String(row.isometric||'');
+        });
+        if (idx >= 0) Object.assign(allRows[idx], row);
+        else allRows.push(row);
+      });
+    }
+  } catch(e) { console.error('RT weldbook_rows error:', e); }
+
+  // Aj z lokalnej pamate (weldBookData) - moze byt novsi ako Firebase
+  if (weldBookData && weldBookData.length > 0) {
+    weldBookData.forEach(function(row) {
+      if (row.rtDate && row.rtDate === datum) {
+        var idx = allRows.findIndex(function(r) {
+          return String(r.weldId||'') === String(row.weldId||'') &&
+                 String(r.isometric||'') === String(row.isometric||'');
+        });
+        if (idx >= 0) Object.assign(allRows[idx], row);
+        else allRows.push(row);
+      }
+    });
+  }
+
+  var result = allRows.filter(function(r){ return r.rtDate && r.rtDate === datum; });
+  console.log('RT celkom najdenych:', result.length, 'zvarov');
+  return result;
 }
 
 async function previewRtPoziadavka() {
