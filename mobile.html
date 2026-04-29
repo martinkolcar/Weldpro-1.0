@@ -1366,7 +1366,7 @@ async function mSave() {
 
     // Ulož späť
     const json = JSON.stringify(parsed);
-    const CHUNK = 800 * 1024;
+    const CHUNK = 400 * 1024;
     const newChunks = [];
     for (let i = 0; i < json.length; i += CHUNK) newChunks.push(json.slice(i, i + CHUNK));
 
@@ -1698,7 +1698,7 @@ async function clearFittingModal() {
     if (partRows.length === 0 && weldBookData.length > 0) partRows = weldBookData;
     if (!partRows.length) { showToast('WB nie je nacitany'); return; }
     var docId = part ? (part + '_main') : 'weldbook_main';
-    var json = JSON.stringify(partRows), CHUNK = 800*1024, chunks = [];
+    var json = JSON.stringify(partRows), CHUNK = 400*1024, chunks = [];
     for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
     await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
     await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() });
@@ -1744,7 +1744,7 @@ async function saveFittingModal() {
     if (partRows.length === 0) { showToast('WB nie je nacitany - otvor WeldBook sekciu'); return; }
     var docId = part ? (part + '_main') : 'weldbook_main';
     var json = JSON.stringify(partRows);
-    var CHUNK = 800*1024, chunks = [];
+    var CHUNK = 400*1024, chunks = [];
     for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
     await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
     await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() });
@@ -2049,7 +2049,18 @@ async function loadWbForPart(part) {
         // Pridaj zatvorkuAk chyba
         if (!fixed.endsWith(']')) fixed = fixed + ']';
         try { weldBookData = JSON.parse(fixed); }
-        catch(e2) { throw new Error('JSON neopravitelny: ' + parseErr.message); }
+        catch(e2) {
+          // Posledny pokus - najdi posledny kompletny objekt
+          var lastBrace = fixed.lastIndexOf('},');
+          if (lastBrace < 0) lastBrace = fixed.lastIndexOf('}');
+          if (lastBrace > 0) {
+            var fixed2 = fixed.substring(0, lastBrace + 1) + ']';
+            try { weldBookData = JSON.parse(fixed2); }
+            catch(e3) { throw new Error('JSON neopravitelny: ' + parseErr.message); }
+          } else {
+            throw new Error('JSON neopravitelny: ' + parseErr.message);
+          }
+        }
       }
     } else if (!part) {
       // weldbook_main neexistuje - nacitaj vsetky casti paralelne
@@ -2067,7 +2078,12 @@ async function loadWbForPart(part) {
         catch(e3) {
           var f2 = j2.trimEnd().replace(/,\s*$/,'');
           if (!f2.endsWith(']')) f2 = f2 + ']';
-          try { return JSON.parse(f2); } catch(e4) { return []; }
+          try { return JSON.parse(f2); } catch(e4) {
+            var lb = f2.lastIndexOf('},');
+            if (lb < 0) lb = f2.lastIndexOf('}');
+            if (lb > 0) { try { return JSON.parse(f2.substring(0,lb+1)+']'); } catch(e5){} }
+            return [];
+          }
         }
       }));
       weldBookData = [].concat(...allArrays);
@@ -2125,7 +2141,7 @@ async function saveWeldBookToFirebase() {
     console.log('💾 WB save → docId:', docId, '| rows:', partRows.length);
     showToast('💾 Ukladám ' + docId + ' (' + partRows.length + ' zvarov)');
     const json = JSON.stringify(partRows);
-    const CHUNK = 800*1024;
+    const CHUNK = 400*1024;
     const chunks = [];
     for(let i=0;i<json.length;i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
 
@@ -2396,7 +2412,7 @@ async function _directWbSave(targetRow) {
   if (!partRows.length) { showToast('⚠️ WB nie je načítaný'); return; }
   if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
   var docId = part ? (part + '_main') : 'weldbook_main';
-  var json = JSON.stringify(partRows), CHUNK = 800*1024, chunks = [];
+  var json = JSON.stringify(partRows), CHUNK = 400*1024, chunks = [];
   for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
   // Najprv vsetky chunky, potom metadata, potom signal
   await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
@@ -2467,7 +2483,7 @@ async function deleteWbRowModal() {
 
       showToast('💾 Mažem zvar #' + weldId + ' z ' + doc.id + '...');
       const json = JSON.stringify(parsed);
-      const CHUNK = 800*1024;
+      const CHUNK = 400*1024;
       const newChunks = [];
       for (let i = 0; i < json.length; i += CHUNK) newChunks.push(json.slice(i, i+CHUNK));
       await Promise.all(newChunks.map((c, i) => doc.ref.collection('data').doc('c'+i).set({d:c})));
