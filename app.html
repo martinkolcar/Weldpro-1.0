@@ -10045,25 +10045,52 @@ function startWbRealtimeSync() {
       return;
     }
 
-    // Načítaj aktívnu časť
     showWbSyncNotification('🔄 ' + data.by + ' upravil WeldBook...', 'loading');
     var syncPart = changedPart || wbActivePart;
+
+    // Mode 'rows' = mobile ulozil len zmenene riadky do weldbook_rows
+    if (data.mode === 'rows') {
+      console.log('📥 Row-level sync od:', data.by, 'part:', syncPart);
+      var since = new Date(Date.now() - 60000).toISOString(); // posledna 1 minuta
+      db.collection('weldbook_rows')
+        .where('_part', '==', syncPart || changedPart || 'LIG')
+        .where('_updatedAt', '>=', since)
+        .get().then(function(snap) {
+          if (snap.empty) { showWbSyncNotification('✅ Sync OK (0 zmien)', 'success'); return; }
+          snap.docs.forEach(function(d) {
+            var row = d.data();
+            // Odstran interni fieldy
+            delete row._part; delete row._updatedAt; delete row._by; delete row._sessionId;
+            var idx = weldBookData.findIndex(function(r) {
+              return String(r.weldId||'') === String(row.weldId||'') &&
+                     String(r.isometric||'') === String(row.isometric||'');
+            });
+            if (idx >= 0) Object.assign(weldBookData[idx], row);
+            else weldBookData.push(row);
+          });
+          wbLocalBackup();
+          if (weldBookGrid && weldBookGrid.api) {
+            weldBookGrid.api.setGridOption('rowData', weldBookData);
+            weldBookGrid.api.refreshCells({ force: true });
+          }
+          showWbSyncNotification('✅ ' + data.by + ' - ' + snap.docs.length + ' zmien', 'success');
+          addNotification('📋 ' + data.by + ' upravil WeldBook [' + (syncPart||'ALL') + '] - ' + snap.docs.length + ' zvarov');
+        }).catch(function(e){ console.error('Row sync error:', e); });
+      return;
+    }
+
+    // Standardny mode - nacitaj cely part
     var fetchDocId = syncPart ? (syncPart + '_main') : 'weldbook_main';
     console.log('📥 Načítavam zmeny z:', fetchDocId);
 
-    // Ulož aktuálnu scroll pozíciu a filter
-    var currentIsoFilter = document.getElementById('wbFilterIsometric') ? document.getElementById('wbFilterIsometric').value : '';
-
     db.collection('weldbook').doc(fetchDocId).collection('data').get().then(function(snap) {
       if (snap.empty) { console.warn('Žiadne chunky v', fetchDocId); return null; }
-      // Zoraď chunky podľa názvu c0, c1, c2...
       var chunkDocs = snap.docs.sort(function(a,b){ return a.id.localeCompare(b.id, undefined, {numeric:true}); });
       var joined = chunkDocs.map(function(d){ return d.data().d || ''; }).join('');
       return JSON.parse(joined);
     }).then(function(newData) {
       if (!newData) return;
       console.log('✅ Načítaných', newData.length, 'zvarov z Firebase');
-      // In-place update - zachová grid pozíciu
       newData.forEach(function(newRow) {
         var idx = weldBookData.findIndex(function(r) {
           return String(r.weldId||'') === String(newRow.weldId||'') &&
@@ -10072,6 +10099,23 @@ function startWbRealtimeSync() {
         if (idx >= 0) Object.assign(weldBookData[idx], newRow);
         else weldBookData.push(newRow);
       });
+      // Vymaz zaznamy ktore uz nie su v newData
+      if (syncPart) {
+        weldBookData = weldBookData.filter(function(r) {
+          if ((r.part||'').toUpperCase() !== syncPart) return true;
+          return newData.some(function(n) {
+            return String(n.weldId||'') === String(r.weldId||'') &&
+                   String(n.isometric||'') === String(r.isometric||'');
+          });
+        });
+        weldBookData.sort(function(a, b) {
+          var ia = (a.isometric||'').toLowerCase(), ib = (b.isometric||'').toLowerCase();
+          if (ia < ib) return -1; if (ia > ib) return 1;
+          var na = parseFloat(a.weldId)||0, nb = parseFloat(b.weldId)||0;
+          if (na !== nb) return na - nb;
+          return String(a.weldId).localeCompare(String(b.weldId));
+        });
+      }
       wbLocalBackup();
       if (weldBookGrid && weldBookGrid.api) {
         weldBookGrid.api.setGridOption('rowData', weldBookData);
