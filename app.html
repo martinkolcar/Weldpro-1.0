@@ -17129,6 +17129,34 @@ async function getRtPozWelds(datum) {
       allRows = allRows.concat(rows);
     } catch(e) { console.error('RT error '+p+':', e); }
   }
+  // Pridaj aj z weldbook_patches (zmeny z mobile)
+  try {
+    var patchSnap = await db.collection('weldbook_patches').where('rtDate', '==', datum).get();
+    console.log('RT patches:', patchSnap.size, 'pre datum='+datum);
+    patchSnap.docs.forEach(function(d) {
+      var row = d.data();
+      delete row._patch; delete row._part; delete row._by; delete row._at; delete row._sessionId;
+      var idx = allRows.findIndex(function(r) {
+        return String(r.weldId||'') === String(row.weldId||'') &&
+               String(r.isometric||'') === String(row.isometric||'');
+      });
+      if (idx >= 0) Object.assign(allRows[idx], row);
+      else allRows.push(row);
+    });
+  } catch(e) { console.error('RT patches error:', e); }
+
+  // Pridaj aj z lokalnej pamate
+  weldBookData.forEach(function(row) {
+    if (row.rtDate === datum) {
+      var idx = allRows.findIndex(function(r) {
+        return String(r.weldId||'') === String(row.weldId||'') &&
+               String(r.isometric||'') === String(row.isometric||'');
+      });
+      if (idx >= 0) Object.assign(allRows[idx], row);
+      else allRows.push(row);
+    }
+  });
+
   return allRows.filter(function(r){ return r.rtDate && r.rtDate === datum; });
 }
 
