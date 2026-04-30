@@ -1557,7 +1557,6 @@ function saveWelderModal() {
     wbEntry.welderId = welder;
     wbEntry.dateWelding = date;
     _savedTarget = wbEntry;
-    _markDirty(wbEntry);
     console.log('saveWelderModal [existujuci]: weld='+_savedDisplayNum+' date='+date+' welder='+welder+' dateCheck='+wbEntry.dateWelding);
   } else {
     // Novy zaznam - vloz a uloz referenciu
@@ -1571,7 +1570,6 @@ function saveWelderModal() {
     };
     wbInsertSorted(newRow);
     _savedTarget = newRow;
-    _markDirty(newRow);
     console.log('saveWelderModal [novy]: weld='+_savedDisplayNum+' date='+date+' welder='+welder);
   }
   mDraw();
@@ -1785,7 +1783,6 @@ function cutWeldModal() {
   // Povodny - canceled + isCut flag (NEprepis dateWelding!)
   liveOld.canceledNote = 'canceled';
   weld.isCut = true;
-  _markDirty(liveOld);
 
   // Novy zvar - kopia s prazdnym zvaracom a datumom
   const newEntry = Object.assign({}, liveOld);
@@ -1794,7 +1791,6 @@ function cutWeldModal() {
   newEntry.dateWelding = '';
   newEntry.canceledNote = '';
   newEntry.vtDate = '';
-  _markDirty(newEntry);
   weldBookData.push(newEntry);
 
   closeWelderModal();
@@ -1837,7 +1833,6 @@ function uncutWeldModal() {
 
   liveEntry.canceledNote = '';
   weld.isCut = false;
-  _markDirty(liveEntry);
 
   // Vymaz n zvar - uloz referenciu pred splice pre save
   const nIdx = weldBookData.findIndex(r => String(r.weldId) === newWeldId);
@@ -2054,18 +2049,7 @@ async function loadWbForPart(part) {
         // Pridaj zatvorkuAk chyba
         if (!fixed.endsWith(']')) fixed = fixed + ']';
         try { weldBookData = JSON.parse(fixed); }
-        catch(e2) {
-          // Posledny pokus - najdi posledny kompletny objekt
-          var lastBrace = fixed.lastIndexOf('},');
-          if (lastBrace < 0) lastBrace = fixed.lastIndexOf('}');
-          if (lastBrace > 0) {
-            var fixed2 = fixed.substring(0, lastBrace + 1) + ']';
-            try { weldBookData = JSON.parse(fixed2); }
-            catch(e3) { throw new Error('JSON neopravitelny: ' + parseErr.message); }
-          } else {
-            throw new Error('JSON neopravitelny: ' + parseErr.message);
-          }
-        }
+        catch(e2) { throw new Error('JSON neopravitelny: ' + parseErr.message); }
       }
     } else if (!part) {
       // weldbook_main neexistuje - nacitaj vsetky casti paralelne
@@ -2083,12 +2067,7 @@ async function loadWbForPart(part) {
         catch(e3) {
           var f2 = j2.trimEnd().replace(/,\s*$/,'');
           if (!f2.endsWith(']')) f2 = f2 + ']';
-          try { return JSON.parse(f2); } catch(e4) {
-            var lb = f2.lastIndexOf('},');
-            if (lb < 0) lb = f2.lastIndexOf('}');
-            if (lb > 0) { try { return JSON.parse(f2.substring(0,lb+1)+']'); } catch(e5){} }
-            return [];
-          }
+          try { return JSON.parse(f2); } catch(e4) { return []; }
         }
       }));
       weldBookData = [].concat(...allArrays);
@@ -2407,79 +2386,36 @@ function saveWbModal() {
 }
 
 // Bezpecny priamy save - uklada len riadky daneho partu, nikdy viac
-// Helper - oznaci riadok ako zmeneny pre nasledujuci save
-function _markDirty(row) {
-  if (!row) return;
-  if (!window._wbDirty) window._wbDirty = {};
-  window._wbDirty[String(row.weldId||'')+'_'+(row.isometric||'')] = row;
-}
-
-// Debounce queue - zabrania viacnasobnemu save pri rychlych zmenach
-var _wbSaveQueue = {};
-var _wbSaveTimers = {};
-
 async function _directWbSave(targetRow) {
-  var part = (targetRow.part || '').toUpperCase() || activeWbPart || null;
-  var partKey = part || 'ALL';
-
-  // Uloz do fronty - posledna zmena pre dany part
-  _wbSaveQueue[partKey] = targetRow;
-
-  // Zrus predchadzajuci timer pre tento part
-  if (_wbSaveTimers[partKey]) clearTimeout(_wbSaveTimers[partKey]);
-
-  // Pocka 1.5s po poslednej zmene, potom ulozi
-  return new Promise(function(resolve, reject) {
-    _wbSaveTimers[partKey] = setTimeout(async function() {
-      delete _wbSaveTimers[partKey];
-      delete _wbSaveQueue[partKey];
-      try {
-        await _doWbSave(part);
-        resolve();
-      } catch(e) { reject(e); }
-    }, 1500);
-  });
-}
-
-async function _doWbSave(part) {
+  // Uloz len JEDEN zmeneny riadok - nie cely part
   if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+  var part = (targetRow.part || '').toUpperCase() || activeWbPart || null;
 
-  // Zber zmenene riadky z _wbDirty
-  var dirty = window._wbDirty || {};
-  var dirtyRows = Object.values(dirty);
-  if (dirtyRows.length === 0) {
-    console.log('_doWbSave: ziadne zmeny na ulozenie');
-    return;
-  }
-
-  // Uloz kazdy zmeneny riadok ako samostatny Firestore dokument (~1KB kazdy)
-  // weldbook_rows / {part}_{isometric}_{weldId} = { ...row }
-  var ops = dirtyRows.map(function(row) {
-    var p = (row.part||'').toUpperCase() || part || 'ALL';
-    var iso = (row.isometric||'').replace(/[\/\\.#\[\]*]/g,'_').substring(0,80);
-    var wid = String(row.weldId||'').replace(/[\/\\.#\[\]*]/g,'_');
-    var docId = p + '_' + iso + '_' + wid;
-    return db.collection('weldbook_rows').doc(docId).set(Object.assign({}, row, {
-      _part: p, _updatedAt: new Date().toISOString(), _by: currentUser?currentUser.username:'mobile', _sessionId: window._mobileSessionId
-    }));
+  // Patch dokument - jeden zvar ~1KB
+  var patchData = Object.assign({}, targetRow, {
+    _patch: true,
+    _part: part || 'ALL',
+    _by: currentUser ? currentUser.username : 'mobile',
+    _at: new Date().toISOString(),
+    _sessionId: window._mobileSessionId
   });
 
-  // Max 20 ops naraz
-  for (var i=0; i<ops.length; i+=20) {
-    await Promise.all(ops.slice(i, i+20));
-  }
+  // ID patchu - unikatne pre kazdy zvar
+  var iso = (targetRow.isometric||'').replace(/[^a-zA-Z0-9_-]/g,'_').substring(0,60);
+  var wid = String(targetRow.weldId||'').replace(/[^a-zA-Z0-9_-]/g,'_');
+  var patchId = (part||'ALL') + '_' + iso + '_' + wid;
 
-  // Vymaz dirty
-  window._wbDirty = {};
-
-  // Signal pre PC
+  await db.collection('weldbook_patches').doc(patchId).set(patchData);
   window._lastOwnSaveAt = Date.now();
   await db.collection('weldbook_signal').doc('latest').set({
-    by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(),
-    part: part||'ALL', count: dirtyRows.length, sessionId: window._mobileSessionId,
-    mode: 'rows' // PC vie ze su to row-level zmeny
+    by: currentUser ? currentUser.username : 'mobile',
+    at: new Date().toISOString(),
+    part: part || 'ALL',
+    mode: 'patch',
+    patchId: patchId,
+    sessionId: window._mobileSessionId
   });
-  console.log('✅ WB rows saved:', dirtyRows.length, 'riadkov pre part='+part);
+  console.log('✅ Patch saved:', patchId);
 }
 
 function removeWbModal() {
@@ -2490,7 +2426,6 @@ function removeWbModal() {
   r.welderId = '';
   r.dateWelding = '';
   r.vtDate = '';
-  _markDirty(r);
   closeWbModal();
   showToast('💾 Odstraňujem...');
   _directWbSave(r).then(function() {
