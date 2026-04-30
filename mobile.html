@@ -2387,11 +2387,10 @@ function saveWbModal() {
 
 // Bezpecny priamy save - uklada len riadky daneho partu, nikdy viac
 async function _directWbSave(targetRow) {
-  // Uloz len JEDEN zmeneny riadok - nie cely part
   if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
   var part = (targetRow.part || '').toUpperCase() || activeWbPart || null;
 
-  // Patch dokument - jeden zvar ~1KB
+  // Uloz len JEDEN zmeneny riadok ako patch dokument (~1KB)
   var patchData = Object.assign({}, targetRow, {
     _patch: true,
     _part: part || 'ALL',
@@ -2399,8 +2398,6 @@ async function _directWbSave(targetRow) {
     _at: new Date().toISOString(),
     _sessionId: window._mobileSessionId
   });
-
-  // ID patchu - unikatne pre kazdy zvar
   var iso = (targetRow.isometric||'').replace(/[^a-zA-Z0-9_-]/g,'_').substring(0,60);
   var wid = String(targetRow.weldId||'').replace(/[^a-zA-Z0-9_-]/g,'_');
   var patchId = (part||'ALL') + '_' + iso + '_' + wid;
