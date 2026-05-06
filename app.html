@@ -9918,6 +9918,26 @@ async function loadWbPart(part) {
       var chunks = chunkDocs.filter(function(c) { return c.exists; }).map(function(c) { return c.data().d; });
       weldBookData = JSON.parse(chunks.join(''));
       sortWeldBookData();
+
+      // Aplikuj patche z weldbook_patches (zmeny ulozene cez patch system)
+      try {
+        var pSnap = await db.collection('weldbook_patches')
+          .where('_part', '==', wbActivePart || 'ALL').get();
+        if (!pSnap.empty) {
+          pSnap.docs.forEach(function(d) {
+            var row = d.data();
+            delete row._patch; delete row._part; delete row._by; delete row._at; delete row._sessionId;
+            var pidx = weldBookData.findIndex(function(r) {
+              return String(r.weldId||'') === String(row.weldId||'') &&
+                     String(r.isometric||'') === String(row.isometric||'');
+            });
+            if (pidx >= 0) Object.assign(weldBookData[pidx], row);
+            else weldBookData.push(row);
+          });
+          console.log('📋 Aplikovanych ' + pSnap.size + ' patchov pre ' + (wbActivePart||'ALL'));
+        }
+      } catch(pe) { console.warn('Patch load error:', pe); }
+
       wbLocalBackup();
       console.log('✅ WeldBook [' + (part||'ALL') + '] načítaný:', weldBookData.length, 'zvarov');
       if (part) {

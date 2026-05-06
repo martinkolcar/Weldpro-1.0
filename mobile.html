@@ -2075,6 +2075,28 @@ async function loadWbForPart(part) {
       // Konkretna cast neexistuje - prazdne
       weldBookData = [];
     }
+    // Aplikuj patche z weldbook_patches (zmeny ulozene cez patch system)
+    try {
+      const partForPatch = part ? part.toUpperCase() : null;
+      let patchQuery = db.collection('weldbook_patches');
+      if (partForPatch) patchQuery = patchQuery.where('_part', '==', partForPatch);
+      const patchSnap = await patchQuery.get();
+      if (!patchSnap.empty) {
+        console.log('📋 Aplikujem ' + patchSnap.size + ' patchov pre ' + (partForPatch||'ALL'));
+        patchSnap.docs.forEach(function(d) {
+          const row = d.data();
+          const cleanRow = Object.assign({}, row);
+          delete cleanRow._patch; delete cleanRow._part; delete cleanRow._by; delete cleanRow._at; delete cleanRow._sessionId;
+          const idx = weldBookData.findIndex(function(r) {
+            return String(r.weldId||'') === String(cleanRow.weldId||'') &&
+                   String(r.isometric||'') === String(cleanRow.isometric||'');
+          });
+          if (idx >= 0) Object.assign(weldBookData[idx], cleanRow);
+          else weldBookData.push(cleanRow);
+        });
+      }
+    } catch(patchErr) { console.warn('Patch load error:', patchErr); }
+
     // Cache
     try { localStorage.setItem('wbCache_'+(part||'ALL'), JSON.stringify(weldBookData)); } catch(e){}
     // Zachovaj aktívny filter - nevolaj renderWeldBook priamo
