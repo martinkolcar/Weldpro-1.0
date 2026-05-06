@@ -2009,14 +2009,31 @@ function startWbSignalListener() {
     // Ignoruj stary signal (>60s)
     var age = Date.now() - (data.at ? new Date(data.at).getTime() : 0);
     if (age > 60000) return;
-    // Ignoruj ak zmenena ina cast ako aktivna
     var changedPart = (data.part && data.part !== 'ALL') ? data.part.toUpperCase() : null;
+
+    // Mode 'patch' - aplikuj len jeden zmeneny riadok, bez reloadu
+    if (data.mode === 'patch' && data.patchId) {
+      db.collection('weldbook_patches').doc(data.patchId).get().then(function(doc) {
+        if (!doc.exists) return;
+        var row = doc.data();
+        delete row._patch; delete row._part; delete row._by; delete row._at; delete row._sessionId;
+        var idx = weldBookData.findIndex(function(r) {
+          return String(r.weldId||'') === String(row.weldId||'') &&
+                 String(r.isometric||'') === String(row.isometric||'');
+        });
+        if (idx >= 0) Object.assign(weldBookData[idx], row);
+        else weldBookData.push(row);
+        filterWB();
+        showToast('🔄 Aktualizovaný zvar #' + row.weldId);
+      });
+      return;
+    }
+
+    // Standardny signal - ignoruj ak je ina cast alebo nerob full reload
+    // (mobile nerobi full reload aby nevyhadzovalo pouzivatela)
     if (changedPart && activeWbPart && changedPart !== activeWbPart) return;
-    // Nacitaj aktualizaciu - zachovaj filter
-    console.log('📡 WB signal od', data.by, '- nacitavam...');
-    loadWbForPart(activeWbPart).then(function() {
-      showToast('🔄 WB aktualizovaný (' + data.by + ')');
-    });
+    // Len notifikacia - bez reloadu
+    showToast('🔄 WB zmenený (' + data.by + ')');
   });
 }
 
