@@ -1999,8 +1999,19 @@ function startWbSignalListener() {
   if (_wbSignalUnsub) { _wbSignalUnsub(); _wbSignalUnsub = null; }
   var initialLoad = true;
   setTimeout(function(){ initialLoad = false; }, 1000);
+  // Safari/iOS fix - ignoruj signaly ked sa tab prebudi z pozadia
+  var _lastVisible = Date.now();
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+      _lastVisible = Date.now();
+      console.log('📱 Tab sa prebудил - ignorujem signaly 5s');
+    }
+  });
+
   _wbSignalUnsub = db.collection('weldbook_signal').doc('latest').onSnapshot(function(doc) {
     if (!doc.exists || initialLoad) return;
+    // Safari fix - ignoruj signal ak sa tab prebutil pred menej ako 5s
+    if (Date.now() - _lastVisible < 5000) { console.log('📱 Safari wakeup - ignorujem signal'); return; }
     var data = doc.data();
     // Ignoruj vlastne zmeny
     if (data.sessionId && data.sessionId === window._mobileSessionId) return;
@@ -2115,7 +2126,22 @@ async function loadWbForPart(part) {
     } catch(patchErr) { console.warn('Patch load error:', patchErr); }
 
     // Cache
-    try { localStorage.setItem('wbCache_'+(part||'ALL'), JSON.stringify(weldBookData)); } catch(e){}
+    // Uloz do cache len ak je maly part (< 1000 riadkov) aby sme nepretazili localStorage
+    try {
+      if (weldBookData.length < 1000) {
+        localStorage.setItem('wbCache_'+(part||'ALL'), JSON.stringify(weldBookData));
+      } else {
+        // Pre velke party uloz len metadata (pocet, datum)
+        localStorage.setItem('wbCache_meta_'+(part||'ALL'), JSON.stringify({count: weldBookData.length, at: new Date().toISOString()}));
+        // Vymaz staru velku cache ak existuje
+        localStorage.removeItem('wbCache_'+(part||'ALL'));
+      }
+    } catch(e) { 
+      // localStorage plny - vymaz stare cache
+      try { 
+        ['SUL','LIG','DRY','FLA','LHT','ALL'].forEach(function(p){ localStorage.removeItem('wbCache_'+p); });
+      } catch(e2){}
+    }
     // Zachovaj aktívny filter - nevolaj renderWeldBook priamo
     filterWB();
     document.getElementById('wbCount').textContent = weldBookData.length + ' zvarov' + (part ? ' ('+part+')' : '');
