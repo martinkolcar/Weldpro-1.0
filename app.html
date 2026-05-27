@@ -4380,7 +4380,32 @@ if(ws.length===0){
 weldsHtml='<p style="text-align:center;color:#999;padding:40px">Zatiaľ žiadne zvary.<br>Označ zvary na výkrese!</p>';
 }
 
+// Tlacidlo Ulozit do WeldBook
+if(ws.length>0){
+weldsHtml+='<div style="margin-top:16px;padding:12px 0;border-top:2px solid #e5e7eb">';
+weldsHtml+='<button onclick="saveWeldLogToWeldBook()" style="width:100%;padding:12px;background:linear-gradient(135deg,#10b981,#059669);color:white;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 2px 8px rgba(16,185,129,0.3)">💾 Uložiť do WeldBook</button>';
+weldsHtml+='</div>';
+}
+
 weldsList.innerHTML=weldsHtml;
+}
+
+function saveWeldLogToWeldBook(){
+var saved=0;
+ws.forEach(function(w){
+var assignment=weldAssignments[w.id];
+if(assignment&&(assignment.from||assignment.to)){
+updateWeldBookFromAssignment(w.id);
+saved++;
+}
+});
+if(saved>0){
+saveWeldBookToStorage();
+alert('✅ Uložené do WeldBook: '+saved+' zvarov');
+}else{
+alert('⚠️ Žiadne zvary nemajú priradené komponenty.
+Najprv vyber From/To pre každý zvar.');
+}
 }
 
 function saveWeldAssignment(weldId,field,value){
@@ -4565,7 +4590,10 @@ var html='<div style="background:#f9fafb;padding:15px;border-radius:3px;border:2
 html+='<table style="width:100%;border-collapse:collapse;font-size:13px">';
 html+='<tr style="background:#667eea;color:white;font-weight:600"><th style="padding:8px;text-align:left">Type</th><th style="padding:8px;text-align:left">Size</th><th style="padding:8px;text-align:left">Material</th></tr>';
 weldLogMaterials.forEach(function(m){
-html+='<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px">'+m.type+'</td><td style="padding:8px">'+m.size+'</td><td style="padding:8px">'+m.material+'</td></tr>';
+// Spätná kompatibilita - size -> diameter x thickness
+if(m.size && !m.diameter){var sp=m.size.split('x');m.diameter=sp[0]||'';m.thickness=sp[1]||'';}
+var sizeStr = m.diameter ? (m.thickness ? m.diameter+'x'+m.thickness : m.diameter) : (m.size||'');
+html+='<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px">'+m.type+'</td><td style="padding:8px">'+sizeStr+'</td><td style="padding:8px">'+m.material+'</td></tr>';
 });
 html+='</table></div>';
 materialsTable.innerHTML=html;
