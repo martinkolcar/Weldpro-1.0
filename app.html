@@ -1495,10 +1495,51 @@ var kontrolaData={
 function saveKontrolaData(){
   if(!projectsData.currentProject || !projectsData.currentPart)return;
   var key='kontrola_'+projectsData.currentProject+'_'+projectsData.currentPart;
-  localStorage.setItem(key,JSON.stringify(kontrolaData));
-  console.log('💾 Kontrola data uložené do localStorage');
-  
-  // Uložiť aj do Firebase
+
+  // Uloz len podstatne data - nie expandedRoutes/expandedSpools (tie su docasne UI stav)
+  var toSave = {
+    completedWelds: kontrolaData.completedWelds || {},
+    welderData: kontrolaData.welderData || {},
+    dateData: kontrolaData.dateData || {},
+    qrCodes: kontrolaData.qrCodes || {},
+    expandedRoutes: kontrolaData.expandedRoutes || {},
+    expandedSpools: kontrolaData.expandedSpools || {}
+  };
+
+  var attempt = function(data) {
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+      return true;
+    } catch(e) {
+      if (e.name === 'QuotaExceededError' || e.code === 22) return false;
+      return false;
+    }
+  };
+
+  // Pokus 1 - uloz vsetko
+  if (!attempt(toSave)) {
+    // Pokus 2 - vymaz stare kontrola kluce a skus znovu
+    var toDelete = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.startsWith('kontrola_') && k !== key) toDelete.push(k);
+    }
+    toDelete.forEach(function(k) { localStorage.removeItem(k); });
+    console.warn('🧹 Vymazanych ' + toDelete.length + ' starych kontrola klucov');
+
+    if (!attempt(toSave)) {
+      // Pokus 3 - uloz len completedWelds + welderData + dateData (bez qrCodes)
+      var minimal = {
+        completedWelds: kontrolaData.completedWelds || {},
+        welderData: kontrolaData.welderData || {},
+        dateData: kontrolaData.dateData || {}
+      };
+      attempt(minimal);
+      console.warn('⚠️ Ulozene len minimalne kontrola data (bez QR kodov)');
+    }
+  }
+
+  // Uloz aj do Firebase
   saveProjectsToFirebase();
 }
 
@@ -1507,12 +1548,32 @@ function loadKontrolaData(){
   var key='kontrola_'+projectsData.currentProject+'_'+projectsData.currentPart;
   var saved=localStorage.getItem(key);
   if(saved){
-    kontrolaData=JSON.parse(saved);
-    console.log('📂 Kontrola data načítané');
+    try {
+      kontrolaData=JSON.parse(saved);
+      console.log('📂 Kontrola data načítané z localStorage');
+    } catch(e) {
+      kontrolaData={expandedRoutes:{},expandedSpools:{},completedWelds:{},welderData:{},dateData:{},qrCodes:{}};
+    }
   }else{
     kontrolaData={expandedRoutes:{},expandedSpools:{},completedWelds:{},welderData:{},dateData:{},qrCodes:{}};
   }
 }
+
+// Vycisti stare kontrola kluce pri starte
+(function cleanOldKontrolaKeys() {
+  try {
+    var keys = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.startsWith('kontrola_')) keys.push(k);
+    }
+    // Ak je viac ako 5 kontrola klucov, vymaz najstarsie
+    if (keys.length > 5) {
+      keys.slice(0, keys.length - 5).forEach(function(k) { localStorage.removeItem(k); });
+      console.log('🧹 Vycistene stare kontrola kluce:', keys.length - 5);
+    }
+  } catch(e) {}
+})();
 var arrows=[];
 var arrowPt=null;
 var arrowColor='#FF0000';
@@ -5108,6 +5169,12 @@ trRoute.className='route-row';
 trRoute.style.background='#e8f4f8';
 trRoute.style.fontWeight='bold';
 trRoute.style.cursor='pointer';
+
+var icon=isRouteExpanded?'▼':'▶';
+trRoute.innerHTML='<td colspan="4" style="padding:12px;border:1px solid #0078D4;color:#0078D4">'+
+icon+' <strong>'+isoName+'</strong> ('+isoSpools.length+' spoolov)</td>';
+
+// onclick az PO innerHTML - inak sa handler zmaze
 trRoute.onclick=function(iso){
 return function(){
 kontrolaData.expandedRoutes[iso]=!kontrolaData.expandedRoutes[iso];
@@ -5116,9 +5183,6 @@ buildSpoolListTable();
 };
 }(isoName);
 
-var icon=isRouteExpanded?'▼':'▶';
-trRoute.innerHTML='<td colspan="4" style="padding:12px;border:1px solid #0078D4;color:#0078D4">'+
-icon+' <strong>'+isoName+'</strong> ('+isoSpools.length+' spoolov)</td>';
 tbody.appendChild(trRoute);
 
 // Ak je route rozbalená, zobraz spooly
