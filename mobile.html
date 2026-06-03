@@ -2237,13 +2237,41 @@ async function saveWeldBookToFirebase() {
 
 function onWbPartChange() {
   var part = document.getElementById('wbFPart').value;
-  if (!part) return;
   var isoSel = document.getElementById('wbFIso');
+  var dbgEl = document.getElementById('wbCount');
+
+  if (!part) {
+    // Vsetky casti - zobraz sumar z weldbook_meta
+    if (isoSel) isoSel.innerHTML = '<option value="">-- Vyber izometriu --</option>';
+    weldBookData = [];
+    filterWB();
+    if (dbgEl) dbgEl.textContent = '⏳ Načítavam súhrn...';
+    // Nacitaj pocty zo vsetkych partov
+    (async function() {
+      try {
+        var parts = ['SUL','LIG','DRY','FLA','LHT'];
+        var total = 0;
+        var isoTotal = 0;
+        for (var pi = 0; pi < parts.length; pi++) {
+          var m = await db.collection('weldbook_meta').doc(parts[pi]).get();
+          if (m.exists) {
+            total += m.data().count || 0;
+            isoTotal += (m.data().isometrics || []).length;
+          }
+        }
+        if (dbgEl) dbgEl.textContent = total + ' zvarov / ' + isoTotal + ' izometrií (všetky časti)';
+      } catch(e) {
+        if (dbgEl) dbgEl.textContent = 'Vyber časť';
+      }
+    })();
+    return;
+  }
+
   if (isoSel) isoSel.innerHTML = '<option value="">-- Načítavam... --</option>';
   weldBookData = [];
   filterWB();
   loadWbIsoList(part).catch(function(e){
-    document.getElementById('wbCount').textContent = '❌ ' + e.message;
+    if (dbgEl) dbgEl.textContent = '❌ ' + e.message;
   });
 }
 
@@ -3030,12 +3058,13 @@ async function applyScanResult() {
     partSel.value = correctPart;
   }
 
-  // Nacitaj izometriu priamo
-  showToast('📋 ' + iso);
-  var dbgEl = document.getElementById('wbCount');
-  if (dbgEl) dbgEl.textContent = '⏳ ' + iso + '...';
+  // Nacitaj zoznam izometrii pre spravny part (aby dropdown sedel)
+  if (correctPart) {
+    await loadWbIsoList(correctPart);
+  }
 
   // Nacitaj zvary pre tuto izometriu
+  showToast('📋 ' + iso);
   await loadWbForIsometric(correctPart || 'SUL', iso);
 
   // Nastav iso dropdown
