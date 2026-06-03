@@ -2996,13 +2996,61 @@ function findIsoInText(text) {
 }
 
 
-function applyScanResult() {
+async function applyScanResult() {
   if (!_scanMatchedIso) return;
   closeIsoScanner();
+  var iso = _scanMatchedIso;
+
+  // Zisti v ktorom parte je tato izometria
+  var partSel = document.getElementById('wbFPart');
   var isoSel = document.getElementById('wbFIso');
-  if (isoSel) for (var i=0;i<isoSel.options.length;i++) if(isoSel.options[i].value===_scanMatchedIso){isoSel.selectedIndex=i;break;}
-  filterWB();
-  showToast('📋 ' + _scanMatchedIso);
+  var currentPart = partSel ? partSel.value : '';
+
+  // Ak nie je vybrany part alebo izometria nie je v aktualnom parte,
+  // najdi spravny part z weldbook_meta
+  var correctPart = currentPart;
+  if (!currentPart) {
+    try {
+      var parts = ['SUL','LIG','DRY','FLA','LHT'];
+      for (var pi = 0; pi < parts.length; pi++) {
+        var metaDoc = await db.collection('weldbook_meta').doc(parts[pi]).get();
+        if (metaDoc.exists) {
+          var isos = metaDoc.data().isometrics || [];
+          if (isos.indexOf(iso) >= 0) {
+            correctPart = parts[pi];
+            break;
+          }
+        }
+      }
+    } catch(e) { console.warn('applyScanResult part lookup:', e); }
+  }
+
+  // Nastav part dropdown
+  if (correctPart && partSel) {
+    partSel.value = correctPart;
+  }
+
+  // Nacitaj izometriu priamo
+  showToast('📋 ' + iso);
+  var dbgEl = document.getElementById('wbCount');
+  if (dbgEl) dbgEl.textContent = '⏳ ' + iso + '...';
+
+  // Nacitaj zvary pre tuto izometriu
+  await loadWbForIsometric(correctPart || 'SUL', iso);
+
+  // Nastav iso dropdown
+  if (isoSel) {
+    // Pridaj izometriu do dropdownu ak tam nie je
+    var found = false;
+    for (var i = 0; i < isoSel.options.length; i++) {
+      if (isoSel.options[i].value === iso) { isoSel.selectedIndex = i; found = true; break; }
+    }
+    if (!found) {
+      var opt = document.createElement('option');
+      opt.value = iso; opt.text = iso; opt.selected = true;
+      isoSel.appendChild(opt);
+    }
+  }
 }
 
 function applyManualSelect() {
