@@ -2723,50 +2723,39 @@ function openIsoScanner() {
 }
 
 async function loadScanIsoCache() {
-  // 1. Ak weldBookData má dáta, použi ich
+  // 1. Ak weldBookData má dáta pre aktuálny part, pridaj ich
   if (typeof weldBookData !== 'undefined' && weldBookData.length > 0) {
     var seen = {};
-    _scanIsoCache = [];
-    for (var i = 0; i < weldBookData.length; i++) {
-      var v = (weldBookData[i].isometric || '').trim();
-      if (v && !seen[v]) { seen[v] = true; _scanIsoCache.push(v); }
-    }
-    return;
+    weldBookData.forEach(function(r) {
+      var v = (r.isometric||'').trim();
+      if (v && !seen[v]) { seen[v]=true; _scanIsoCache.push(v); }
+    });
   }
-  // 2. Inak načítaj zo Firebase - všetky party
+
+  // 2. Načítaj zo weldbook_meta (rýchle - 5 dokumentov namiesto chunkov)
+  if (_scanIsoCache.length > 0) return; // uz mame
   try {
     var parts = ['SUL','LIG','DRY','FLA','LHT'];
-    var allRows = [];
+    var allIsos = [];
     for (var p = 0; p < parts.length; p++) {
-      var docId = parts[p] + '_main';
-      var metaDoc = await db.collection('weldbook').doc(docId).get();
-      if (!metaDoc.exists) continue;
-      var meta = metaDoc.data();
-      if (!meta || !meta.chunks) continue;
-      var cps = [];
-      for (var c = 0; c < meta.chunks; c++) cps.push(db.collection('weldbook').doc(docId).collection('data').doc('c'+c).get());
-      var cds = await Promise.all(cps);
-      var json = cds.filter(function(x){return x.exists;}).map(function(x){return x.data().d;}).join('');
-      if (json) { var rows = JSON.parse(json); allRows = allRows.concat(rows); }
+      try {
+        var metaDoc = await db.collection('weldbook_meta').doc(parts[p]).get();
+        if (metaDoc.exists && metaDoc.data().isometrics) {
+          allIsos = allIsos.concat(metaDoc.data().isometrics);
+        }
+      } catch(me) {}
     }
-    // Also try weldbook_main fallback
-    if (!allRows.length) {
-      var mainDoc = await db.collection('weldbook').doc('weldbook_main').get();
-      if (mainDoc.exists && mainDoc.data().chunks) {
-        var cps2 = [];
-        for (var c2 = 0; c2 < mainDoc.data().chunks; c2++) cps2.push(db.collection('weldbook').doc('weldbook_main').collection('data').doc('c'+c2).get());
-        var cds2 = await Promise.all(cps2);
-        var json2 = cds2.filter(function(x){return x.exists;}).map(function(x){return x.data().d;}).join('');
-        if (json2) allRows = JSON.parse(json2);
-      }
+    if (allIsos.length > 0) {
+      var seen2 = {};
+      _scanIsoCache = [];
+      allIsos.forEach(function(v) {
+        if (v && !seen2[v]) { seen2[v]=true; _scanIsoCache.push(v); }
+      });
+      _scanIsoCache.sort();
+      console.log('[SCAN] Cache načítaná z weldbook_meta:', _scanIsoCache.length);
+      return;
     }
-    var seen2 = {};
-    _scanIsoCache = [];
-    for (var j = 0; j < allRows.length; j++) {
-      var iso = (allRows[j].isometric || '').trim();
-      if (iso && !seen2[iso]) { seen2[iso] = true; _scanIsoCache.push(iso); }
-    }
-  } catch(e) { console.log('Scan iso cache load error:', e); }
+  } catch(e) { console.warn('loadScanIsoCache meta:', e); }
 }
 
 function closeIsoScanner() {
