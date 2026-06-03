@@ -2127,8 +2127,19 @@ async function loadWbIsoList(part) {
         isos.map(function(v){return '<option value="'+v+'">'+v+'</option>';}).join('');
     }
     weldBookData = [];
-    if (dbgEl) dbgEl.textContent = isos.length + ' izometrií — vyber jednu';
-    filterWB();
+    // Zobraz info z metadata - pocet zvarov aj izometrii
+    try {
+      var metaInfo = await db.collection('weldbook_meta').doc(partUpper).get();
+      if (metaInfo.exists && metaInfo.data().count) {
+        var cnt = metaInfo.data().count;
+        if (dbgEl) dbgEl.textContent = cnt.toLocaleString() + ' zvarov / ' + isos.length + ' izometrií — vyber jednu';
+      } else {
+        if (dbgEl) dbgEl.textContent = isos.length + ' izometrií — vyber jednu';
+      }
+    } catch(e) {
+      if (dbgEl) dbgEl.textContent = isos.length + ' izometrií — vyber jednu';
+    }
+    // Nevolaj filterWB - prepise by text
   } catch(e) {
     if (dbgEl) dbgEl.textContent = '❌ ' + e.message;
     console.error('loadWbIsoList:', e);
@@ -2330,7 +2341,11 @@ function _applyWbFilter() {
     return true;
   });
   renderWeldBook(filtered);
-  document.getElementById('wbCount').textContent = filtered.length + ' / ' + weldBookData.length + ' zvarov';
+  // Neprepis wbCount ak nie su nacitane zvary (len zoznam izometrii)
+  if (weldBookData.length > 0) {
+    document.getElementById('wbCount').textContent = filtered.length + ' / ' + weldBookData.length + ' zvarov';
+  }
+  // Ak weldBookData prazdny - nechaj sumar text (pocet zvarov/izometrii)
 }
 
 function renderWeldBook(rows) {
