@@ -2249,6 +2249,7 @@ function onWbPartChange() {
     // Nacitaj pocty zo vsetkych partov
     (async function() {
       try {
+        if (!db) { if (dbgEl) dbgEl.textContent = 'Vyber časť'; return; }
         var parts = ['SUL','LIG','DRY','FLA','LHT'];
         var total = 0;
         var isoTotal = 0;
@@ -2259,7 +2260,7 @@ function onWbPartChange() {
             isoTotal += (m.data().isometrics || []).length;
           }
         }
-        if (dbgEl) dbgEl.textContent = total + ' zvarov / ' + isoTotal + ' izometrií (všetky časti)';
+        if (dbgEl) dbgEl.textContent = total.toLocaleString() + ' zvarov / ' + isoTotal + ' izometrií';
       } catch(e) {
         if (dbgEl) dbgEl.textContent = 'Vyber časť';
       }
@@ -3028,58 +3029,54 @@ async function applyScanResult() {
   if (!_scanMatchedIso) return;
   closeIsoScanner();
   var iso = _scanMatchedIso;
-
-  // Zisti v ktorom parte je tato izometria
   var partSel = document.getElementById('wbFPart');
   var isoSel = document.getElementById('wbFIso');
-  var currentPart = partSel ? partSel.value : '';
+  var dbgEl = document.getElementById('wbCount');
 
-  // Ak nie je vybrany part alebo izometria nie je v aktualnom parte,
-  // najdi spravny part z weldbook_meta
-  var correctPart = currentPart;
-  if (!currentPart) {
-    try {
-      var parts = ['SUL','LIG','DRY','FLA','LHT'];
-      for (var pi = 0; pi < parts.length; pi++) {
-        var metaDoc = await db.collection('weldbook_meta').doc(parts[pi]).get();
-        if (metaDoc.exists) {
-          var isos = metaDoc.data().isometrics || [];
-          if (isos.indexOf(iso) >= 0) {
-            correctPart = parts[pi];
-            break;
-          }
+  if (dbgEl) dbgEl.textContent = '⏳ Hľadám ' + iso + '...';
+
+  // Vzdy najdi spravny part z weldbook_meta (bez ohladu na aktualny part)
+  var correctPart = null;
+  try {
+    var parts = ['SUL','LIG','DRY','FLA','LHT'];
+    for (var pi = 0; pi < parts.length; pi++) {
+      var metaDoc = await db.collection('weldbook_meta').doc(parts[pi]).get();
+      if (metaDoc.exists) {
+        var isos = metaDoc.data().isometrics || [];
+        if (isos.indexOf(iso) >= 0) {
+          correctPart = parts[pi];
+          break;
         }
       }
-    } catch(e) { console.warn('applyScanResult part lookup:', e); }
+    }
+  } catch(e) { console.warn('applyScanResult part lookup:', e); }
+
+  if (!correctPart) {
+    showToast('❌ Izometria nenájdená v databáze');
+    if (dbgEl) dbgEl.textContent = '❌ ' + iso + ' nenájdená';
+    return;
   }
 
-  // Nastav part dropdown
-  if (correctPart && partSel) {
-    partSel.value = correctPart;
-  }
+  // Prepni part dropdown
+  if (partSel) partSel.value = correctPart;
 
-  // Nacitaj zoznam izometrii pre spravny part (aby dropdown sedel)
-  if (correctPart) {
-    await loadWbIsoList(correctPart);
-  }
+  // Nacitaj zoznam izometrii pre tento part
+  await loadWbIsoList(correctPart);
 
-  // Nacitaj zvary pre tuto izometriu
-  showToast('📋 ' + iso);
-  await loadWbForIsometric(correctPart || 'SUL', iso);
+  // Nacitaj zvary
+  await loadWbForIsometric(correctPart, iso);
 
-  // Nastav iso dropdown
+  // Nastav iso dropdown na spravnu izometriu
   if (isoSel) {
-    // Pridaj izometriu do dropdownu ak tam nie je
-    var found = false;
-    for (var i = 0; i < isoSel.options.length; i++) {
-      if (isoSel.options[i].value === iso) { isoSel.selectedIndex = i; found = true; break; }
-    }
-    if (!found) {
-      var opt = document.createElement('option');
-      opt.value = iso; opt.text = iso; opt.selected = true;
-      isoSel.appendChild(opt);
+    for (var j = 0; j < isoSel.options.length; j++) {
+      if (isoSel.options[j].value === iso) {
+        isoSel.selectedIndex = j;
+        break;
+      }
     }
   }
+
+  showToast('📋 ' + correctPart + ' — ' + iso);
 }
 
 function applyManualSelect() {
