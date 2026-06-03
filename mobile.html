@@ -2051,13 +2051,32 @@ function startWbSignalListener() {
 async function loadWbForPart(part) {
   activeWbPart = part ? part.toUpperCase() : null;
   isWbLoading = true;
+  var dbgEl = document.getElementById('wbCount');
   try {
+    if (!part) {
+      // Žiadny part - zobraz súhrn zo všetkých partov
+      if (dbgEl) dbgEl.textContent = '⏳ Načítavam súhrn...';
+      try {
+        var parts = ['SUL','LIG','DRY','FLA','LHT'];
+        var total = 0, isoTotal = 0;
+        for (var pi = 0; pi < parts.length; pi++) {
+          var m = await db.collection('weldbook_meta').doc(parts[pi]).get();
+          if (m.exists) {
+            total += m.data().count || 0;
+            isoTotal += (m.data().isometrics || []).length;
+          }
+        }
+        if (dbgEl) dbgEl.textContent = total.toLocaleString() + ' zvarov / ' + isoTotal + ' izometrií (všetky časti)';
+      } catch(e) {
+        if (dbgEl) dbgEl.textContent = 'Vyber časť';
+      }
+      return;
+    }
     var iso = document.getElementById('wbFIso') ? document.getElementById('wbFIso').value : '';
     if (iso) await loadWbForIsometric(part, iso);
     else await loadWbIsoList(part);
   } catch(e) {
-    var el = document.getElementById('wbCount');
-    if (el) el.textContent = '❌ ' + e.message;
+    if (dbgEl) dbgEl.textContent = '❌ ' + e.message;
   } finally { isWbLoading = false; }
 }
 
