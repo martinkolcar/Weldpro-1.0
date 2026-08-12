@@ -2503,6 +2503,15 @@ if(wbEntry.isometric === originalFileName ||
    wbEntry.isometric.includes(originalFileName)){
 isThisIsometric = true;
 }
+// ✅ OPRAVA - porovnaj aj cez vyčistený názov (bez "XXX_PIPE ISOMETRIC," prefixu),
+// nech sa nájde zhoda aj keby sa vyššie porovnanie z akéhokoľvek dôvodu minulo
+if(!isThisIsometric){
+var cleanOriginal = splitIsometricName(originalFileName).isometric;
+if(cleanOriginal && (cleanOriginal === wbEntry.isometric ||
+   cleanOriginal.toLowerCase().trim() === String(wbEntry.isometric).toLowerCase().trim())){
+isThisIsometric = true;
+}
+}
 }
 
 if(isThisWeld && isThisIsometric){
@@ -6619,7 +6628,7 @@ weldBookEntry.dateWelding=dateInput;
 var splitName=splitIsometricName(originalFileName||'Unknown');
 addWeldToWeldBook({
 part:splitName.part,
-isometric:originalFileName,  // ✅ OPRAVA - použi originalFileName!
+isometric:splitName.isometric,  // ✅ OPRAVA - použi rozdelený názov (bez "SUL_PIPE ISOMETRIC," prefixu), nech sa priradí k existujúcemu riadku
 sheets:1,
 weldId:String(weld.displayNum),
 welderId:welderInput,
